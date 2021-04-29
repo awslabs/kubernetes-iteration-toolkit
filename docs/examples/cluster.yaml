@@ -1,0 +1,5 @@
+apiVersion: kit.k8s.amazonaws.com/v1alpha1
+kind: Cluster
+metadata:
+  name: example
+spec: {}
