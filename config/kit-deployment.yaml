@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kit
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kit
+  namespace: kit
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kit
+subjects:
+- kind: ServiceAccount
+  name: kit
+  namespace: kit
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kit-leader-election
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kit-leader-election
+subjects:
+- kind: ServiceAccount
+  name: kit
+  namespace: kit
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kit
+rules:
+- apiGroups:
+  - kit.k8s.amazonaws.com
+  resources:
+  - clusters
+  - clusters/status
+  verbs:
+  - create
+  - delete
+  - patch
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - create
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kit-leader-election
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps/status
+  verbs:
+  - get
+  - update
+  - patch
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kit
+  namespace: kit
+  labels:
+    control-plane: kit
+spec:
+  selector:
+    matchLabels:
+      control-plane: kit
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: kit
+    spec:
+      serviceAccountName: kit
+      containers:
+      - name: manager
+        image: ko://github.com/prateekgogia/kit/cmd/controller
+        resources:
+          requests:
+            cpu: 100m
+            memory: 20Mi
+      # https://github.com/aws/amazon-eks-pod-identity-webhook/issues/8#issuecomment-636888074
+      securityContext:
+        fsGroup: 1000
