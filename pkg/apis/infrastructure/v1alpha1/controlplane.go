@@ -18,25 +18,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterSpec
-type ClusterSpec struct {
+// ControlPlaneSpec
+type ControlPlaneSpec struct {
 }
 
-// Cluster is the Schema for the Clusters API
+// ControlPlane is the Schema for the ControlPlanes API
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-type Cluster struct {
+type ControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterSpec   `json:"spec,omitempty"`
-	Status ClusterStatus `json:"status,omitempty"`
+	Spec   ControlPlaneSpec   `json:"spec,omitempty"`
+	Status ControlPlaneStatus `json:"status,omitempty"`
 }
 
-// ClusterList contains a list of Cluster
+// ControlPlaneList contains a list of ControlPlane
 // +kubebuilder:object:root=true
-type ClusterList struct {
+type ControlPlaneList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Cluster `json:"items"`
+	Items           []ControlPlane `json:"items"`
 }

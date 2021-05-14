@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/aws"
+	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
 	infra "github.com/prateekgogia/kit/pkg/controllers/infrastructure/v1alpha1/controller"
 
@@ -47,16 +47,19 @@ func main() {
 		controllerruntimezap.StacktraceLevel(zapcore.DPanicLevel),
 	)
 	manager := controllers.NewManagerOrDie(controllerruntime.GetConfigOrDie(), controllerruntime.Options{
-		LeaderElection:     true,
-		LeaderElectionID:   "kit-leader-election",
-		Scheme:             scheme,
-		MetricsBindAddress: fmt.Sprintf(":%d", options.MetricsPort),
-		Port:               options.WebhookPort,
+		LeaderElection:          true,
+		LeaderElectionID:        "kit-leader-election",
+		Scheme:                  scheme,
+		MetricsBindAddress:      fmt.Sprintf(":%d", options.MetricsPort),
+		Port:                    options.WebhookPort,
+		LeaderElectionNamespace: "kit",
 	})
 
-	session := aws.NewSession()
+	session := awsprovider.NewSession()
 	err := manager.RegisterWebhooks().RegisterControllers(
-		infra.NewController(aws.EC2Client(session)),
+		infra.NewVPCController(awsprovider.EC2Client(session)),
+		infra.NewSubnetController(awsprovider.EC2Client(session)),
+		infra.NewInternetGWController(awsprovider.EC2Client(session)),
 	).Start(controllerruntime.SetupSignalHandler())
 	log.PanicIfError(err, "Unable to start manager")
 }

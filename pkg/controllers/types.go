@@ -16,38 +16,31 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"knative.dev/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
-// Controller is an interface implemented by kit custom resources.
+// Controller is an interface implemented by AWS resources like VPC, Subnet,
+// Security groups etc. required for a cluster creation
 type Controller interface {
+	// Name returns the name of controller for the resource (vpc, subnet) to
+	// identify which controller is running and to add info to the logs.
+	Name() string
 	// Reconcile hands a hydrated kubernetes resource to the controller for
 	// reconciliation. Any changes made to the resource's status are persisted
 	// after Reconcile returns, even if it returns an error.
-	Reconcile(context.Context, Object) error
-	// Interval returns an interval that the controller should wait before
-	// executing another reconciliation loop. If set to zero, will only execute
-	// on watch events or the global resync interval.
-	Interval() time.Duration
+	Reconcile(context.Context, Object) (reconcile.Result, error)
+	// Reconcile hands a hydrated kubernetes resource to the controller for
+	// cleanup. Any changes made to the resource's status are persisted after
+	// Finalize returns, even if it returns an error.
+	Finalize(context.Context, Object) (reconcile.Result, error)
 	// For returns a default instantiation of the resource and is injected by
 	// data from the API Server at the start of the reconciliation loop.
 	For() Object
-	// Owns returns a slice of resources that are watched by this resources.
-	// Watch events are triggered if owner references are set on the resource.
-	Owns() []Object
-}
-
-// NamedController allows controllers to optionally implement a Name() function which will be used instead of the
-// reconciled resource's name. This is useful when writing multiple controllers for a single resource type.
-type NamedController interface {
-	Controller
-	// Name returns the name of the controller
-	Name() string
 }
 
 // Webhook implements both a handler and path and can be attached to a webhook server.

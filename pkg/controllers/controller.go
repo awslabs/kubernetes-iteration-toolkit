@@ -45,18 +45,33 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	}
 	// 2. Copy object for merge patch base
 	persisted := resource.DeepCopyObject()
-	// 3. Reconcile
-	if err := c.Controller.Reconcile(ctx, resource); err != nil {
+	// 3. reconcile else finalize if object is deleted
+	result, err := c.reconcile(ctx, resource)
+	if err != nil {
 		resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
-		zap.S().Errorf("Controller failed to reconcile kind %s, %s",
-			resource.GetObjectKind().GroupVersionKind().Kind, err.Error())
-		return reconcile.Result{Requeue: true}, nil
-	} else {
-		resource.StatusConditions().MarkTrue(v1alpha1.Active)
+		zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
+		return reconcile.Result{Requeue: true}, err
 	}
+	zap.S().Debugf("Successfully synced %v resources for cluster %v", c.Name(), resource.GetName())
+	resource.StatusConditions().MarkTrue(v1alpha1.Active)
 	// 4. Update Status using a merge patch
 	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
-		return reconcile.Result{}, fmt.Errorf("Failed to persist changes to %s, %w", req.NamespacedName, err)
+		return reconcile.Result{}, fmt.Errorf("failed to persist changes to %s, %w", req.NamespacedName, err)
 	}
-	return reconcile.Result{RequeueAfter: c.Interval()}, nil
+	return result, nil
+}
+
+func (c *GenericController) reconcile(ctx context.Context, resource Object) (reconcile.Result, error) {
+	if resource.GetDeletionTimestamp() == nil {
+		result, err := c.Controller.Reconcile(ctx, resource)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("reconciling resource, %w", err)
+		}
+		return result, nil
+	}
+	result, err := c.Controller.Finalize(ctx, resource)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("finalizing resource, %w", err)
+	}
+	return result, nil
 }

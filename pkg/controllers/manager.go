@@ -50,12 +50,7 @@ func (m *GenericControllerManager) RegisterControllers(controllers ...Controller
 				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 			),
 		})
-		if namedController, ok := c.(NamedController); ok {
-			builder.Named(namedController.Name())
-		}
-		for _, resource := range c.Owns() {
-			builder = builder.Owns(resource)
-		}
+		builder.Named(c.Name())
 		log.PanicIfError(builder.Complete(&GenericController{Controller: c, Client: m.GetClient()}),
 			"Failed to register controller to manager for %s", controlledObject)
 		log.PanicIfError(controllerruntime.NewWebhookManagedBy(m).For(controlledObject).Complete(),

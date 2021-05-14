@@ -6,20 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.0
   creationTimestamp: null
-  name: clusters.kit.k8s.amazonaws.com
+  name: controlplanes.kit.k8s.amazonaws.com
 spec:
   group: kit.k8s.amazonaws.com
   names:
-    kind: Cluster
-    listKind: ClusterList
-    plural: clusters
-    singular: cluster
+    kind: ControlPlane
+    listKind: ControlPlaneList
+    plural: controlplanes
+    singular: controlplane
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Cluster is the Schema for the Clusters API
+        description: ControlPlane is the Schema for the ControlPlanes API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -30,13 +30,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClusterSpec
+            description: ControlPlaneSpec
             type: object
           status:
-            description: ClusterStatus defines the observed state of Cluster
+            description: ControlPlaneStatus defines the observed state of the ControlPlane of a cluster
             properties:
               conditions:
-                description: Conditions is the set of conditions required for this Cluster to create its objects, and indicates whether or not those conditions are met.
+                description: Conditions is the set of conditions required for this ControlPlane to create its objects, and indicates whether or not those conditions are met.
                 items:
                   description: 'Conditions defines a readiness condition for a Knative resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
                   properties:
@@ -63,6 +63,24 @@ spec:
                   - type
                   type: object
                 type: array
+              infrastructure:
+                description: Infrastructure is the status of the infrastructure for the ControlPlane. It gets updated by the infrastructure controller as the resources as are being created in AWS
+                properties:
+                  internetGateway:
+                    type: string
+                  natGateway:
+                    type: string
+                  privateSubnets:
+                    items:
+                      type: string
+                    type: array
+                  publicSubnets:
+                    items:
+                      type: string
+                    type: array
+                  vpcID:
+                    type: string
+                type: object
             type: object
         type: object
     served: true

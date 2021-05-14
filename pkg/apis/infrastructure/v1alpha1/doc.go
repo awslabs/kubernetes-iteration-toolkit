@@ -47,5 +47,5 @@ const (
 )
 
 func init() {
-	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
+	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})
 }
