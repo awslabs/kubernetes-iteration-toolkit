@@ -26,6 +26,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
+	"github.com/prateekgogia/kit/pkg/awsprovider"
+	"github.com/prateekgogia/kit/pkg/controllers"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )

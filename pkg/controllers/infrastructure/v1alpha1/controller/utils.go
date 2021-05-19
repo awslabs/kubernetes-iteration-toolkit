@@ -45,3 +45,12 @@ func ec2FilterFor(clusterName string) []*ec2.Filter {
 		Values: []*string{aws.String(clusterName)},
 	}}
 }
+
+func generateEC2Filter(clusterName string) []*ec2.Filter {
+	return []*ec2.Filter{
+		&ec2.Filter{
+			Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
+			Values: []*string{aws.String(clusterName)},
+		},
+	}
+}
