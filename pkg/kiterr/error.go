@@ -8,17 +8,23 @@ import (
 )
 
 var (
-	ErrWaitingForSubResources = errors.New("waiting for subresource to be ready")
+	WaitingForSubResources = errors.New("waiting for subresource to be ready")
 )
 
-func IsErrWaitingForSubResource(err error) bool {
+func SafeToIgnore(err error) bool {
+	return IsWaitingForSubResource(err) ||
+		IsDependencyExists(err) ||
+		IsWhileRemovingFinalizer(err)
+}
+
+func IsWaitingForSubResource(err error) bool {
 	if err != nil {
-		return errors.Is(err, ErrWaitingForSubResources)
+		return errors.Is(err, WaitingForSubResources)
 	}
 	return false
 }
 
-func IsErrSubnetExists(err error) bool {
+func IsSubnetExists(err error) bool {
 	if err != nil {
 		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
 			return aerr.Code() == "InvalidSubnet.Conflict"
@@ -27,7 +33,7 @@ func IsErrSubnetExists(err error) bool {
 	return false
 }
 
-func IsErrDependencyExists(err error) bool {
+func IsDependencyExists(err error) bool {
 	if err != nil {
 		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
 			return aerr.Code() == "DependencyViolation"
@@ -36,7 +42,7 @@ func IsErrDependencyExists(err error) bool {
 	return false
 }
 
-func IsErrWhileRemovingFinalizer(err error) bool {
+func IsWhileRemovingFinalizer(err error) bool {
 	if k := kubeerrors.APIStatus(nil); errors.As(err, &k) {
 		if k.Status().Reason == "Invalid" {
 			return true
