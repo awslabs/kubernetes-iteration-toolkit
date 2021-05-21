@@ -155,10 +155,14 @@ func (s *subnet) deleteSubnets(ctx context.Context, subnets []*ec2.Subnet) error
 
 // getSubnets from AWS for the control plane
 func (s *subnet) getSubnets(ctx context.Context, clusterName string) ([]*ec2.Subnet, error) {
+	return getSubnets(ctx, s.ec2api, clusterName)
+}
+
+func getSubnets(ctx context.Context, ec2api *awsprovider.EC2, clusterName string) ([]*ec2.Subnet, error) {
 	input := &ec2.DescribeSubnetsInput{
 		Filters: ec2FilterFor(clusterName),
 	}
-	output, err := s.ec2api.DescribeSubnetsWithContext(ctx, input)
+	output, err := ec2api.DescribeSubnetsWithContext(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("describing subnet, %w", err)
 	}

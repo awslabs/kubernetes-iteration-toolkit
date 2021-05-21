@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
@@ -44,4 +45,29 @@ func ec2FilterFor(clusterName string) []*ec2.Filter {
 		Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
 		Values: []*string{aws.String(clusterName)},
 	}}
+}
+
+// TODO fix this naming
+func generateAutoScalingTags(svcName, clusterName string) []*autoscaling.Tag {
+	return []*autoscaling.Tag{
+		&autoscaling.Tag{
+			Key:               aws.String(TagKeyNameForAWSResources),
+			Value:             aws.String(clusterName),
+			PropagateAtLaunch: aws.Bool(true),
+		},
+		&autoscaling.Tag{
+			Key:               aws.String("Name"),
+			Value:             aws.String(svcName),
+			PropagateAtLaunch: aws.Bool(true),
+		},
+	}
+}
+
+// TODO get all AZs for a region from an API
+func availabilityZonesForRegion(region string) []string {
+	azs := []string{}
+	for _, azPrefix := range []string{"a", "b", "c"} {
+		azs = append(azs, fmt.Sprintf(region+azPrefix))
+	}
+	return azs
 }

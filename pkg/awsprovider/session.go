@@ -23,7 +23,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"github.com/awslabs/karpenter/pkg/utils/project"
 )
@@ -60,4 +62,20 @@ type EC2 struct {
 
 func EC2Client(sess *session.Session) *EC2 {
 	return &EC2{EC2: ec2.New(sess)}
+}
+
+type IAM struct {
+	*iam.IAM
+}
+
+func IAMClient(sess *session.Session) *IAM {
+	return &IAM{IAM: iam.New(sess)}
+}
+
+type AutoScaling struct {
+	*autoscaling.AutoScaling
+}
+
+func AutoScalingClient(sess *session.Session) *AutoScaling {
+	return &AutoScaling{AutoScaling: autoscaling.New(sess)}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
@@ -46,13 +47,18 @@ func main() {
 		controllerruntimezap.ConsoleEncoder(),
 		controllerruntimezap.StacktraceLevel(zapcore.DPanicLevel),
 	)
+	renewDeadline := time.Second * 3
+	leaseDuration := time.Second * 4
 	manager := controllers.NewManagerOrDie(controllerruntime.GetConfigOrDie(), controllerruntime.Options{
-		LeaderElection:          true,
-		LeaderElectionID:        "kit-leader-election",
-		Scheme:                  scheme,
-		MetricsBindAddress:      fmt.Sprintf(":%d", options.MetricsPort),
-		Port:                    options.WebhookPort,
-		LeaderElectionNamespace: "kit",
+		LeaderElection:                true,
+		LeaderElectionID:              "kit-leader-election",
+		LeaseDuration:                 &leaseDuration,
+		RenewDeadline:                 &renewDeadline,
+		LeaderElectionReleaseOnCancel: true,
+		Scheme:                        scheme,
+		MetricsBindAddress:            fmt.Sprintf(":%d", options.MetricsPort),
+		Port:                          options.WebhookPort,
+		LeaderElectionNamespace:       "kit",
 	})
 
 	session := awsprovider.NewSession()
@@ -61,6 +67,18 @@ func main() {
 		infra.NewVPCController(awsprovider.EC2Client(session)),
 		infra.NewSubnetController(awsprovider.EC2Client(session)),
 		infra.NewInternetGWController(awsprovider.EC2Client(session)),
+		infra.NewElasticIPController(awsprovider.EC2Client(session)),
+		infra.NewNatGWController(awsprovider.EC2Client(session)),
+		infra.NewRouteTableController(awsprovider.EC2Client(session)),
+		infra.NewSecurityGroupController(awsprovider.EC2Client(session)),
+		infra.NewIAMRoleController(awsprovider.IAMClient(session)),
+		infra.NewIAMProfileController(awsprovider.IAMClient(session)),
+		infra.NewIAMPolicyController(awsprovider.IAMClient(session)),
+		infra.NewLaunchTemplateController(awsprovider.EC2Client(session)),
+		infra.NewAutoScalingGroupController(
+			awsprovider.EC2Client(session),
+			awsprovider.AutoScalingClient(session),
+		),
 	).Start(controllerruntime.SetupSignalHandler())
 	log.PanicIfError(err, "Unable to start manager")
 }
