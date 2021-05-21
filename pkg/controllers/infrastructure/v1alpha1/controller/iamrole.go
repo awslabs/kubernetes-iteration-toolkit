@@ -79,23 +79,23 @@ func (i *iamRole) Reconcile(ctx context.Context, object controllers.Object) (rec
 	// Create desired roles if not exist
 	for _, roleName := range desiredRoles {
 		role, err := i.getRole(ctx, roleName)
-		if kiterr.IsErrIAMResourceNotFound(err) {
+		if kiterr.IsIAMResourceNotFound(err) {
 			// Create role in IAM
 			role, err := i.iam.CreateRole(&iam.CreateRoleInput{
 				AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
 				RoleName:                 aws.String(roleName),
 			})
 			if err != nil {
-				return resourceReconcileFailed, fmt.Errorf("creating role, %w", err)
+				return ResourceFailedProgressing, fmt.Errorf("creating role, %w", err)
 			}
 			zap.S().Infof("Successfully created role %v for cluster %v", *role.Role.RoleName, controlPlane.Name)
 			continue
 		} else if err != nil {
-			return resourceReconcileFailed, fmt.Errorf("getting role, %w", err)
+			return ResourceFailedProgressing, fmt.Errorf("getting role, %w", err)
 		}
 		zap.S().Debugf("Successfully discovered role %v for cluster %v", *role.Role.RoleName, controlPlane.Name)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 // Finalize deletes the resource from AWS
@@ -106,18 +106,17 @@ func (i *iamRole) Finalize(ctx context.Context, object controllers.Object) (reco
 		fmt.Sprintf(ETCDInstanceRoleName, controlPlane.Name),
 	}
 	for _, roleName := range desiredRoles {
-		if _, err := i.getRole(ctx, roleName); err != nil && kiterr.IsErrIAMResourceNotFound(err) {
+		if _, err := i.getRole(ctx, roleName); err != nil && kiterr.IsIAMResourceNotFound(err) {
 			continue
 		}
 		if _, err := i.iam.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
 			RoleName: aws.String(roleName),
 		}); err != nil {
-			// zap.S().Infof("Failed to delete err", err)
-			return resourceReconcileFailed, err
+			return ResourceFailedProgressing, err
 		}
 		zap.S().Infof("Successfully deleted role %s", roleName)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceTerminated, nil
 }
 
 func (i *iamRole) getRole(ctx context.Context, roleName string) (*iam.GetRoleOutput, error) {

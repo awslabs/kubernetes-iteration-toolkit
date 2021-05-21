@@ -54,17 +54,17 @@ func (e *elasticIP) Reconcile(ctx context.Context, object controllers.Object) (r
 	// 1. Check if the elastic IP for this cluster already exists in AWS
 	eip, err := e.getElasticIP(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting elastic-ip, %w", err)
+		return ResourceFailedProgressing, fmt.Errorf("getting elastic-ip, %w", err)
 	}
 	// 2. create an elastic-ip in AWS if required
 	if eip == nil {
 		if _, err := e.createElasticIP(ctx, controlPlane.Name); err != nil {
-			return resourceReconcileFailed, fmt.Errorf("creating elastic-ip, %w", err)
+			return ResourceFailedProgressing, fmt.Errorf("creating elastic-ip, %w", err)
 		}
 	} else {
 		zap.S().Debugf("Successfully discovered elastic-ip %v for cluster %v", *eip.AllocationId, controlPlane.Name)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 // Finalize deletes the resource from AWS
@@ -72,9 +72,9 @@ func (e *elasticIP) Finalize(ctx context.Context, object controllers.Object) (re
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	// TODO check if we need to disassociate elastic IP from instance
 	if err := e.deleteElasticIP(ctx, controlPlane.Name); err != nil {
-		return resourceReconcileFailed, err
+		return ResourceFailedProgressing, err
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceTerminated, nil
 }
 
 func (e *elasticIP) createElasticIP(ctx context.Context, clusterName string) (*ec2.AllocateAddressOutput, error) {
@@ -91,7 +91,7 @@ func (e *elasticIP) createElasticIP(ctx context.Context, clusterName string) (*e
 func (e *elasticIP) deleteElasticIP(ctx context.Context, clusterName string) error {
 	eip, err := e.getElasticIP(ctx, clusterName)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting elastic IP, %w", err)
 	}
 	if eip == nil || aws.StringValue(eip.AllocationId) == "" {
 		return nil
@@ -99,7 +99,7 @@ func (e *elasticIP) deleteElasticIP(ctx context.Context, clusterName string) err
 	if _, err := e.ec2api.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{
 		AllocationId: eip.AllocationId,
 	}); err != nil {
-		return err
+		return fmt.Errorf("failed to release elastic IP, %w", err)
 	}
 	zap.S().Infof("Successfully deleted elastic-ip %v for cluster %v", *eip.AllocationId, clusterName)
 	return nil
@@ -111,7 +111,7 @@ func (e *elasticIP) getElasticIP(ctx context.Context, clusterName string) (*ec2.
 
 func getElasticIP(ctx context.Context, ec2api *awsprovider.EC2, clusterName string) (*ec2.Address, error) {
 	output, err := ec2api.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{
-		Filters: generateEC2Filter(clusterName),
+		Filters: ec2FilterFor(clusterName),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing elastic-ip, %w", err)

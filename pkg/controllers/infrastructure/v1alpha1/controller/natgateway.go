@@ -55,12 +55,12 @@ func (n *natGateway) Reconcile(ctx context.Context, object controllers.Object) (
 	// 1. Check if the Nat gateway exists in AWS
 	natGW, err := n.getNatGateway(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting nat-gateway, %w", err)
+		return ResourceFailedProgressing, fmt.Errorf("getting nat-gateway, %w", err)
 	}
 	// 2. create a nat-gateway in AWS if required
 	if natGW == nil || aws.StringValue(natGW.NatGatewayId) == "" {
 		if natGW, err = n.createNatGateway(ctx, controlPlane); err != nil {
-			return resourceReconcileFailed, fmt.Errorf("creating nat-gateway, %w", err)
+			return ResourceFailedProgressing, fmt.Errorf("creating nat-gateway, %w", err)
 		}
 	} else {
 		zap.S().Debugf("Successfully discovered nat-gateway %v for cluster %v", *natGW.NatGatewayId, controlPlane.Name)
@@ -70,17 +70,17 @@ func (n *natGateway) Reconcile(ctx context.Context, object controllers.Object) (
 		natGWID = aws.StringValue(natGW.NatGatewayId)
 	}
 	controlPlane.Status.Infrastructure.NatGatewayID = natGWID
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 // Finalize deletes the resource from AWS
 func (n *natGateway) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	if err := n.deleteNatGateway(ctx, controlPlane.Name); err != nil {
-		return resourceReconcileFailed, err
+		return ResourceFailedProgressing, err
 	}
 	controlPlane.Status.Infrastructure.NatGatewayID = ""
-	return resourceReconcileSucceeded, nil
+	return ResourceTerminated, nil
 }
 
 func (n *natGateway) createNatGateway(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (*ec2.NatGateway, error) {
@@ -144,7 +144,7 @@ func (n *natGateway) getNatGateway(ctx context.Context, clusterName string) (*ec
 
 func getNatGateway(ctx context.Context, ec2api *awsprovider.EC2, clusterName string) (*ec2.NatGateway, error) {
 	output, err := ec2api.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{
-		Filter: generateEC2Filter(clusterName),
+		Filter: ec2FilterFor(clusterName),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing nat-gateway, %w", err)

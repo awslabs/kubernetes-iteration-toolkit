@@ -74,7 +74,10 @@ func main() {
 		infra.NewIAMRoleController(awsprovider.IAMClient(session)),
 		infra.NewIAMProfileController(awsprovider.IAMClient(session)),
 		infra.NewIAMPolicyController(awsprovider.IAMClient(session)),
-		infra.NewLaunchTemplateController(awsprovider.EC2Client(session)),
+		infra.NewLaunchTemplateController(
+			awsprovider.EC2Client(session),
+			awsprovider.SSMClient(session),
+		),
 		infra.NewAutoScalingGroupController(
 			awsprovider.EC2Client(session),
 			awsprovider.AutoScalingClient(session),

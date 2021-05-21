@@ -62,19 +62,19 @@ func (i *iamProfile) Reconcile(ctx context.Context, object controllers.Object) (
 	// Create desired profiles if not exist
 	for profileName := range desiredProfilesRolesMapping {
 		profile, err := i.getInstanceProfile(ctx, profileName)
-		if kiterr.IsErrIAMResourceNotFound(err) {
+		if kiterr.IsIAMResourceNotFound(err) {
 			// Create profile in IAM
 			result, err := i.iam.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
 				InstanceProfileName: aws.String(profileName),
 			})
 			if err != nil {
-				return resourceReconcileFailed, fmt.Errorf("creating profile, %w", err)
+				return ResourceFailedProgressing, fmt.Errorf("creating profile, %w", err)
 			}
 			zap.S().Infof("Successfully created instance profile %v", *result.InstanceProfile.InstanceProfileName)
 			actualProfilesRolesMapping[profileName] = result.InstanceProfile.Roles
 			continue
 		} else if err != nil {
-			return resourceReconcileFailed, fmt.Errorf("getting instance profile, %w", err)
+			return ResourceFailedProgressing, fmt.Errorf("getting instance profile, %w", err)
 		}
 		actualProfilesRolesMapping[profileName] = profile.InstanceProfile.Roles
 		zap.S().Debugf("Successfully discovered profile %v for cluster %v", *profile.InstanceProfile.InstanceProfileName, controlPlane.Name)
@@ -89,14 +89,14 @@ func (i *iamProfile) Reconcile(ctx context.Context, object controllers.Object) (
 		if _, err := i.iam.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
 			RoleName:            aws.String(roleName),
-		}); err != nil && kiterr.IsErrIAMResourceNotFound(err) { //if role is not created yet
-			return resourceReconcileFailed, nil
+		}); err != nil && kiterr.IsIAMResourceNotFound(err) { //if role is not created yet
+			return WaitingForSubResource, nil
 		} else if err != nil {
-			return resourceReconcileFailed, fmt.Errorf("adding role to instance profile, %w", err)
+			return ResourceFailedProgressing, fmt.Errorf("adding role to instance profile, %w", err)
 		}
 		zap.S().Debugf("Successfully added role %v to instance profile %v", roleName, profileName)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 // Finalize deletes the resource from AWS
@@ -107,22 +107,22 @@ func (i *iamProfile) Finalize(ctx context.Context, object controllers.Object) (r
 			InstanceProfileName: aws.String(profileName),
 			RoleName:            aws.String(roleName),
 		}); err != nil {
-			if kiterr.IsErrIAMResourceNotFound(err) {
+			if kiterr.IsIAMResourceNotFound(err) {
 				continue
 			}
-			return resourceReconcileFailed, err
+			return ResourceFailedProgressing, err
 		}
 		if _, err := i.iam.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
 		}); err != nil {
-			if kiterr.IsErrIAMResourceNotFound(err) ||
-				kiterr.IsErrIAMResourceDependencyExists(err) {
+			if kiterr.IsIAMResourceNotFound(err) ||
+				kiterr.IsIAMResourceDependencyExists(err) {
 				continue
 			}
-			return resourceReconcileFailed, err
+			return ResourceFailedProgressing, err
 		}
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 func rolesContains(roles []*iam.Role, roleName string) bool {

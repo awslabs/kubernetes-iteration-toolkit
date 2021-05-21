@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
@@ -35,11 +36,12 @@ const (
 
 type launchTemplate struct {
 	ec2api *awsprovider.EC2
+	ssm    *awsprovider.SSM
 }
 
 // NewLaunchTemplateController returns a controller for managing LaunchTemplates in AWS
-func NewLaunchTemplateController(ec2api *awsprovider.EC2) *launchTemplate {
-	return &launchTemplate{ec2api: ec2api}
+func NewLaunchTemplateController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM) *launchTemplate {
+	return &launchTemplate{ec2api: ec2api, ssm: ssm}
 }
 
 // Name returns the name of the controller
@@ -59,7 +61,7 @@ func (l *launchTemplate) Reconcile(ctx context.Context, object controllers.Objec
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	templates, err := l.getLaunchTemplates(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting launch template, %w", err)
+		return ResourceFailedProgressing, fmt.Errorf("getting launch template, %w", err)
 	}
 	for _, templateName := range l.desiredLaunchTemplates(controlPlane.Name) {
 		if existingTemplateMatchesDesired(templates, templateName) { // TODO check if existing LT is same as desired LT
@@ -67,11 +69,11 @@ func (l *launchTemplate) Reconcile(ctx context.Context, object controllers.Objec
 			continue
 		}
 		if _, err := l.createLaunchTemplate(ctx, templateName, controlPlane.Name); err != nil {
-			return resourceReconcileFailed, fmt.Errorf("creating launch template, %w", err)
+			return ResourceFailedProgressing, fmt.Errorf("creating launch template, %w", err)
 		}
 		zap.S().Infof("Successfully created launch template %v for cluster %v", templateName, controlPlane.Name)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 // Finalize deletes the resource from AWS
@@ -79,18 +81,18 @@ func (l *launchTemplate) Finalize(ctx context.Context, object controllers.Object
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	launchTemplates, err := l.getLaunchTemplates(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting launch template, %w", err)
+		return ResourceFailedProgressing, fmt.Errorf("getting launch template, %w", err)
 	}
 	for _, launchTemplate := range launchTemplates {
 		_, err := l.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
 			LaunchTemplateName: launchTemplate.LaunchTemplateName,
 		})
 		if err != nil {
-			return resourceReconcileFailed, err
+			return ResourceFailedProgressing, err
 		}
 		zap.S().Infof("Successfully deleted launch template %v for cluster %v", *launchTemplate.LaunchTemplateName, controlPlane.Name)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceTerminated, nil
 }
 
 func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName, clusterName string) (*ec2.CreateLaunchTemplateOutput, error) {
@@ -101,6 +103,13 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName,
 	if securityGroupID == "" || instanceProfileName == "" {
 		return nil, fmt.Errorf("failed to find security group and profile ")
 	}
+	paramOutput, err := l.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
+		Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("getting ssm parameter, %w", err)
+	}
+	amiID := *paramOutput.Parameter.Value
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
 			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{
@@ -116,7 +125,7 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName,
 			},
 			KeyName:      aws.String("dev-account-manually-created-VMs"),
 			InstanceType: aws.String("t2.large"),
-			ImageId:      aws.String("ami-077e31c4939f6a2f3"),
+			ImageId:      aws.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
 				// Arn:  aws.String("arn:aws:iam::674320443449:instance-profile/cluster-foo-master-instance-profile"),
 				Name: aws.String(fmt.Sprintf(MasterInstanceProfileName, clusterName)),
@@ -191,7 +200,7 @@ func (l *launchTemplate) getLaunchTemplates(ctx context.Context, clusterName str
 
 func getLaunchTemplates(ctx context.Context, ec2api *awsprovider.EC2, clusterName string) ([]*ec2.LaunchTemplate, error) {
 	output, err := ec2api.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{
-		Filters: generateEC2Filter(clusterName),
+		Filters: ec2FilterFor(clusterName),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing launch template, %w", err)

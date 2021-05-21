@@ -58,25 +58,25 @@ func (r *routeTable) Reconcile(ctx context.Context, object controllers.Object) (
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	routeTables, err := r.getRouteTables(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting route tables, %w", err)
+		return ResourceFailedProgressing, fmt.Errorf("getting route tables, %w", err)
 	}
 	if len(routeTables) < desiredRouteTableCount {
 		if err := r.createRouteTables(ctx, controlPlane); err != nil {
-			return resourceReconcileFailed, err
+			return ResourceFailedProgressing, err
 		}
 	} else {
 		zap.S().Debugf("Successfully discovered route-tables for cluster %v", controlPlane.Name)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 // Finalize deletes the resource from AWS
 func (r *routeTable) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	if err := r.deleteRouteTable(ctx, controlPlane.Name); err != nil {
-		return resourceReconcileFailed, err
+		return ResourceFailedProgressing, err
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 func (r *routeTable) createRouteTables(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
@@ -192,7 +192,7 @@ func (r *routeTable) deleteRouteTable(ctx context.Context, clusterName string) e
 
 func (r *routeTable) getRouteTables(ctx context.Context, clusterName string) ([]*ec2.RouteTable, error) {
 	output, err := r.ec2api.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
-		Filters: generateEC2Filter(clusterName),
+		Filters: ec2FilterFor(clusterName),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing route tables, %w", err)

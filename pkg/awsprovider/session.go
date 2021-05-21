@@ -26,6 +26,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"github.com/awslabs/karpenter/pkg/utils/project"
 )
@@ -78,4 +80,12 @@ type AutoScaling struct {
 
 func AutoScalingClient(sess *session.Session) *AutoScaling {
 	return &AutoScaling{AutoScaling: autoscaling.New(sess)}
+}
+
+type SSM struct {
+	ssmiface.SSMAPI
+}
+
+func SSMClient(sess *session.Session) *SSM {
+	return &SSM{SSMAPI: ssm.New(sess)}
 }

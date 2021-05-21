@@ -61,7 +61,7 @@ func (a *autoScalingGroup) Reconcile(ctx context.Context, object controllers.Obj
 	asgNames := a.desiredAutoScalingGroups(controlPlane.Name)
 	asgs, err := a.getAutoScalingGroup(ctx, asgNames)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting autoscaling groups, %w", err)
+		return ResourceFailedProgressing, fmt.Errorf("getting autoscaling groups, %w", err)
 	}
 	for _, asgName := range asgNames {
 		if a.existingASGMatchesDesrired(asgs, asgName) {
@@ -69,11 +69,11 @@ func (a *autoScalingGroup) Reconcile(ctx context.Context, object controllers.Obj
 			continue
 		}
 		if err := a.createAutoScalingGroup(ctx, asgName, controlPlane.Name); err != nil {
-			return resourceReconcileFailed, err
+			return ResourceFailedProgressing, err
 		}
 		zap.S().Infof("Successfully created autoscaling group %v for cluster %v", asgName, controlPlane.Name)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceCreated, nil
 }
 
 // Finalize deletes the resource from AWS
@@ -82,19 +82,21 @@ func (a *autoScalingGroup) Finalize(ctx context.Context, object controllers.Obje
 	asgNames := a.desiredAutoScalingGroups(controlPlane.Name)
 	existingASGs, err := a.getAutoScalingGroup(ctx, asgNames)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting auto-scaling-groups, %w", err)
+		return ResourceFailedProgressing, fmt.Errorf("getting auto-scaling-groups, %w", err)
 	}
-	zap.S().Info("existingASGs are ", existingASGs)
 	for _, asg := range existingASGs {
+		if asg.Status == aws.String("Delete in progress") {
+			continue
+		}
 		if _, err := a.autoscalingAPI.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
 			AutoScalingGroupName: asg.AutoScalingGroupName,
 			ForceDelete:          aws.Bool(true),
 		}); err != nil {
-			return resourceReconcileFailed, err
+			return ResourceFailedProgressing, err
 		}
 		zap.S().Infof("Successfully deleted auto-scaling-group %v", *asg.AutoScalingGroupName)
 	}
-	return resourceReconcileSucceeded, nil
+	return ResourceTerminated, nil
 }
 
 func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, name, clusterName string) error {

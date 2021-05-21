@@ -90,17 +90,25 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object) (*re
 }
 
 func (c *GenericController) addFinalizerIfNotExists(ctx context.Context, resource Object) error {
-	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
-	for _, finalizer := range resource.GetFinalizers() {
-		if finalizer == finalizerStr {
-			return nil
-		}
+	if c.finalizerExists(resource) {
+		return nil
 	}
+	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
 	finalizers := append(resource.GetFinalizers(), finalizerStr)
 	if err := c.patchFinalizersToResource(ctx, resource, finalizers); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (c *GenericController) finalizerExists(resource Object) bool {
+	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
+	for _, finalizer := range resource.GetFinalizers() {
+		if finalizer == finalizerStr {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *GenericController) removeFinalizer(ctx context.Context, resource Object) error {
