@@ -27,3 +27,6 @@ EOF
 KIT operator will use the defaults and provision a kubernetes control plane in a new VPC, all the AWS resources created by KIT are tagged in AWS with `kit.k8s.amazonaws.com/cluster-name=foo`
 
 > TODO add instructions to be able to configure control plane parameters.
+
+
+kubeadm init --control-plane-endpoint "foo-lb-7174398f05be7a01.elb.us-east-2.amazonaws.com:6443" --upload-certs --image-repository public.ecr.aws/eks-distro/kubernetes --kubernetes-version v1.19.8-eks-1-19-4

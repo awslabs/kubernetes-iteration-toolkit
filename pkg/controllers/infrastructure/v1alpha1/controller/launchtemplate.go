@@ -112,23 +112,21 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName,
 	amiID := *paramOutput.Parameter.Value
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
-			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{
-				&ec2.LaunchTemplateBlockDeviceMappingRequest{
-					DeviceName: aws.String("/dev/xvda"),
-					Ebs: &ec2.LaunchTemplateEbsBlockDeviceRequest{
-						DeleteOnTermination: aws.Bool(true),
-						Iops:                aws.Int64(3000),
-						VolumeSize:          aws.Int64(40),
-						VolumeType:          aws.String("gp3"),
-					},
-				},
+			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{{
+				DeviceName: aws.String("/dev/xvda"),
+				Ebs: &ec2.LaunchTemplateEbsBlockDeviceRequest{
+					DeleteOnTermination: aws.Bool(true),
+					Iops:                aws.Int64(3000),
+					VolumeSize:          aws.Int64(40),
+					VolumeType:          aws.String("gp3"),
+				}},
 			},
 			KeyName:      aws.String("dev-account-manually-created-VMs"),
 			InstanceType: aws.String("t2.large"),
 			ImageId:      aws.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
 				// Arn:  aws.String("arn:aws:iam::674320443449:instance-profile/cluster-foo-master-instance-profile"),
-				Name: aws.String(fmt.Sprintf(MasterInstanceProfileName, clusterName)),
+				Name: aws.String(fmt.Sprintf(instanceProfileName, clusterName)),
 			},
 			Monitoring: &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 			// SecurityGroupIds: []*string{aws.String("sg-0c44ff3e16005d370")},
@@ -226,6 +224,7 @@ yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/li
 
 sudo swapoff -a
 sudo yum install -y docker
+sudo yum install -y conntrack-tools
 sudo systemctl start docker
 sudo systemctl enable docker
 
@@ -241,36 +240,39 @@ sudo docker tag public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.14-eks-1-18-1 public
 sudo setenforce 0
 sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
 
-echo "br_netfilter" > /etc/modules-load.d/k8s.conf
-
-sudo mkdir -p /var/lib/kubelet
-cat > /var/lib/kubelet/kubeadm-flags.env <<EOF
-KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd —network-plugin=cni —pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:3.2"
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+br_netfilter
 EOF
 
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+sudo sysctl --system
+
+cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+exclude=kubelet kubeadm kubectl
+EOF
+
+sudo yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+
 cd /usr/bin
+sudo rm kubelet kubeadm kubectl
 sudo wget https://distro.eks.amazonaws.com/kubernetes-1-18/releases/1/artifacts/kubernetes/v1.18.9/bin/linux/amd64/kubelet; \
 sudo wget https://distro.eks.amazonaws.com/kubernetes-1-18/releases/1/artifacts/kubernetes/v1.18.9/bin/linux/amd64/kubeadm; \
 sudo wget https://distro.eks.amazonaws.com/kubernetes-1-18/releases/1/artifacts/kubernetes/v1.18.9/bin/linux/amd64/kubectl
 chmod +x kubeadm kubectl kubelet
 
-
-cat > /usr/lib/systemd/system/kubelet.service <<EOF
-[Unit]
-Description=kubelet: The Kubernetes Node Agent
-Documentation=https://kubernetes.io/docs/
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-ExecStart=/usr/bin/kubelet
-Restart=always
-StartLimitInterval=0
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-
+sudo mkdir -p /var/lib/kubelet
+cat > /var/lib/kubelet/kubeadm-flags.env <<EOF
+KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd —network-plugin=cni —pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:3.2"
 EOF
 
 sudo systemctl enable --now kubelet`
