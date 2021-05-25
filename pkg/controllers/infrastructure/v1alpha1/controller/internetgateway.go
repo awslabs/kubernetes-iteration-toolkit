@@ -18,11 +18,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
+	"github.com/prateekgogia/kit/pkg/errors"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -54,17 +56,17 @@ func (i *internetGateway) Reconcile(ctx context.Context, object controllers.Obje
 	// 1. Get the VPC ID for the control plane
 	vpcID := controlPlane.Status.Infrastructure.VPCID
 	if vpcID == "" {
-		return resourceReconcileFailed, fmt.Errorf("waiting to create internet-gateway, vpc does not exist")
+		return Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
 	}
 	// 2. Check if the internet gateway exists in AWS
 	igw, err := i.getInternetGateway(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting internet-gateway, %w", err)
+		return Waiting, fmt.Errorf("getting internet-gateway, %w", err)
 	}
 	// 3. create an internet-gateway in AWS if required
 	if igw == nil || aws.StringValue(igw.InternetGatewayId) == "" {
 		if igw, err = i.createInternetGateway(ctx, controlPlane.Name); err != nil {
-			return resourceReconcileFailed, fmt.Errorf("creating internet-gateway, %w", err)
+			return reconcile.Result{}, fmt.Errorf("creating internet-gateway, %w", err)
 		}
 	} else {
 		zap.S().Debugf("Successfully discovered internet-gateway %v for cluster %v", *igw.InternetGatewayId, controlPlane.Name)
@@ -72,23 +74,46 @@ func (i *internetGateway) Reconcile(ctx context.Context, object controllers.Obje
 	// 4. Check igw is attached to the desired VPC ID
 	if len(igw.Attachments) == 0 || *igw.Attachments[0].VpcId != vpcID {
 		if err := i.attachInternetGWToVPC(ctx, *igw.InternetGatewayId, vpcID); err != nil {
-			return resourceReconcileFailed, fmt.Errorf("attaching internet-gateway, %w", err)
+			return reconcile.Result{}, fmt.Errorf("attaching internet-gateway, %w", err)
 		}
 	}
 	// 4. Sync resource status with the controlPlane status object in Kubernetes
-	i.syncStatus(ctx, controlPlane)
-	return resourceReconcileSucceeded, nil
+	controlPlane.Status.Infrastructure.InternetGatewayID = *igw.InternetGatewayId
+	return Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (i *internetGateway) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
-	// TODO check if we need to detach from VPC before calling delete
-	if err := i.deleteInternetGateway(ctx, controlPlane.Name); err != nil {
-		return resourceReconcileFailed, err
+	// 1. Get the VPC ID for the cluster, if not found return success
+	vpcID := controlPlane.Status.Infrastructure.VPCID
+	if vpcID == "" {
+		return Terminated, nil
 	}
-	i.syncStatus(ctx, controlPlane)
-	return resourceReconcileSucceeded, nil
+	// 2. Get the internet gateway ID for the control plane
+	igw, err := i.getInternetGateway(ctx, controlPlane.Name)
+	if err != nil {
+		return Waiting, err
+	}
+	if igw != nil && aws.StringValue(igw.InternetGatewayId) != "" {
+		// 3. Detach Internet Gateway from VPC
+		if _, err := i.ec2api.DetachInternetGatewayWithContext(
+			ctx, &ec2.DetachInternetGatewayInput{
+				InternetGatewayId: igw.InternetGatewayId,
+				VpcId:             aws.String(vpcID),
+			}); err != nil {
+			return reconcile.Result{}, err
+		}
+		// 4. Delete Internet Gateway
+		if _, err := i.ec2api.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
+			InternetGatewayId: igw.InternetGatewayId,
+		}); err != nil {
+			return reconcile.Result{}, err
+		}
+		zap.S().Infof("Successfully deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, controlPlane.Name)
+	}
+	controlPlane.Status.Infrastructure.InternetGatewayID = ""
+	return Terminated, nil
 }
 
 func (i *internetGateway) createInternetGateway(ctx context.Context, clusterName string) (*ec2.InternetGateway, error) {
@@ -113,33 +138,10 @@ func (i *internetGateway) attachInternetGWToVPC(ctx context.Context, igwID, vpcI
 	return nil
 }
 
-func (i *internetGateway) deleteInternetGateway(ctx context.Context, clusterName string) error {
-	igw, err := i.getInternetGateway(ctx, clusterName)
-	if err != nil {
-		return err
-	}
-	if igw == nil || *igw.InternetGatewayId == "" {
-		return nil
-	}
-	if _, err := i.ec2api.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
-		InternetGatewayId: aws.String(*igw.InternetGatewayId),
-	}); err != nil {
-		return err
-	}
-	zap.S().Infof("Deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, clusterName)
-	return nil
-}
-
 func (i *internetGateway) getInternetGateway(ctx context.Context, clusterName string) (*ec2.InternetGateway, error) {
-	input := &ec2.DescribeInternetGatewaysInput{
-		Filters: []*ec2.Filter{
-			&ec2.Filter{
-				Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
-				Values: []*string{aws.String(clusterName)},
-			},
-		},
-	}
-	output, err := i.ec2api.DescribeInternetGatewaysWithContext(ctx, input)
+	output, err := i.ec2api.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
+		Filters: ec2FilterFor(clusterName),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("describing internet-gateway, %w", err)
 	}
@@ -150,18 +152,4 @@ func (i *internetGateway) getInternetGateway(ctx context.Context, clusterName st
 		return nil, fmt.Errorf("expected to find one internet-gateway, but found %d", len(output.InternetGateways))
 	}
 	return output.InternetGateways[0], nil
-}
-
-// syncStatus syncs the status for internet-gateway in AWS with the controlPlane object status in Kubernetes
-func (i *internetGateway) syncStatus(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
-	igw, err := i.getInternetGateway(ctx, controlPlane.Name)
-	if err != nil {
-		zap.S().Errorf("Failed to sync internet-gateway status, %v", err)
-		return
-	}
-	igwID := ""
-	if igw != nil {
-		igwID = aws.StringValue(igw.InternetGatewayId)
-	}
-	controlPlane.Status.Infrastructure.InternetGatewayID = igwID
 }

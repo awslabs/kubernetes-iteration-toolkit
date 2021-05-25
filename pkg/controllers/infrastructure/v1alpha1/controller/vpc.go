@@ -54,8 +54,9 @@ func (v *vpc) Reconcile(ctx context.Context, object controllers.Object) (reconci
 	// 1. Get the VPC from AWS
 	vpc, err := v.getVPC(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, err
+		return reconcile.Result{}, err
 	}
+	vpcID := ""
 	// 2. If VPC doesn't exist, create a new VPC for this cluster
 	if vpc == nil || *vpc.VpcId == "" {
 		result, err := v.ec2api.CreateVpc(&ec2.CreateVpcInput{
@@ -63,35 +64,33 @@ func (v *vpc) Reconcile(ctx context.Context, object controllers.Object) (reconci
 			TagSpecifications: generateEC2Tags(v.Name(), controlPlane.Name),
 		})
 		if err != nil {
-			return resourceReconcileFailed, err
+			return reconcile.Result{}, err
 		}
-		zap.S().Infof("Successfully created VPC ID %v for cluster name %v", *result.Vpc.VpcId, controlPlane.Name)
+		vpcID = *result.Vpc.VpcId
+		zap.S().Infof("Successfully created VPC ID %v for cluster name %v", vpcID, controlPlane.Name)
 	} else {
+		vpcID = *vpc.VpcId
 		zap.S().Debugf("Successfully discovered VPC ID %v for cluster %v", *vpc.VpcId, controlPlane.Name)
 	}
 	// 3. Sync resource status with the controlPlane status object in Kubernetes
-	v.syncStatus(ctx, controlPlane)
-	return resourceReconcileSucceeded, nil
+	controlPlane.Status.Infrastructure.VPCID = vpcID
+	return Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (v *vpc) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	if err := v.deleteVPC(ctx, controlPlane.Name); err != nil {
-		return resourceReconcileFailed, err
+		return reconcile.Result{}, err
 	}
-	v.syncStatus(ctx, controlPlane)
-	return resourceReconcileSucceeded, nil
+	zap.S().Infof("Successfully deleted VPC for cluster %v", controlPlane.Name)
+	controlPlane.Status.Infrastructure.VPCID = ""
+	return Terminated, nil
 }
 
 func (v *vpc) getVPC(ctx context.Context, clusterName string) (*ec2.Vpc, error) {
 	input := &ec2.DescribeVpcsInput{
-		Filters: []*ec2.Filter{
-			&ec2.Filter{
-				Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
-				Values: []*string{aws.String(clusterName)},
-			},
-		},
+		Filters: ec2FilterFor(clusterName),
 	}
 	output, err := v.ec2api.DescribeVpcsWithContext(ctx, input)
 	if err != nil {
@@ -122,17 +121,4 @@ func (v *vpc) deleteVPC(ctx context.Context, clusterName string) error {
 		return fmt.Errorf("deleting vpc, %w", err)
 	}
 	return nil
-}
-
-func (v *vpc) syncStatus(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
-	vpc, err := v.getVPC(ctx, controlPlane.Name)
-	if err != nil {
-		zap.S().Errorf("Failed to sync VPC status, %v", err)
-		return
-	}
-	vpcID := ""
-	if vpc != nil {
-		vpcID = aws.StringValue(vpc.VpcId)
-	}
-	controlPlane.Status.Infrastructure.VPCID = vpcID
 }

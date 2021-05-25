@@ -18,12 +18,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
+	"github.com/prateekgogia/kit/pkg/errors"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -55,12 +56,12 @@ func (s *subnet) Reconcile(ctx context.Context, object controllers.Object) (reco
 	// 1. Get the VPC ID for the control plane status
 	vpcID := controlPlane.Status.Infrastructure.VPCID
 	if vpcID == "" {
-		return resourceReconcileFailed, fmt.Errorf("waiting to create subnets, vpc does not exist")
+		return Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
 	}
 	// 2. Check if subnets exists in AWS
 	subnets, err := s.getSubnets(ctx, controlPlane.Name)
 	if err != nil {
-		return resourceReconcileFailed, fmt.Errorf("getting subnets from AWS, %w", err)
+		return reconcile.Result{}, fmt.Errorf("getting subnets from AWS, %w", err)
 	}
 	// In future we might want to check the CIDRs for subnets to verify
 	expectedCount := len(s.availabilityZonesForRegion(*s.ec2api.Config.Region)) * 2
@@ -69,11 +70,11 @@ func (s *subnet) Reconcile(ctx context.Context, object controllers.Object) (reco
 		for i, az := range s.availabilityZonesForRegion(*s.ec2api.Config.Region) {
 			// create a private subnet
 			if err := s.createSubnet(ctx, false, controlPlane.Name, az, vpcID, privateSubnetCIDRs[i]); err != nil {
-				return resourceReconcileFailed, fmt.Errorf("creating private subnet, %w", err)
+				return reconcile.Result{}, fmt.Errorf("creating private subnet, %w", err)
 			}
 			// create a public subnet
 			if err := s.createSubnet(ctx, true, controlPlane.Name, az, vpcID, publicSubnetCIDRs[i]); err != nil {
-				return resourceReconcileFailed, fmt.Errorf("creating public subnet, %w", err)
+				return reconcile.Result{}, fmt.Errorf("creating public subnet, %w", err)
 			}
 		}
 	} else {
@@ -81,17 +82,24 @@ func (s *subnet) Reconcile(ctx context.Context, object controllers.Object) (reco
 	}
 	// 4. Sync resource status with the controlPlane status object in Kubernetes
 	s.syncStatus(ctx, controlPlane)
-	return resourceReconcileSucceeded, nil
+	return Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (s *subnet) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
-	if err := s.deleteSubnets(ctx, controlPlane.Name); err != nil {
-		return resourceReconcileFailed, err
+	subnets, err := s.getSubnets(ctx, controlPlane.Name)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if len(subnets) != 0 {
+		if err := s.deleteSubnets(ctx, subnets); err != nil {
+			return reconcile.Result{}, err
+		}
+		zap.S().Infof("Successfully deleted Subnets for cluster %v", controlPlane.Name)
 	}
 	s.syncStatus(ctx, controlPlane)
-	return resourceReconcileSucceeded, nil
+	return Terminated, nil
 }
 
 func (s *subnet) createSubnet(ctx context.Context, public bool, clusterName, az, vpcID, cidr string) error {
@@ -103,10 +111,8 @@ func (s *subnet) createSubnet(ctx context.Context, public bool, clusterName, az,
 	}
 	output, err := s.ec2api.CreateSubnetWithContext(ctx, input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			if aerr.Code() == "InvalidSubnet.Conflict" {
-				return nil
-			}
+		if errors.IsSubnetExists(err) {
+			return nil
 		}
 		return fmt.Errorf("creating subnet, %w", err)
 	}
@@ -134,11 +140,7 @@ func (s *subnet) availabilityZonesForRegion(region string) []string {
 	return azs
 }
 
-func (s *subnet) deleteSubnets(ctx context.Context, clusterName string) error {
-	subnets, err := s.getSubnets(ctx, clusterName)
-	if err != nil {
-		return nil
-	}
+func (s *subnet) deleteSubnets(ctx context.Context, subnets []*ec2.Subnet) error {
 	for _, subnet := range subnets {
 		if _, err := s.ec2api.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
 			SubnetId: subnet.SubnetId,
@@ -152,12 +154,7 @@ func (s *subnet) deleteSubnets(ctx context.Context, clusterName string) error {
 // getSubnets from AWS for the control plane
 func (s *subnet) getSubnets(ctx context.Context, clusterName string) ([]*ec2.Subnet, error) {
 	input := &ec2.DescribeSubnetsInput{
-		Filters: []*ec2.Filter{
-			&ec2.Filter{
-				Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
-				Values: []*string{aws.String(clusterName)},
-			},
-		},
+		Filters: ec2FilterFor(clusterName),
 	}
 	output, err := s.ec2api.DescribeSubnetsWithContext(ctx, input)
 	if err != nil {

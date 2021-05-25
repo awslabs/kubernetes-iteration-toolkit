@@ -33,24 +33,27 @@ var (
 	privateSubnetCIDRs = []string{"10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"}
 	publicSubnetCIDRs  = []string{"10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"}
 
-	resourceReconcileFailed    = reconcile.Result{RequeueAfter: 5 * time.Second}
-	resourceReconcileSucceeded = reconcile.Result{RequeueAfter: 30 * time.Second}
+	Waiting    = reconcile.Result{RequeueAfter: 5 * time.Second}
+	Created    = reconcile.Result{RequeueAfter: 60 * time.Second}
+	Terminated = reconcile.Result{}
 )
 
 func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {
-	return []*ec2.TagSpecification{
-		&ec2.TagSpecification{
-			ResourceType: aws.String(svcName),
-			Tags: []*ec2.Tag{
-				&ec2.Tag{
-					Key:   aws.String(TagKeyNameForAWSResources),
-					Value: aws.String(clusterName),
-				},
-				&ec2.Tag{
-					Key:   aws.String("Name"),
-					Value: aws.String(fmt.Sprintf("%s-%s", clusterName, svcName)),
-				},
-			},
-		},
-	}
+	return []*ec2.TagSpecification{{
+		ResourceType: aws.String(svcName),
+		Tags: []*ec2.Tag{{
+			Key:   aws.String(TagKeyNameForAWSResources),
+			Value: aws.String(clusterName),
+		}, {
+			Key:   aws.String("Name"),
+			Value: aws.String(fmt.Sprintf("%s-%s", clusterName, svcName)),
+		}},
+	}}
+}
+
+func ec2FilterFor(clusterName string) []*ec2.Filter {
+	return []*ec2.Filter{{
+		Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
+		Values: []*string{aws.String(clusterName)},
+	}}
 }
