@@ -41,25 +41,26 @@ type ControlPlaneList struct {
 // master and etcd are configured to run. By default, KIT uses all the default
 // values and ControlPlaneSpec can be empty.
 type ControlPlaneSpec struct {
-	VPCCidr string     `json:"vpccidr,omitempty"`
-	Master  MasterSpec `json:"master,omitempty"`
-	Etcd    ETCDSpec   `json:"etcd,omitempty"`
+	VPCCidr           string     `json:"vpccidr,omitempty"`
+	KubernetesVersion string     `json:"KubernetesVersion,omitempty"`
+	Master            MasterSpec `json:"master,omitempty"`
+	Etcd              ETCDSpec   `json:"etcd,omitempty"`
 }
 
 // MasterSpec provides a way for the user to configure master instances and
 // custom flags for components running on master nodes like apiserver, KCM and
 // scheduler.
 type MasterSpec struct {
-	InfraSpec                 `json:"infrastructure,omitempty"`
-	KubeSchedulerSpec         *Config `json:"scheduler,omitempty"`
-	KubeControllerManagerSpec *Config `json:"controllerManager,omitempty"`
-	KubeAPIServerSpec         *Config `json:"apiServer,omitempty"`
+	Instances         `json:"instances,omitempty"`
+	Scheduler         *Config `json:"scheduler,omitempty"`
+	ControllerManager *Config `json:"controllerManager,omitempty"`
+	APIServer         *Config `json:"apiServer,omitempty"`
 }
 
 // ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
 type ETCDSpec struct {
-	InfraSpec `json:"infrastructure,omitempty"`
-	ETCDSpec  *Config `json:"vpccidr,omitempty"`
+	Instances `json:"instances,omitempty"`
+	*Config   `json:",inline"`
 }
 
 // Config provides a generic way to pass in args and images to master and etcd
@@ -70,16 +71,14 @@ type Config struct {
 	Image string            `json:"image,omitempty"`
 }
 
-// InfraSpec denotes how the infrastructure of a particular components looks
+// Instances denotes how the infrastructure of a particular components looks
 // like, if a user wants to use a specific AMI ID, they can provide this in the
-// InfraSpec for the corresponding component.
-type InfraSpec struct {
+// Instances for the corresponding component.
+type Instances struct {
 	Zones            []string `json:"zones,omitempty"`
 	PrivateSubnets   []string `json:"privateSubnets,omitempty"`
-	PublicSubnets    []string `json:"publicSubnets,omitempty"`
-	AMIID            string   `json:"ami,omitempty"`
-	Version          string   `json:"version,omitempty"`
-	InstanceType     string   `json:"instanceType,omitempty"`
-	InstanceCount    int      `json:"instanceCount,omitempty"`
+	AMI              string   `json:"ami,omitempty"`
+	Type             string   `json:"instanceType,omitempty"`
+	Count            int      `json:"instanceCount,omitempty"`
 	LoadBalancerType string   `json:"loadbalancerType,omitempty"`
 }

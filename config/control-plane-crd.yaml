@@ -32,11 +32,19 @@ spec:
           spec:
             description: ControlPlaneSpec specifies the shape of the cluster and how components like master and etcd are configured to run. By default, KIT uses all the default values and ControlPlaneSpec can be empty.
             properties:
+              KubernetesVersion:
+                type: string
               etcd:
                 description: ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
                 properties:
-                  infrastructure:
-                    description: InfraSpec denotes how the infrastructure of a particular components looks like, if a user wants to use a specific AMI ID, they can provide this in the InfraSpec for the corresponding component.
+                  args:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  image:
+                    type: string
+                  instances:
+                    description: Instances denotes how the infrastructure of a particular components looks like, if a user wants to use a specific AMI ID, they can provide this in the Instances for the corresponding component.
                     properties:
                       ami:
                         type: string
@@ -50,26 +58,10 @@ spec:
                         items:
                           type: string
                         type: array
-                      publicSubnets:
-                        items:
-                          type: string
-                        type: array
-                      version:
-                        type: string
                       zones:
                         items:
                           type: string
                         type: array
-                    type: object
-                  vpccidr:
-                    description: Config provides a generic way to pass in args and images to master and etcd components. If a user wants to change the QPS they need to provide the following flag with the desired value -`kube-api-qps:100` in the args.
-                    properties:
-                      args:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      image:
-                        type: string
                     type: object
                 type: object
               master:
@@ -95,8 +87,8 @@ spec:
                       image:
                         type: string
                     type: object
-                  infrastructure:
-                    description: InfraSpec denotes how the infrastructure of a particular components looks like, if a user wants to use a specific AMI ID, they can provide this in the InfraSpec for the corresponding component.
+                  instances:
+                    description: Instances denotes how the infrastructure of a particular components looks like, if a user wants to use a specific AMI ID, they can provide this in the Instances for the corresponding component.
                     properties:
                       ami:
                         type: string
@@ -110,12 +102,6 @@ spec:
                         items:
                           type: string
                         type: array
-                      publicSubnets:
-                        items:
-                          type: string
-                        type: array
-                      version:
-                        type: string
                       zones:
                         items:
                           type: string
