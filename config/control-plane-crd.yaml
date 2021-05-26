@@ -32,41 +32,37 @@ spec:
           spec:
             description: ControlPlaneSpec specifies the shape of the cluster and how components like master and etcd are configured to run. By default, KIT uses all the default values and ControlPlaneSpec can be empty.
             properties:
-              KubernetesVersion:
-                type: string
               etcd:
                 description: ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
                 properties:
+                  ami:
+                    type: string
                   args:
                     additionalProperties:
                       type: string
                     type: object
                   image:
                     type: string
-                  instances:
-                    description: Instances denotes how the infrastructure of a particular components looks like, if a user wants to use a specific AMI ID, they can provide this in the Instances for the corresponding component.
-                    properties:
-                      ami:
-                        type: string
-                      instanceCount:
-                        type: integer
-                      instanceType:
-                        type: string
-                      loadbalancerType:
-                        type: string
-                      privateSubnets:
-                        items:
-                          type: string
-                        type: array
-                      zones:
-                        items:
-                          type: string
-                        type: array
-                    type: object
+                  instanceCount:
+                    type: integer
+                  instanceType:
+                    type: string
+                  privateSubnets:
+                    items:
+                      type: string
+                    type: array
+                  zones:
+                    items:
+                      type: string
+                    type: array
                 type: object
+              kubernetesVersion:
+                type: string
               master:
                 description: MasterSpec provides a way for the user to configure master instances and custom flags for components running on master nodes like apiserver, KCM and scheduler.
                 properties:
+                  ami:
+                    type: string
                   apiServer:
                     description: Config provides a generic way to pass in args and images to master and etcd components. If a user wants to change the QPS they need to provide the following flag with the desired value -`kube-api-qps:100` in the args.
                     properties:
@@ -87,26 +83,14 @@ spec:
                       image:
                         type: string
                     type: object
-                  instances:
-                    description: Instances denotes how the infrastructure of a particular components looks like, if a user wants to use a specific AMI ID, they can provide this in the Instances for the corresponding component.
-                    properties:
-                      ami:
-                        type: string
-                      instanceCount:
-                        type: integer
-                      instanceType:
-                        type: string
-                      loadbalancerType:
-                        type: string
-                      privateSubnets:
-                        items:
-                          type: string
-                        type: array
-                      zones:
-                        items:
-                          type: string
-                        type: array
-                    type: object
+                  instanceCount:
+                    type: integer
+                  instanceType:
+                    type: string
+                  privateSubnets:
+                    items:
+                      type: string
+                    type: array
                   scheduler:
                     description: Config provides a generic way to pass in args and images to master and etcd components. If a user wants to change the QPS they need to provide the following flag with the desired value -`kube-api-qps:100` in the args.
                     properties:
@@ -117,6 +101,10 @@ spec:
                       image:
                         type: string
                     type: object
+                  zones:
+                    items:
+                      type: string
+                    type: array
                 type: object
               vpccidr:
                 type: string

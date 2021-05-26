@@ -42,7 +42,7 @@ type ControlPlaneList struct {
 // values and ControlPlaneSpec can be empty.
 type ControlPlaneSpec struct {
 	VPCCidr           string     `json:"vpccidr,omitempty"`
-	KubernetesVersion string     `json:"KubernetesVersion,omitempty"`
+	KubernetesVersion string     `json:"kubernetesVersion,omitempty"`
 	Master            MasterSpec `json:"master,omitempty"`
 	Etcd              ETCDSpec   `json:"etcd,omitempty"`
 }
@@ -51,7 +51,7 @@ type ControlPlaneSpec struct {
 // custom flags for components running on master nodes like apiserver, KCM and
 // scheduler.
 type MasterSpec struct {
-	Instances         `json:"instances,omitempty"`
+	Instances         `json:",inline"`
 	Scheduler         *Config `json:"scheduler,omitempty"`
 	ControllerManager *Config `json:"controllerManager,omitempty"`
 	APIServer         *Config `json:"apiServer,omitempty"`
@@ -59,7 +59,7 @@ type MasterSpec struct {
 
 // ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
 type ETCDSpec struct {
-	Instances `json:"instances,omitempty"`
+	Instances `json:",inline"`
 	*Config   `json:",inline"`
 }
 
@@ -75,10 +75,9 @@ type Config struct {
 // like, if a user wants to use a specific AMI ID, they can provide this in the
 // Instances for the corresponding component.
 type Instances struct {
-	Zones            []string `json:"zones,omitempty"`
-	PrivateSubnets   []string `json:"privateSubnets,omitempty"`
-	AMI              string   `json:"ami,omitempty"`
-	Type             string   `json:"instanceType,omitempty"`
-	Count            int      `json:"instanceCount,omitempty"`
-	LoadBalancerType string   `json:"loadbalancerType,omitempty"`
+	Zones          []string `json:"zones,omitempty"`
+	PrivateSubnets []string `json:"privateSubnets,omitempty"`
+	AMI            string   `json:"ami,omitempty"`
+	Type           string   `json:"instanceType,omitempty"`
+	Count          int      `json:"instanceCount,omitempty"`
 }
