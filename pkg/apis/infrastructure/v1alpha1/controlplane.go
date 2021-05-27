@@ -41,10 +41,16 @@ type ControlPlaneList struct {
 // master and etcd are configured to run. By default, KIT uses all the default
 // values and ControlPlaneSpec can be empty.
 type ControlPlaneSpec struct {
-	VPCCidr           string     `json:"vpccidr,omitempty"`
+	Infrastructure    `json:",inline"`
 	KubernetesVersion string     `json:"kubernetesVersion,omitempty"`
 	Master            MasterSpec `json:"master,omitempty"`
 	Etcd              ETCDSpec   `json:"etcd,omitempty"`
+}
+
+type Infrastructure struct {
+	VPCCidr        string   `json:"vpccidr,omitempty"`
+	Zones          []string `json:"zones,omitempty"`
+	PrivateSubnets []string `json:"privateSubnets,omitempty"`
 }
 
 // MasterSpec provides a way for the user to configure master instances and
@@ -75,9 +81,7 @@ type Config struct {
 // like, if a user wants to use a specific AMI ID, they can provide this in the
 // Instances for the corresponding component.
 type Instances struct {
-	Zones          []string `json:"zones,omitempty"`
-	PrivateSubnets []string `json:"privateSubnets,omitempty"`
-	AMI            string   `json:"ami,omitempty"`
-	Type           string   `json:"instanceType,omitempty"`
-	Count          int      `json:"instanceCount,omitempty"`
+	AMI   string `json:"ami,omitempty"`
+	Type  string `json:"type,omitempty"`
+	Count int    `json:"count,omitempty"`
 }

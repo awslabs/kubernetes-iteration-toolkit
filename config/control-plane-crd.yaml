@@ -41,20 +41,12 @@ spec:
                     additionalProperties:
                       type: string
                     type: object
+                  count:
+                    type: integer
                   image:
                     type: string
-                  instanceCount:
-                    type: integer
-                  instanceType:
+                  type:
                     type: string
-                  privateSubnets:
-                    items:
-                      type: string
-                    type: array
-                  zones:
-                    items:
-                      type: string
-                    type: array
                 type: object
               kubernetesVersion:
                 type: string
@@ -83,14 +75,8 @@ spec:
                       image:
                         type: string
                     type: object
-                  instanceCount:
+                  count:
                     type: integer
-                  instanceType:
-                    type: string
-                  privateSubnets:
-                    items:
-                      type: string
-                    type: array
                   scheduler:
                     description: Config provides a generic way to pass in args and images to master and etcd components. If a user wants to change the QPS they need to provide the following flag with the desired value -`kube-api-qps:100` in the args.
                     properties:
@@ -101,13 +87,19 @@ spec:
                       image:
                         type: string
                     type: object
-                  zones:
-                    items:
-                      type: string
-                    type: array
+                  type:
+                    type: string
                 type: object
+              privateSubnets:
+                items:
+                  type: string
+                type: array
               vpccidr:
                 type: string
+              zones:
+                items:
+                  type: string
+                type: array
             type: object
           status:
             description: ControlPlaneStatus defines the observed state of the ControlPlane of a cluster
@@ -140,24 +132,6 @@ spec:
                   - type
                   type: object
                 type: array
-              infrastructure:
-                description: Infrastructure is the status of the infrastructure for the ControlPlane. It gets updated by the infrastructure controller as the resources as are being created in AWS
-                properties:
-                  internetGateway:
-                    type: string
-                  natGateway:
-                    type: string
-                  privateSubnets:
-                    items:
-                      type: string
-                    type: array
-                  publicSubnets:
-                    items:
-                      type: string
-                    type: array
-                  vpcID:
-                    type: string
-                type: object
             type: object
         type: object
     served: true
