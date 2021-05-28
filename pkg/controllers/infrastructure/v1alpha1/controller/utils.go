@@ -16,26 +16,14 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
 	TagKeyNameForAWSResources = "kit.k8s.amazonaws.com/cluster-name"
 	vpcCIDR                   = "10.0.0.0/16" // TODO hardcoded for now, make defaults
-)
-
-var (
-	// TODO hardcoded for now, make defaults
-	privateSubnetCIDRs = []string{"10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"}
-	publicSubnetCIDRs  = []string{"10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"}
-
-	Waiting    = reconcile.Result{RequeueAfter: 5 * time.Second}
-	Created    = reconcile.Result{RequeueAfter: 60 * time.Second}
-	Terminated = reconcile.Result{}
 )
 
 func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {

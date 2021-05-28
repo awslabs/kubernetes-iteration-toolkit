@@ -10,6 +10,5 @@ controller-gen \
 
 ./hack/boilerplate.sh
 
-mv config/kit.k8s.amazonaws.com_controlplanes.yaml config/control-plane-crd.yaml
 # CRDs don't currently jive with VolatileTime, which has an Any type.
-perl -pi -e 's/Any/string/g' config/control-plane-crd.yaml
+perl -pi -e 's/Any/string/g' config/*.yaml

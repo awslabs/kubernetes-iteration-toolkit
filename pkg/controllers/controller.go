@@ -17,10 +17,10 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -54,28 +54,28 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	if err != nil {
 		resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
 		if errors.SafeToIgnore(err) {
-			return result, nil
+			return reconcile.Result{}, err
 		}
 		zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
-		return reconcile.Result{Requeue: true}, err
+		return reconcile.Result{}, err
 	}
 	resource.StatusConditions().MarkTrue(v1alpha1.Active)
 	// 4. Update Status using a merge patch
 	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to persist changes to %s, %w", req.NamespacedName, err)
 	}
-	return result, nil
+	return *result, nil
 }
 
-func (c *GenericController) reconcile(ctx context.Context, resource Object) (reconcile.Result, error) {
+func (c *GenericController) reconcile(ctx context.Context, resource Object) (*reconcile.Result, error) {
 	if resource.GetDeletionTimestamp() == nil {
 		// Add finalizer for this controller if not exists
 		if err := c.addFinalizerIfNotExists(ctx, resource); err != nil {
-			return reconcile.Result{Requeue: true}, err
+			return nil, err
 		}
 		result, err := c.Controller.Reconcile(ctx, resource)
 		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("reconciling resource, %w", err)
+			return nil, fmt.Errorf("reconciling resource, %w", err)
 		}
 		return result, nil
 	}
@@ -84,7 +84,7 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object) (rec
 		return result, fmt.Errorf("finalizing resource controller name %v, %w", c.Controller.Name(), err)
 	}
 	if err := c.removeFinalizer(ctx, resource); err != nil {
-		return reconcile.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("removing finalizers, %w", err)
+		return status.Waiting, fmt.Errorf("removing finalizers, %w", err)
 	}
 	return result, nil
 }

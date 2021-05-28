@@ -57,6 +57,7 @@ func main() {
 
 	session := awsprovider.NewSession()
 	err := manager.RegisterWebhooks().RegisterControllers(
+		infra.NewControlPlaneController(awsprovider.EC2Client(session), manager.GetClient()),
 		infra.NewVPCController(awsprovider.EC2Client(session)),
 		infra.NewSubnetController(awsprovider.EC2Client(session)),
 		infra.NewInternetGWController(awsprovider.EC2Client(session)),

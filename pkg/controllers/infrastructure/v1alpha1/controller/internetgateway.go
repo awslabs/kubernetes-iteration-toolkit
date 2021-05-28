@@ -22,6 +22,7 @@ import (
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
 	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -45,75 +46,83 @@ func (i *internetGateway) Name() string {
 
 // For returns the resource this controller is for.
 func (i *internetGateway) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.InternetGateway{}
 }
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with the ControlPlane.Status
+// else create the resource and then sync status with the igwObj.Status
 // object
-func (i *internetGateway) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
+func (i *internetGateway) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	igwObj := object.(*v1alpha1.InternetGateway)
+	clusterName := igwObj.Name
 	// 1. Get the VPC ID for the control plane
-	vpcID := controlPlane.Status.Infrastructure.VPCID
-	if vpcID == "" {
-		return Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
+	vpc, err := getVPC(ctx, i.ec2api, clusterName)
+	if err != nil {
+		return status.Waiting, fmt.Errorf("getting VPC %w", err)
+	}
+	if vpc == nil {
+		return status.Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
 	}
 	// 2. Check if the internet gateway exists in AWS
-	igw, err := i.getInternetGateway(ctx, controlPlane.Name)
+	igw, err := i.getInternetGateway(ctx, clusterName)
 	if err != nil {
-		return Waiting, fmt.Errorf("getting internet-gateway, %w", err)
+		return status.Waiting, fmt.Errorf("getting internet-gateway, %w", err)
 	}
 	// 3. create an internet-gateway in AWS if required
 	if igw == nil || aws.StringValue(igw.InternetGatewayId) == "" {
-		if igw, err = i.createInternetGateway(ctx, controlPlane.Name); err != nil {
-			return reconcile.Result{}, fmt.Errorf("creating internet-gateway, %w", err)
+		if igw, err = i.createInternetGateway(ctx, clusterName); err != nil {
+			return nil, fmt.Errorf("creating internet-gateway, %w", err)
 		}
 	} else {
-		zap.S().Debugf("Successfully discovered internet-gateway %v for cluster %v", *igw.InternetGatewayId, controlPlane.Name)
+		zap.S().Debugf("Successfully discovered internet-gateway %v for cluster %v", *igw.InternetGatewayId, clusterName)
 	}
 	// 4. Check igw is attached to the desired VPC ID
-	if len(igw.Attachments) == 0 || *igw.Attachments[0].VpcId != vpcID {
-		if err := i.attachInternetGWToVPC(ctx, *igw.InternetGatewayId, vpcID); err != nil {
-			return reconcile.Result{}, fmt.Errorf("attaching internet-gateway, %w", err)
+	if len(igw.Attachments) == 0 || *igw.Attachments[0].VpcId != *vpc.VpcId {
+		if err := i.attachInternetGWToVPC(ctx, *igw.InternetGatewayId, *vpc.VpcId); err != nil {
+			return nil, fmt.Errorf("attaching internet-gateway, %w", err)
 		}
 	}
-	// 4. Sync resource status with the controlPlane status object in Kubernetes
-	controlPlane.Status.Infrastructure.InternetGatewayID = *igw.InternetGatewayId
-	return Created, nil
+	// 5. Sync resource status with the igwObj status object in Kubernetes
+	igwObj.Status.InternetGatewayID = *igw.InternetGatewayId
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (i *internetGateway) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
+func (i *internetGateway) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	igwObj := object.(*v1alpha1.InternetGateway)
+	clusterName := igwObj.Name
 	// 1. Get the VPC ID for the cluster, if not found return success
-	vpcID := controlPlane.Status.Infrastructure.VPCID
-	if vpcID == "" {
-		return Terminated, nil
+	vpc, err := getVPC(ctx, i.ec2api, clusterName)
+	if err != nil {
+		return status.Waiting, fmt.Errorf("getting VPC %w", err)
+	}
+	if vpc == nil {
+		return status.Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
 	}
 	// 2. Get the internet gateway ID for the control plane
-	igw, err := i.getInternetGateway(ctx, controlPlane.Name)
+	igw, err := i.getInternetGateway(ctx, clusterName)
 	if err != nil {
-		return Waiting, err
+		return status.Waiting, err
 	}
 	if igw != nil && aws.StringValue(igw.InternetGatewayId) != "" {
 		// 3. Detach Internet Gateway from VPC
 		if _, err := i.ec2api.DetachInternetGatewayWithContext(
 			ctx, &ec2.DetachInternetGatewayInput{
 				InternetGatewayId: igw.InternetGatewayId,
-				VpcId:             aws.String(vpcID),
+				VpcId:             aws.String(*vpc.VpcId),
 			}); err != nil {
-			return reconcile.Result{}, err
+			return nil, err
 		}
 		// 4. Delete Internet Gateway
 		if _, err := i.ec2api.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
 			InternetGatewayId: igw.InternetGatewayId,
 		}); err != nil {
-			return reconcile.Result{}, err
+			return nil, err
 		}
-		zap.S().Infof("Successfully deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, controlPlane.Name)
+		zap.S().Infof("Successfully deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, clusterName)
 	}
-	controlPlane.Status.Infrastructure.InternetGatewayID = ""
-	return Terminated, nil
+	igwObj.Status.InternetGatewayID = ""
+	return status.Terminated, nil
 }
 
 func (i *internetGateway) createInternetGateway(ctx context.Context, clusterName string) (*ec2.InternetGateway, error) {

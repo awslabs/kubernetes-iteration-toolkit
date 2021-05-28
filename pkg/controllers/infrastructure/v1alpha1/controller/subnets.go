@@ -22,6 +22,7 @@ import (
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
 	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -45,99 +46,97 @@ func (s *subnet) Name() string {
 
 // For returns the object managed by this controller
 func (s *subnet) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.Subnet{}
 }
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with the ControlPlane.Status
+// else create the resource and then sync status with the Subnet.Status
 // object
-func (s *subnet) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
+func (s *subnet) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	subnetObj := object.(*v1alpha1.Subnet)
+	clusterName := subnetObj.Name
 	// 1. Get the VPC ID for the control plane status
-	vpcID := controlPlane.Status.Infrastructure.VPCID
-	if vpcID == "" {
-		return Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
+	vpc, err := getVPC(ctx, s.ec2api, clusterName)
+	if err != nil {
+		return status.Waiting, fmt.Errorf("getting VPC %w", err)
+	}
+	if vpc == nil {
+		return status.Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
 	}
 	// 2. Check if subnets exists in AWS
-	subnets, err := s.getSubnets(ctx, controlPlane.Name)
+	subnets, err := s.getSubnets(ctx, clusterName)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("getting subnets from AWS, %w", err)
+		return nil, fmt.Errorf("getting subnets from AWS, %w", err)
 	}
-	// In future we might want to check the CIDRs for subnets to verify
-	expectedCount := len(s.availabilityZonesForRegion(*s.ec2api.Config.Region)) * 2
-	// 3. If not as desired, create a private and a public subnet in all azs supported
-	if len(subnets) != expectedCount {
-		for i, az := range s.availabilityZonesForRegion(*s.ec2api.Config.Region) {
-			// create a private subnet
-			if err := s.createSubnet(ctx, false, controlPlane.Name, az, vpcID, privateSubnetCIDRs[i]); err != nil {
-				return reconcile.Result{}, fmt.Errorf("creating private subnet, %w", err)
+	subnetObj.Status.PublicSubnets = nil
+	subnetObj.Status.PrivateSubnets = nil
+	for _, subnet := range subnetObj.Spec.Items {
+		subnetID := ""
+		sub, exists := contains(subnets, subnet, clusterName)
+		if !exists {
+			// 3. Create subnets in AWS
+			subnetID, err = s.createSubnet(ctx, clusterName, *vpc.VpcId, subnet)
+			if err != nil {
+				return nil, fmt.Errorf("creating public subnet, %w", err)
 			}
-			// create a public subnet
-			if err := s.createSubnet(ctx, true, controlPlane.Name, az, vpcID, publicSubnetCIDRs[i]); err != nil {
-				return reconcile.Result{}, fmt.Errorf("creating public subnet, %w", err)
-			}
+		} else {
+			subnetID = *sub.SubnetId
+			zap.S().Debugf("Successfully discovered subnet %s for cluster %s", *sub.SubnetId, clusterName)
 		}
-	} else {
-		zap.S().Debugf("Successfully discovered Subnets for cluster %v", controlPlane.Name)
+		if subnet.Public {
+			subnetObj.Status.PublicSubnets = append(subnetObj.Status.PublicSubnets, subnetID)
+		} else {
+			subnetObj.Status.PrivateSubnets = append(subnetObj.Status.PrivateSubnets, subnetID)
+		}
+		zap.S().Infof("Created subnet ID: %s, cidr: %s, public: %v, az: %s", subnetID, subnet.CIDR, subnet.Public, subnet.AZ)
 	}
-	// 4. Sync resource status with the controlPlane status object in Kubernetes
-	s.syncStatus(ctx, controlPlane)
-	return Created, nil
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (s *subnet) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	subnets, err := s.getSubnets(ctx, controlPlane.Name)
+func (s *subnet) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	subnetObj := object.(*v1alpha1.Subnet)
+	subnets, err := s.getSubnets(ctx, subnetObj.Name)
 	if err != nil {
-		return reconcile.Result{}, err
+		return nil, err
 	}
 	if len(subnets) != 0 {
 		if err := s.deleteSubnets(ctx, subnets); err != nil {
-			return reconcile.Result{}, err
+			return nil, err
 		}
-		zap.S().Infof("Successfully deleted Subnets for cluster %v", controlPlane.Name)
+		zap.S().Infof("Successfully deleted Subnets for cluster %v", subnetObj.Name)
 	}
-	s.syncStatus(ctx, controlPlane)
-	return Terminated, nil
+	subnetObj.Status.PublicSubnets = subnetObj.Status.PublicSubnets[:0]
+	subnetObj.Status.PrivateSubnets = subnetObj.Status.PrivateSubnets[:0]
+	return status.Terminated, nil
 }
 
-func (s *subnet) createSubnet(ctx context.Context, public bool, clusterName, az, vpcID, cidr string) error {
+func (s *subnet) createSubnet(ctx context.Context, clusterName, vpcID string, subnet *v1alpha1.SubnetProperty) (string, error) {
 	input := &ec2.CreateSubnetInput{
-		AvailabilityZone:  aws.String(az),
-		CidrBlock:         aws.String(cidr),
+		AvailabilityZone:  aws.String(subnet.AZ),
+		CidrBlock:         aws.String(subnet.CIDR),
 		VpcId:             aws.String(vpcID),
 		TagSpecifications: generateEC2Tags(s.Name(), clusterName),
 	}
 	output, err := s.ec2api.CreateSubnetWithContext(ctx, input)
 	if err != nil {
 		if errors.IsSubnetExists(err) {
-			return nil
+			return "", nil
 		}
-		return fmt.Errorf("creating subnet, %w", err)
+		return "", fmt.Errorf("creating subnet, %w", err)
 	}
-	if public {
+	if subnet.Public {
 		attributeInput := &ec2.ModifySubnetAttributeInput{
 			MapPublicIpOnLaunch: &ec2.AttributeBooleanValue{
-				Value: aws.Bool(public),
+				Value: aws.Bool(subnet.Public),
 			},
 			SubnetId: output.Subnet.SubnetId,
 		}
 		if _, err = s.ec2api.ModifySubnetAttribute(attributeInput); err != nil {
-			return fmt.Errorf("modifying subnet attributes, %w", err)
+			return "", fmt.Errorf("modifying subnet attributes, %w", err)
 		}
 	}
-	zap.S().Infof("Created subnet ID: %s, cidr: %s, public: %v, az: %s", *output.Subnet.SubnetId, cidr, public, az)
-	return nil
-}
-
-// TODO get all AZs for a region from an API
-func (s *subnet) availabilityZonesForRegion(region string) []string {
-	azs := []string{}
-	for _, azPrefix := range []string{"a", "b", "c"} {
-		azs = append(azs, fmt.Sprintf(region+azPrefix))
-	}
-	return azs
+	return *output.Subnet.SubnetId, nil
 }
 
 func (s *subnet) deleteSubnets(ctx context.Context, subnets []*ec2.Subnet) error {
@@ -163,20 +162,15 @@ func (s *subnet) getSubnets(ctx context.Context, clusterName string) ([]*ec2.Sub
 	return output.Subnets, nil
 }
 
-// syncStatus syncs the status for subnet in AWS with the controlPlane status object in Kubernetes
-func (s *subnet) syncStatus(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
-	subnets, err := s.getSubnets(ctx, controlPlane.Name)
-	if err != nil {
-		zap.S().Errorf("Failed to sync subnet status, %v", err)
-		return
-	}
-	controlPlane.Status.Infrastructure.PrivateSubnets = controlPlane.Status.Infrastructure.PrivateSubnets[:0]
-	controlPlane.Status.Infrastructure.PublicSubnets = controlPlane.Status.Infrastructure.PublicSubnets[:0]
+func contains(subnets []*ec2.Subnet, desired *v1alpha1.SubnetProperty, clusterName string) (*ec2.Subnet, bool) {
 	for _, subnet := range subnets {
-		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
-			controlPlane.Status.Infrastructure.PublicSubnets = append(controlPlane.Status.Infrastructure.PublicSubnets, *subnet.SubnetId)
-			continue
+		if aws.StringValue(subnet.CidrBlock) == desired.CIDR &&
+			aws.StringValue(subnet.AvailabilityZone) == desired.AZ &&
+			aws.BoolValue(subnet.MapPublicIpOnLaunch) == desired.Public {
+			zap.S().Debugf("Successfully discovered Subnet ID %s public %v, for cluster %s",
+				*subnet.SubnetId, *subnet.MapPublicIpOnLaunch, clusterName)
+			return subnet, true
 		}
-		controlPlane.Status.Infrastructure.PrivateSubnets = append(controlPlane.Status.Infrastructure.PrivateSubnets, *subnet.SubnetId)
 	}
+	return nil, false
 }
