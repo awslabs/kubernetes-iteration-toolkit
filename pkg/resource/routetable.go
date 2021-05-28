@@ -40,7 +40,7 @@ func (r *RouteTable) Create(ctx context.Context, controlPlane *v1alpha1.ControlP
 				if err := r.create(ctx, subnetType, controlPlane); err != nil {
 					return fmt.Errorf("creating route table kube object, %w", err)
 				}
-				return nil
+				continue
 			}
 			return fmt.Errorf("getting route table object, %w", err)
 		}

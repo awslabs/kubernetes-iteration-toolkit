@@ -51,4 +51,7 @@ func init() {
 	SchemeBuilder.Register(&VPC{}, &VPCList{})
 	SchemeBuilder.Register(&Subnet{}, &SubnetList{})
 	SchemeBuilder.Register(&InternetGateway{}, &InternetGatewayList{})
+	SchemeBuilder.Register(&NatGateway{}, &NatGatewayList{})
+	SchemeBuilder.Register(&ElasticIP{}, &ElasticIPList{})
+	SchemeBuilder.Register(&RouteTable{}, &RouteTableList{})
 }

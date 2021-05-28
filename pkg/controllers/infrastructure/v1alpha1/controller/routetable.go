@@ -29,10 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	desiredRouteTableCount = 2
-)
-
 type routeTable struct {
 	ec2api *awsprovider.EC2
 }
@@ -57,18 +53,24 @@ func (r *routeTable) For() controllers.Object {
 // object
 func (r *routeTable) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	tableObj := object.(*v1alpha1.RouteTable)
-	routeTables, err := r.getRouteTables(ctx, tableObj.Name)
+	routeTables, err := r.getRouteTables(ctx, tableObj.Spec.ClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("getting route tables, %w", err)
 	}
-	if len(routeTables) == 0 {
-		result, err := r.createRouteTables(ctx, tableObj)
-		if err != nil {
-			return result, err
+	for _, routeTable := range routeTables {
+		if containsTable(routeTable.Tags, tableObj.Name) {
+			if err := r.reconcileTableAssociations(ctx, routeTable, tableObj); err != nil {
+				return nil, fmt.Errorf("associate subnets to tables, %w", err)
+			}
+			zap.S().Debugf("Successfully discovered and subnets associated with route-table %v", tableObj.Name)
+			return status.Created, nil
 		}
-	} else {
-		zap.S().Debugf("Successfully discovered route-tables for cluster %v", tableObj.Name)
 	}
+	result, err := r.createRouteTables(ctx, tableObj)
+	if err != nil {
+		return result, err
+	}
+	zap.S().Infof("Successfully created route table %v for cluster %v", tableObj.Name, tableObj.Spec.ClusterName)
 	return status.Created, nil
 }
 
@@ -83,103 +85,113 @@ func (r *routeTable) Finalize(ctx context.Context, object controllers.Object) (*
 
 func (r *routeTable) createRouteTables(ctx context.Context, tableObj *v1alpha1.RouteTable) (*reconcile.Result, error) {
 	// Verify VPCID exists
-	clusterName := tableObj.Spec.ClusterName
-	vpc, err := getVPC(ctx, r.ec2api, clusterName)
+	vpc, err := getVPC(ctx, r.ec2api, tableObj.Spec.ClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("getting VPC %w", err)
 	}
 	if vpc == nil {
 		return status.Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
 	}
-	// Verify private subnets exists
-	privateSubnets, err := getPrivateSubnetIDs(ctx, r.ec2api, clusterName)
+	result, err := r.createTableWithRoute(ctx, *vpc.VpcId, tableObj)
 	if err != nil {
-		return nil, fmt.Errorf("getting private subnets %w", err)
+		return nil, err
 	}
-	publicSubnets, err := getPublicSubnetIDs(ctx, r.ec2api, clusterName)
-	if err != nil {
-		return nil, fmt.Errorf("getting public subnets %w", err)
-	}
-	igw, err := getInternetGateway(ctx, r.ec2api, clusterName)
-	if err != nil {
-		return nil, fmt.Errorf("getting internet-gateway %w", err)
-	}
-	if igw == nil {
-		return status.Waiting, fmt.Errorf("internet-gateway does not exist %w", errors.WaitingForSubResources)
-	}
-	// We need to get nat gateway which is available else we might add a route to
-	// GW which is pending and GW might end up in the failed state in few
-	// minutes.
-	// TODO At some point in the reconciler here we will check the GWs added to
-	// the routes, if they are still active, until then we need to wait for an
-	// active NAT GW.
-	natGW, err := getNatGateway(ctx, r.ec2api, clusterName)
-	if err != nil || natGW == nil || aws.StringValue(natGW.State) != "available" {
-		return status.Waiting, fmt.Errorf("nat-gateway does not exist %w", errors.WaitingForSubResources)
-	}
-	if len(privateSubnets) > 0 {
-		if err := r.createRoutesForPrivateSubnets(ctx, clusterName, *vpc.VpcId, *natGW.NatGatewayId, privateSubnets); err != nil {
-			return nil, err
+	return result, nil
+}
+
+func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID string, tableObj *v1alpha1.RouteTable) (*reconcile.Result, error) {
+	routeInput := &ec2.CreateRouteInput{DestinationCidrBlock: aws.String("0.0.0.0/0")}
+	if tableObj.Spec.ForPrivateSubnets {
+		igw, err := getInternetGateway(ctx, r.ec2api, tableObj.Spec.ClusterName)
+		if err != nil {
+			return nil, fmt.Errorf("getting internet-gateway %w", err)
 		}
-		zap.S().Infof("Successfully created route table for private subnets for cluster %v", clusterName)
-	}
-	if len(publicSubnets) > 0 {
-		if err := r.createRoutesForPublicSubnets(ctx, clusterName, *vpc.VpcId, *igw.InternetGatewayId, publicSubnets); err != nil {
-			return nil, err
+		if igw == nil {
+			return status.Waiting, fmt.Errorf("internet-gateway does not exist %w", errors.WaitingForSubResources)
 		}
-		zap.S().Infof("Successfully created route table for public subnets for cluster %v", clusterName)
+		routeInput.GatewayId = igw.InternetGatewayId
+	} else {
+		// We need to get nat gateway which is available else we might add a route to
+		// GW which is pending and GW might end up in the failed state in few
+		// minutes.
+		// TODO At some point in the reconciler here we will check the GWs added to
+		// the routes, if they are still active, until then we need to wait for an
+		// active NAT GW.
+		natGW, err := getNatGateway(ctx, r.ec2api, tableObj.Spec.ClusterName)
+		if err != nil || natGW == nil || aws.StringValue(natGW.State) != "available" {
+			return status.Waiting, fmt.Errorf("nat-gateway does not exist %w", errors.WaitingForSubResources)
+		}
+		routeInput.NatGatewayId = natGW.NatGatewayId
+	}
+	routeTableID, err := r.createTable(ctx, vpcID, tableObj.Name, tableObj.Spec.ClusterName)
+	if err != nil {
+		return nil, err
+	}
+	routeInput.RouteTableId = aws.String(routeTableID)
+	if _, err := r.ec2api.CreateRouteWithContext(ctx, routeInput); err != nil {
+		return nil, fmt.Errorf("adding route to the table, %w", err)
 	}
 	return status.Created, nil
 }
 
-func (r *routeTable) createRoutesForPrivateSubnets(ctx context.Context, clusterName, vpcID, natGWID string, subnets []string) error {
-	routeTableID, err := r.createTableAndAssociateSubnets(ctx, vpcID, clusterName, subnets)
-	if err != nil {
-		return err
+func (r *routeTable) reconcileTableAssociations(ctx context.Context, routeTable *ec2.RouteTable, desiredObj *v1alpha1.RouteTable) error {
+	var subnets []string
+	var err error
+	if desiredObj.Spec.ForPrivateSubnets {
+		subnets, err = getPrivateSubnetIDs(ctx, r.ec2api, desiredObj.Spec.ClusterName)
+		if err != nil {
+			return fmt.Errorf("getting private subnets %w", err)
+		}
+	} else {
+		subnets, err = getPublicSubnetIDs(ctx, r.ec2api, desiredObj.Spec.ClusterName)
+		if err != nil {
+			return fmt.Errorf("getting public subnets %w", err)
+		}
 	}
-	if _, err := r.ec2api.CreateRouteWithContext(ctx, &ec2.CreateRouteInput{
-		DestinationCidrBlock: aws.String("0.0.0.0/0"),
-		NatGatewayId:         aws.String(natGWID),
-		RouteTableId:         aws.String(routeTableID),
-	}); err != nil {
-		return fmt.Errorf("adding route to the table, %w", err)
+	remaining := []string{}
+	for _, subnet := range subnets {
+		if !isSubnetAssociated(routeTable.Associations, subnet) {
+			remaining = append(remaining, subnet)
+		}
+	}
+	if err := r.associateSubnetsToTable(ctx, *routeTable.RouteTableId, remaining); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (r *routeTable) createRoutesForPublicSubnets(ctx context.Context, clusterName, vpcID, igwID string, subnets []string) error {
-	routeTableID, err := r.createTableAndAssociateSubnets(ctx, vpcID, clusterName, subnets)
-	if err != nil {
-		return err
-	}
-	if _, err := r.ec2api.CreateRouteWithContext(ctx, &ec2.CreateRouteInput{
-		DestinationCidrBlock: aws.String("0.0.0.0/0"),
-		GatewayId:            aws.String(igwID),
-		RouteTableId:         aws.String(routeTableID),
-	}); err != nil {
-		return fmt.Errorf("adding route to the table, %w", err)
-	}
-	return nil
-}
-
-func (r *routeTable) createTableAndAssociateSubnets(ctx context.Context, vpcID, clusterName string, subnets []string) (string, error) {
+func (r *routeTable) createTable(ctx context.Context, vpcID, tableName, clusterName string) (string, error) {
+	tags := []*ec2.TagSpecification{{
+		ResourceType: aws.String(r.Name()),
+		Tags: []*ec2.Tag{{
+			Key:   aws.String(TagKeyNameForAWSResources),
+			Value: aws.String(clusterName),
+		}, {
+			Key:   aws.String("Name"),
+			Value: aws.String(tableName),
+		}},
+	}}
 	routeTable, err := r.ec2api.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
 		VpcId:             aws.String(vpcID),
-		TagSpecifications: generateEC2Tags(r.Name(), clusterName),
+		TagSpecifications: tags,
 	})
 	if err != nil {
 		return "", err
 	}
+	return *routeTable.RouteTable.RouteTableId, nil
+}
+
+func (r *routeTable) associateSubnetsToTable(ctx context.Context, tableID string, subnets []string) error {
 	for _, subnet := range subnets {
 		_, err := r.ec2api.AssociateRouteTableWithContext(ctx, &ec2.AssociateRouteTableInput{
-			RouteTableId: aws.String(*routeTable.RouteTable.RouteTableId),
+			RouteTableId: aws.String(tableID),
 			SubnetId:     aws.String(subnet),
 		})
 		if err != nil {
-			return "", err
+			return err
 		}
 	}
-	return *routeTable.RouteTable.RouteTableId, nil
+	return nil
 }
 
 func (r *routeTable) deleteRouteTable(ctx context.Context, clusterName string) error {
@@ -209,8 +221,24 @@ func (r *routeTable) getRouteTables(ctx context.Context, clusterName string) ([]
 	if output == nil || len(output.RouteTables) == 0 {
 		return nil, nil
 	}
-	if len(output.RouteTables) > desiredRouteTableCount {
-		return nil, fmt.Errorf("expected to find two route tables, but found %d", len(output.RouteTables))
-	}
 	return output.RouteTables, nil
+}
+
+func containsTable(tags []*ec2.Tag, tableName string) bool {
+	for _, tag := range tags {
+		if aws.StringValue(tag.Key) == "Name" &&
+			aws.StringValue(tag.Value) == tableName {
+			return true
+		}
+	}
+	return false
+}
+
+func isSubnetAssociated(associations []*ec2.RouteTableAssociation, subnetID string) bool {
+	for _, association := range associations {
+		if aws.StringValue(association.SubnetId) == subnetID {
+			return true
+		}
+	}
+	return false
 }

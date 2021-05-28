@@ -79,16 +79,15 @@ func (s *subnet) Reconcile(ctx context.Context, object controllers.Object) (*rec
 			if err != nil {
 				return nil, fmt.Errorf("creating public subnet, %w", err)
 			}
+			zap.S().Infof("Created subnet ID: %s, cidr: %s, public: %v, az: %s", subnetID, subnet.CIDR, subnet.Public, subnet.AZ)
 		} else {
 			subnetID = *sub.SubnetId
-			zap.S().Debugf("Successfully discovered subnet %s for cluster %s", *sub.SubnetId, clusterName)
 		}
 		if subnet.Public {
 			subnetObj.Status.PublicSubnets = append(subnetObj.Status.PublicSubnets, subnetID)
 		} else {
 			subnetObj.Status.PrivateSubnets = append(subnetObj.Status.PrivateSubnets, subnetID)
 		}
-		zap.S().Infof("Created subnet ID: %s, cidr: %s, public: %v, az: %s", subnetID, subnet.CIDR, subnet.Public, subnet.AZ)
 	}
 	return status.Created, nil
 }

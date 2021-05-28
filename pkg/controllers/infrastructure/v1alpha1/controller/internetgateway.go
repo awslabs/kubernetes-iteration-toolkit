@@ -111,13 +111,13 @@ func (i *internetGateway) Finalize(ctx context.Context, object controllers.Objec
 				InternetGatewayId: igw.InternetGatewayId,
 				VpcId:             aws.String(*vpc.VpcId),
 			}); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("detaching internet-gateway from VPC, %w", err)
 		}
 		// 4. Delete Internet Gateway
 		if _, err := i.ec2api.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
 			InternetGatewayId: igw.InternetGatewayId,
 		}); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("deleting internet-gateway, %w", err)
 		}
 		zap.S().Infof("Successfully deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, clusterName)
 	}

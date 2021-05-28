@@ -61,6 +61,9 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 		&resource.VPC{KubeClient: c.Client},
 		&resource.Subnet{KubeClient: c.Client, Region: *c.ec2api.Config.Region},
 		&resource.InternetGateway{KubeClient: c.Client},
+		&resource.ElasticIP{KubeClient: c.Client},
+		&resource.NatGateway{KubeClient: c.Client},
+		&resource.RouteTable{KubeClient: c.Client},
 	}
 	for _, resource := range resources {
 		if err := resource.Create(ctx, controlPlane); err != nil {
@@ -71,5 +74,5 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 }
 
 func (c *controlPlane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
-	return nil, nil
+	return status.Terminated, nil
 }
