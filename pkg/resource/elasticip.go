@@ -32,11 +32,11 @@ func (e *ElasticIP) Create(ctx context.Context, controlPlane *v1alpha1.ControlPl
 	if err := e.exists(ctx, controlPlane.Namespace, controlPlane.Name); err != nil {
 		if errors.IsNotFound(err) {
 			if err := e.create(ctx, controlPlane); err != nil {
-				return fmt.Errorf("creating internet gateway kube object, %w", err)
+				return fmt.Errorf("creating elastic IP kube object, %w", err)
 			}
 			return nil
 		}
-		return fmt.Errorf("getting internet gateway object, %w", err)
+		return fmt.Errorf("getting elastic IP object, %w", err)
 	}
 	// TODO verify existing object matches the desired else update
 	return nil
@@ -44,12 +44,12 @@ func (e *ElasticIP) Create(ctx context.Context, controlPlane *v1alpha1.ControlPl
 
 func (e *ElasticIP) create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	if err := e.KubeClient.Create(ctx, &v1alpha1.ElasticIP{
-		ObjectMeta: ObjectMeta(controlPlane),
+		ObjectMeta: ObjectMeta(controlPlane, ""),
 		Spec:       v1alpha1.ElasticIPSpec{},
 	}); err != nil {
-		return fmt.Errorf("creating internet gateway kube object, %w", err)
+		return fmt.Errorf("creating elastic IP kube object, %w", err)
 	}
-	zap.S().Debugf("Successfully created internet gateway object for cluster %v", controlPlane.Name)
+	zap.S().Debugf("Successfully created elastic IP object for cluster %v", controlPlane.Name)
 	return nil
 }
 

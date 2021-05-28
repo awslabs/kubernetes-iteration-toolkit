@@ -44,7 +44,7 @@ func (v *VPC) Create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) e
 
 func (v *VPC) create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	if err := v.KubeClient.Create(ctx, &v1alpha1.VPC{
-		ObjectMeta: ObjectMeta(controlPlane),
+		ObjectMeta: ObjectMeta(controlPlane, ""),
 		Spec:       v1alpha1.VPCSpec{},
 	}); err != nil {
 		return fmt.Errorf("creating kube object, %w", err)

@@ -44,7 +44,7 @@ func (n *NatGateway) Create(ctx context.Context, controlPlane *v1alpha1.ControlP
 
 func (n *NatGateway) create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	if err := n.KubeClient.Create(ctx, &v1alpha1.NatGateway{
-		ObjectMeta: ObjectMeta(controlPlane),
+		ObjectMeta: ObjectMeta(controlPlane, ""),
 		Spec:       v1alpha1.NatGatewaySpec{},
 	}); err != nil {
 		return fmt.Errorf("creating internet gateway kube object, %w", err)

@@ -47,7 +47,7 @@ func (s *Subnet) create(ctx context.Context, controlPlane *v1alpha1.ControlPlane
 	// Create Subnet object
 	items := s.subnetProperties(controlPlane)
 	if err := s.KubeClient.Create(ctx, &v1alpha1.Subnet{
-		ObjectMeta: ObjectMeta(controlPlane),
+		ObjectMeta: ObjectMeta(controlPlane, ""),
 		Spec: v1alpha1.SubnetSpec{
 			Items: items,
 		},

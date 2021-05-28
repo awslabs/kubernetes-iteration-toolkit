@@ -15,6 +15,8 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,10 +37,18 @@ func OwnerReference(o client.Object) []metav1.OwnerReference {
 	}}
 }
 
-func ObjectMeta(o client.Object) metav1.ObjectMeta {
+func ObjectMeta(o client.Object, identifier string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
-		Name:            o.GetName(),
+		Name:            ObjectName(o, identifier),
 		Namespace:       o.GetNamespace(),
 		OwnerReferences: OwnerReference(o),
 	}
+}
+
+func ObjectName(o client.Object, identifier string) string {
+	name := o.GetName()
+	if identifier != "" {
+		name = fmt.Sprintf("%v-%v", name, identifier)
+	}
+	return name
 }

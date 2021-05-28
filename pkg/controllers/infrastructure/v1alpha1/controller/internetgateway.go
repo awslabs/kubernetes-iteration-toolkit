@@ -148,7 +148,11 @@ func (i *internetGateway) attachInternetGWToVPC(ctx context.Context, igwID, vpcI
 }
 
 func (i *internetGateway) getInternetGateway(ctx context.Context, clusterName string) (*ec2.InternetGateway, error) {
-	output, err := i.ec2api.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
+	return getInternetGateway(ctx, i.ec2api, clusterName)
+}
+
+func getInternetGateway(ctx context.Context, ec2api *awsprovider.EC2, clusterName string) (*ec2.InternetGateway, error) {
+	output, err := ec2api.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
 		Filters: ec2FilterFor(clusterName),
 	})
 	if err != nil {
