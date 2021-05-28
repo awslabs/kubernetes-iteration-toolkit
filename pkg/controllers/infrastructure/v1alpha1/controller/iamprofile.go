@@ -23,7 +23,8 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/kiterr"
+	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -55,26 +56,26 @@ const (
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (i *iamProfile) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (i *iamProfile) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	desiredProfilesRolesMapping := i.profileToRoleMapping(controlPlane.Name)
 	actualProfilesRolesMapping := map[string][]*iam.Role{}
 	// Create desired profiles if not exist
 	for profileName := range desiredProfilesRolesMapping {
 		profile, err := i.getInstanceProfile(ctx, profileName)
-		if kiterr.IsIAMResourceNotFound(err) {
+		if errors.IsIAMResourceNotFound(err) {
 			// Create profile in IAM
 			result, err := i.iam.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
 				InstanceProfileName: aws.String(profileName),
 			})
 			if err != nil {
-				return ResourceFailedProgressing, fmt.Errorf("creating profile, %w", err)
+				return nil, fmt.Errorf("creating profile, %w", err)
 			}
 			zap.S().Infof("Successfully created instance profile %v", *result.InstanceProfile.InstanceProfileName)
 			actualProfilesRolesMapping[profileName] = result.InstanceProfile.Roles
 			continue
 		} else if err != nil {
-			return ResourceFailedProgressing, fmt.Errorf("getting instance profile, %w", err)
+			return nil, fmt.Errorf("getting instance profile, %w", err)
 		}
 		actualProfilesRolesMapping[profileName] = profile.InstanceProfile.Roles
 		zap.S().Debugf("Successfully discovered profile %v for cluster %v", *profile.InstanceProfile.InstanceProfileName, controlPlane.Name)
@@ -89,40 +90,40 @@ func (i *iamProfile) Reconcile(ctx context.Context, object controllers.Object) (
 		if _, err := i.iam.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
 			RoleName:            aws.String(roleName),
-		}); err != nil && kiterr.IsIAMResourceNotFound(err) { //if role is not created yet
-			return WaitingForSubResource, nil
+		}); err != nil && errors.IsIAMResourceNotFound(err) { //if role is not created yet
+			return status.Waiting, nil
 		} else if err != nil {
-			return ResourceFailedProgressing, fmt.Errorf("adding role to instance profile, %w", err)
+			return nil, fmt.Errorf("adding role to instance profile, %w", err)
 		}
 		zap.S().Debugf("Successfully added role %v to instance profile %v", roleName, profileName)
 	}
-	return ResourceCreated, nil
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (i *iamProfile) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (i *iamProfile) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	for profileName, roleName := range i.profileToRoleMapping(controlPlane.Name) {
 		if _, err := i.iam.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
 			RoleName:            aws.String(roleName),
 		}); err != nil {
-			if kiterr.IsIAMResourceNotFound(err) {
+			if errors.IsIAMResourceNotFound(err) {
 				continue
 			}
-			return ResourceFailedProgressing, err
+			return nil, err
 		}
 		if _, err := i.iam.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
 		}); err != nil {
-			if kiterr.IsIAMResourceNotFound(err) ||
-				kiterr.IsIAMResourceDependencyExists(err) {
+			if errors.IsIAMResourceNotFound(err) ||
+				errors.IsIAMResourceDependencyExists(err) {
 				continue
 			}
-			return ResourceFailedProgressing, err
+			return status.Waiting, err
 		}
 	}
-	return ResourceCreated, nil
+	return status.Terminated, nil
 }
 
 func rolesContains(roles []*iam.Role, roleName string) bool {

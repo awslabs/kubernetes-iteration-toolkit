@@ -23,7 +23,8 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/kiterr"
+	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -44,75 +45,76 @@ func (n *natGateway) Name() string {
 
 // For returns the resource this controller is for.
 func (n *natGateway) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.NatGateway{}
 }
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with the ControlPlane.Status
+// else create the resource and then sync status with the natGwObj.Status
 // object
-func (n *natGateway) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
+func (n *natGateway) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	natGwObj := object.(*v1alpha1.NatGateway)
 	// 1. Check if the Nat gateway exists in AWS
-	natGW, err := n.getNatGateway(ctx, controlPlane.Name)
+	natGW, err := n.getNatGateway(ctx, natGwObj.Name)
 	if err != nil {
-		return ResourceFailedProgressing, fmt.Errorf("getting nat-gateway, %w", err)
+		return nil, fmt.Errorf("getting nat-gateway, %w", err)
 	}
 	// 2. create a nat-gateway in AWS if required
 	if natGW == nil || aws.StringValue(natGW.NatGatewayId) == "" {
-		if natGW, err = n.createNatGateway(ctx, controlPlane); err != nil {
-			return ResourceFailedProgressing, fmt.Errorf("creating nat-gateway, %w", err)
+		if natGW, err = n.createNatGateway(ctx, natGwObj); err != nil {
+			return nil, fmt.Errorf("creating nat-gateway, %w", err)
 		}
 	} else {
-		zap.S().Debugf("Successfully discovered nat-gateway %v for cluster %v", *natGW.NatGatewayId, controlPlane.Name)
+		zap.S().Debugf("Successfully discovered nat-gateway %v for cluster %v", *natGW.NatGatewayId, natGwObj.Name)
 	}
 	natGWID := ""
 	if natGW != nil {
 		natGWID = aws.StringValue(natGW.NatGatewayId)
 	}
-	controlPlane.Status.Infrastructure.NatGatewayID = natGWID
-	return ResourceCreated, nil
+	natGwObj.Status.ID = natGWID
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (n *natGateway) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	if err := n.deleteNatGateway(ctx, controlPlane.Name); err != nil {
-		return ResourceFailedProgressing, err
+func (n *natGateway) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	natGwObj := object.(*v1alpha1.NatGateway)
+	if err := n.deleteNatGateway(ctx, natGwObj.Name); err != nil {
+		return nil, err
 	}
-	controlPlane.Status.Infrastructure.NatGatewayID = ""
-	return ResourceTerminated, nil
+	natGwObj.Status.ID = ""
+	return status.Terminated, nil
 }
 
-func (n *natGateway) createNatGateway(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (*ec2.NatGateway, error) {
+func (n *natGateway) createNatGateway(ctx context.Context, natGwObj *v1alpha1.NatGateway) (*ec2.NatGateway, error) {
 	// 1. Get elastic IP ID
-	elasticIP, err := getElasticIP(ctx, n.ec2api, controlPlane.Name)
+	elasticIP, err := getElasticIP(ctx, n.ec2api, natGwObj.Name)
 	if err != nil {
 		return nil, err
 	}
 	if elasticIP == nil || aws.StringValue(elasticIP.AllocationId) == "" {
-		return nil, fmt.Errorf("elastic IP does not exist %w", kiterr.WaitingForSubResources)
+		return nil, fmt.Errorf("elastic IP does not exist %w", errors.WaitingForSubResources)
 	}
 	// 2. Get a private subnet ID
-	if len(controlPlane.Status.Infrastructure.PrivateSubnets) == 0 {
-		return nil, fmt.Errorf("private subnets do not exist %w", kiterr.WaitingForSubResources)
+	privateSubnets, err := getPrivateSubnetIDs(ctx, n.ec2api, natGwObj.Name)
+	if err != nil {
+		return nil, fmt.Errorf("getting private subnets, %w", err)
 	}
-	privateSubnetID := controlPlane.Status.Infrastructure.PrivateSubnets[0]
+	privateSubnetID := privateSubnets[0]
 	// 3. Create NAT Gateway
 	output, err := n.ec2api.CreateNatGatewayWithContext(ctx, &ec2.CreateNatGatewayInput{
 		AllocationId:      elasticIP.AllocationId,
 		SubnetId:          aws.String(privateSubnetID),
-		TagSpecifications: generateEC2Tags(n.Name(), controlPlane.Name),
+		TagSpecifications: generateEC2Tags(n.Name(), natGwObj.Name),
 	})
 	if err != nil {
 		return nil, err
 	}
-	zap.S().Infof("Successfully created nat-gateway %v for cluster %v", *output.NatGateway.NatGatewayId, controlPlane.Name)
+	zap.S().Infof("Successfully created nat-gateway %v for cluster %v", *output.NatGateway.NatGatewayId, natGwObj.Name)
 	// 3. Wait for the NAT Gateway to be available
 	// There are scenarios where after creating a NAT gateway, describe NAT GW
 	// call doesn't return the NatGateway ID we just created. In such cases, we
 	// end up creating multiple gateways, in the end only one becomes available
 	// and others end up in the failed state.
-	zap.S().Infof("Waiting for nat-gateway %v to be available for cluster %v", *output.NatGateway.NatGatewayId, controlPlane.Name)
+	zap.S().Infof("Waiting for nat-gateway %v to be available for cluster %v", *output.NatGateway.NatGatewayId, natGwObj.Name)
 	if err := n.ec2api.WaitUntilNatGatewayAvailableWithContext(ctx, &ec2.DescribeNatGatewaysInput{
 		NatGatewayIds: []*string{output.NatGateway.NatGatewayId},
 	}); err != nil {

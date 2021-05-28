@@ -24,7 +24,8 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/kiterr"
+	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -56,7 +57,7 @@ const (
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (i *iamPolicy) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (i *iamPolicy) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	roles := []string{
 		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
@@ -66,15 +67,15 @@ func (i *iamPolicy) Reconcile(ctx context.Context, object controllers.Object) (r
 		desiredPolicies := i.policyRoleMapping(roleName, controlPlane.Name)
 		for policyName, desiredPolicy := range desiredPolicies {
 			// check role exists
-			if _, err := getRole(ctx, i.iam, roleName); err != nil && kiterr.IsIAMResourceNotFound(err) {
-				return WaitingForSubResource, nil
+			if _, err := getRole(ctx, i.iam, roleName); err != nil && errors.IsIAMResourceNotFound(err) {
+				return nil, nil
 			} else if err != nil {
-				return ResourceFailedProgressing, fmt.Errorf("getting role, %w", err)
+				return nil, fmt.Errorf("getting role, %w", err)
 			}
 			// check policy exists on the role
 			output, err := i.getRolePolicy(ctx, policyName, roleName)
-			if err != nil && !kiterr.IsIAMResourceNotFound(err) {
-				return ResourceFailedProgressing, fmt.Errorf("getting role policy, %w", err)
+			if err != nil && !errors.IsIAMResourceNotFound(err) {
+				return nil, fmt.Errorf("getting role policy, %w", err)
 			}
 			if !policyFoundEqualsDesired(output, desiredPolicy) {
 				// Policy is not found or doesn't match the desired policy
@@ -83,7 +84,7 @@ func (i *iamPolicy) Reconcile(ctx context.Context, object controllers.Object) (r
 					PolicyName:     aws.String(policyName),
 					PolicyDocument: aws.String(desiredPolicy),
 				}); err != nil {
-					return ResourceFailedProgressing, fmt.Errorf("adding policy to role, %w", err)
+					return nil, fmt.Errorf("adding policy to role, %w", err)
 				}
 				zap.S().Infof("Successfully added policy %v to role %v", policyName, roleName)
 				continue
@@ -91,11 +92,11 @@ func (i *iamPolicy) Reconcile(ctx context.Context, object controllers.Object) (r
 			zap.S().Debugf("Successfully discovered policy %v to role %v", policyName, roleName)
 		}
 	}
-	return ResourceCreated, nil
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (i *iamPolicy) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (i *iamPolicy) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	roles := []string{
 		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
@@ -110,12 +111,12 @@ func (i *iamPolicy) Finalize(ctx context.Context, object controllers.Object) (re
 			})
 			if err != nil {
 				zap.S().Errorf("Failed to delete role policy, %v", err)
-				return ResourceFailedProgressing, err
+				return nil, err
 			}
 			zap.S().Infof("Successfully removed policy %s from role %s", policyName, roleName)
 		}
 	}
-	return ResourceTerminated, nil
+	return status.Terminated, nil
 }
 
 func (i *iamPolicy) policyRoleMapping(roleName, clusterName string) map[string]string {

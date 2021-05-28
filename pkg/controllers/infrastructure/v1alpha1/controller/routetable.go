@@ -23,7 +23,8 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/kiterr"
+	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -54,49 +55,53 @@ func (r *routeTable) For() controllers.Object {
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (r *routeTable) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (r *routeTable) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	routeTables, err := r.getRouteTables(ctx, controlPlane.Name)
 	if err != nil {
-		return ResourceFailedProgressing, fmt.Errorf("getting route tables, %w", err)
+		return nil, fmt.Errorf("getting route tables, %w", err)
 	}
 	if len(routeTables) < desiredRouteTableCount {
-		if err := r.createRouteTables(ctx, controlPlane); err != nil {
-			return ResourceFailedProgressing, err
+		result, err := r.createRouteTables(ctx, controlPlane)
+		if err != nil {
+			return result, err
 		}
 	} else {
 		zap.S().Debugf("Successfully discovered route-tables for cluster %v", controlPlane.Name)
 	}
-	return ResourceCreated, nil
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (r *routeTable) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (r *routeTable) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	if err := r.deleteRouteTable(ctx, controlPlane.Name); err != nil {
-		return ResourceFailedProgressing, err
+		return nil, err
 	}
-	return ResourceCreated, nil
+	return status.Created, nil
 }
 
-func (r *routeTable) createRouteTables(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (r *routeTable) createRouteTables(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (*reconcile.Result, error) {
 	// Verify VPCID exists
-	if controlPlane.Status.Infrastructure.VPCID == "" {
-		return fmt.Errorf("vpc does not exist %w", kiterr.WaitingForSubResources)
+	vpc, err := getVPC(ctx, r.ec2api, controlPlane.Name)
+	if err != nil {
+		return nil, fmt.Errorf("getting VPC %w", err)
+	}
+	if vpc == nil {
+		return status.Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
 	}
 	// Verify private subnets exists
-	if len(controlPlane.Status.Infrastructure.PrivateSubnets) != len(privateSubnetCIDRs) {
-		return fmt.Errorf("private subnets do not exist %w", kiterr.WaitingForSubResources)
+	privateSubnets, err := getPrivateSubnetIDs(ctx, r.ec2api, controlPlane.Name)
+	if err != nil {
+		return nil, fmt.Errorf("getting private subnets %w", err)
 	}
-	// Verify public subnets exists
-	if len(controlPlane.Status.Infrastructure.PublicSubnets) != len(publicSubnetCIDRs) {
-		return fmt.Errorf("public subnets do not exist %w", kiterr.WaitingForSubResources)
+	publicSubnets, err := getPublicSubnetIDs(ctx, r.ec2api, controlPlane.Name)
+	if err != nil {
+		return nil, fmt.Errorf("getting public subnets %w", err)
 	}
-	// Verify internet gateway exists
-	if controlPlane.Status.Infrastructure.InternetGatewayID == "" {
-		return fmt.Errorf("internet-gateway does not exist %w", kiterr.WaitingForSubResources)
-	}
-	// We need to get nat gateway which is active else we might add a route to
+
+	igwID := ""
+	// We need to get nat gateway which is available else we might add a route to
 	// GW which is pending and GW might end up in the failed state in few
 	// minutes.
 	// TODO At some point in the reconciler here we will check the GWs added to
@@ -104,24 +109,21 @@ func (r *routeTable) createRouteTables(ctx context.Context, controlPlane *v1alph
 	// active NAT GW.
 	natGW, err := getNatGateway(ctx, r.ec2api, controlPlane.Name)
 	if err != nil || natGW == nil || aws.StringValue(natGW.State) != "available" {
-		return fmt.Errorf("nat-gateway does not exist %w", kiterr.WaitingForSubResources)
+		return status.Waiting, fmt.Errorf("nat-gateway does not exist %w", errors.WaitingForSubResources)
 	}
-	if err := r.createRoutesForPrivateSubnets(ctx, controlPlane, *natGW.NatGatewayId); err != nil {
-		return err
+	if err := r.createRoutesForPrivateSubnets(ctx, controlPlane.Name, *vpc.VpcId, *natGW.NatGatewayId, privateSubnets); err != nil {
+		return nil, err
 	}
 	zap.S().Infof("Successfully created route table for private subnets for cluster %v", controlPlane.Name)
-	if err := r.createRoutesForPublicSubnets(ctx, controlPlane); err != nil {
-		return err
+	if err := r.createRoutesForPublicSubnets(ctx, controlPlane.Name, *vpc.VpcId, igwID, publicSubnets); err != nil {
+		return nil, err
 	}
 	zap.S().Infof("Successfully created route table for public subnets for cluster %v", controlPlane.Name)
-	return nil
+	return status.Created, nil
 }
 
-func (r *routeTable) createRoutesForPrivateSubnets(ctx context.Context, controlPlane *v1alpha1.ControlPlane, natgw string) error {
-	vpcID := controlPlane.Status.Infrastructure.VPCID
-	natGWID := natgw
-	subnets := controlPlane.Status.Infrastructure.PrivateSubnets
-	routeTableID, err := r.createTableAndAssociateSubnets(ctx, vpcID, controlPlane.Name, subnets)
+func (r *routeTable) createRoutesForPrivateSubnets(ctx context.Context, clusterName, vpcID, natGWID string, subnets []string) error {
+	routeTableID, err := r.createTableAndAssociateSubnets(ctx, vpcID, clusterName, subnets)
 	if err != nil {
 		return err
 	}
@@ -135,11 +137,8 @@ func (r *routeTable) createRoutesForPrivateSubnets(ctx context.Context, controlP
 	return nil
 }
 
-func (r *routeTable) createRoutesForPublicSubnets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	vpcID := controlPlane.Status.Infrastructure.VPCID
-	igwID := controlPlane.Status.Infrastructure.InternetGatewayID
-	subnets := controlPlane.Status.Infrastructure.PublicSubnets
-	routeTableID, err := r.createTableAndAssociateSubnets(ctx, vpcID, controlPlane.Name, subnets)
+func (r *routeTable) createRoutesForPublicSubnets(ctx context.Context, clusterName, vpcID, igwID string, subnets []string) error {
+	routeTableID, err := r.createTableAndAssociateSubnets(ctx, vpcID, clusterName, subnets)
 	if err != nil {
 		return err
 	}

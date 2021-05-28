@@ -23,6 +23,7 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -49,32 +50,32 @@ func (e *elasticIP) For() controllers.Object {
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (e *elasticIP) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (e *elasticIP) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	// 1. Check if the elastic IP for this cluster already exists in AWS
 	eip, err := e.getElasticIP(ctx, controlPlane.Name)
 	if err != nil {
-		return ResourceFailedProgressing, fmt.Errorf("getting elastic-ip, %w", err)
+		return nil, fmt.Errorf("getting elastic-ip, %w", err)
 	}
 	// 2. create an elastic-ip in AWS if required
 	if eip == nil {
 		if _, err := e.createElasticIP(ctx, controlPlane.Name); err != nil {
-			return ResourceFailedProgressing, fmt.Errorf("creating elastic-ip, %w", err)
+			return nil, fmt.Errorf("creating elastic-ip, %w", err)
 		}
 	} else {
 		zap.S().Debugf("Successfully discovered elastic-ip %v for cluster %v", *eip.AllocationId, controlPlane.Name)
 	}
-	return ResourceCreated, nil
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (e *elasticIP) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (e *elasticIP) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	// TODO check if we need to disassociate elastic IP from instance
 	if err := e.deleteElasticIP(ctx, controlPlane.Name); err != nil {
-		return ResourceFailedProgressing, err
+		return nil, err
 	}
-	return ResourceTerminated, nil
+	return status.Terminated, nil
 }
 
 func (e *elasticIP) createElasticIP(ctx context.Context, clusterName string) (*ec2.AllocateAddressOutput, error) {

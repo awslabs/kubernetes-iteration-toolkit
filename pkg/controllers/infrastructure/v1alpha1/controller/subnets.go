@@ -26,9 +26,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/awsprovider"
-	"github.com/prateekgogia/kit/pkg/controllers"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -167,6 +164,35 @@ func getSubnets(ctx context.Context, ec2api *awsprovider.EC2, clusterName string
 		return nil, fmt.Errorf("describing subnet, %w", err)
 	}
 	return output.Subnets, nil
+}
+
+func getPrivateSubnetIDs(ctx context.Context, ec2api *awsprovider.EC2, clusterName string) ([]string, error) {
+	subnets, err := getSubnets(ctx, ec2api, clusterName)
+	if err != nil {
+		return nil, err
+	}
+	result := []string{}
+	for _, subnet := range subnets {
+		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
+			continue
+		}
+		result = append(result, *subnet.SubnetId)
+	}
+	return result, nil
+}
+
+func getPublicSubnetIDs(ctx context.Context, ec2api *awsprovider.EC2, clusterName string) ([]string, error) {
+	subnets, err := getSubnets(ctx, ec2api, clusterName)
+	if err != nil {
+		return nil, err
+	}
+	result := []string{}
+	for _, subnet := range subnets {
+		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
+			result = append(result, *subnet.SubnetId)
+		}
+	}
+	return result, nil
 }
 
 func contains(subnets []*ec2.Subnet, desired *v1alpha1.SubnetProperty, clusterName string) (*ec2.Subnet, bool) {

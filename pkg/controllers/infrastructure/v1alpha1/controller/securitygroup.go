@@ -23,7 +23,8 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/kiterr"
+	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -56,18 +57,19 @@ func (s *securityGroup) For() controllers.Object {
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (s *securityGroup) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (s *securityGroup) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
-	// 1. Get the VPC ID for the control plane
-	zap.S().Infof("CAME IN Create Security groups")
-	vpcID := controlPlane.Status.Infrastructure.VPCID
-	if vpcID == "" {
-		return WaitingForSubResource, fmt.Errorf("vpc does not exist %w", kiterr.WaitingForSubResources)
+	// 1. Get the VPC ID for the control plane status
+	vpc, err := getVPC(ctx, s.ec2api, controlPlane.Name)
+	if err != nil {
+		return status.Waiting, fmt.Errorf("getting VPC %w", err)
 	}
-	// 2. Get existing security groups
+	if vpc == nil {
+		return status.Waiting, fmt.Errorf("vpc does not exist %w", errors.WaitingForSubResources)
+	} // 2. Get existing security groups
 	existingGroups, err := s.getSecurityGroups(ctx, controlPlane.Name)
 	if err != nil {
-		return WaitingForSubResource, err
+		return nil, err
 	}
 	// 3. Map group names to the group ID
 	groups := map[string]string{}
@@ -76,9 +78,9 @@ func (s *securityGroup) Reconcile(ctx context.Context, object controllers.Object
 	}
 	// 4. If group is not created, create the group
 	if groups[masterInstancesGroupName] == "" {
-		masterGroup, err := s.createGroupForMasterNodes(ctx, controlPlane.Name, vpcID)
+		masterGroup, err := s.createGroupForMasterNodes(ctx, controlPlane.Name, *vpc.VpcId)
 		if err != nil {
-			return ResourceFailedProgressing, err
+			return nil, err
 		}
 		groups[masterInstancesGroupName] = *masterGroup.GroupId
 		zap.S().Infof("Successfully created security group %v for cluster %v", masterInstancesGroupName, controlPlane.Name)
@@ -87,9 +89,9 @@ func (s *securityGroup) Reconcile(ctx context.Context, object controllers.Object
 	}
 	if groups[etcdInstancesGroupName] == "" {
 		masterGroupID := groups[masterInstancesGroupName]
-		etcdGroup, err := s.createGroupForETCDNodes(ctx, masterGroupID, controlPlane.Name, vpcID)
+		etcdGroup, err := s.createGroupForETCDNodes(ctx, masterGroupID, controlPlane.Name, *vpc.VpcId)
 		if err != nil {
-			return ResourceFailedProgressing, err
+			return nil, err
 		}
 		groups[etcdInstancesGroupName] = *etcdGroup.GroupId
 		zap.S().Infof("Successfully created security group %v for cluster %v", etcdInstancesGroupName, controlPlane.Name)
@@ -97,17 +99,17 @@ func (s *securityGroup) Reconcile(ctx context.Context, object controllers.Object
 		zap.S().Debugf("Successfully discovered security group %v for cluster %v", etcdInstancesGroupName, controlPlane.Name)
 	}
 	// 5. Sync security group IDs with status
-	controlPlane.Status.Infrastructure.SecurityGroupMasterNodesID = groups[masterInstancesGroupName]
-	controlPlane.Status.Infrastructure.SecurityGroupETCDNodesID = groups[etcdInstancesGroupName]
-	return ResourceCreated, nil
+	// controlPlane.Status.Infrastructure.SecurityGroupMasterNodesID = groups[masterInstancesGroupName]
+	// controlPlane.Status.Infrastructure.SecurityGroupETCDNodesID = groups[etcdInstancesGroupName]
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (s *securityGroup) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (s *securityGroup) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	existingGroups, err := s.getSecurityGroups(ctx, controlPlane.Name)
 	if err != nil {
-		return ResourceFailedProgressing, err
+		return nil, err
 	}
 	groups := map[string]string{}
 	for _, groupFound := range existingGroups {
@@ -121,12 +123,12 @@ func (s *securityGroup) Finalize(ctx context.Context, object controllers.Object)
 		if _, err := s.ec2api.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
 			GroupId: aws.String(groupID),
 		}); err != nil {
-			return ResourceFailedProgressing, err
+			return nil, err
 		}
 	}
-	controlPlane.Status.Infrastructure.SecurityGroupMasterNodesID = ""
-	controlPlane.Status.Infrastructure.SecurityGroupETCDNodesID = ""
-	return ResourceTerminated, nil
+	// controlPlane.Status.Infrastructure.SecurityGroupMasterNodesID = ""
+	// controlPlane.Status.Infrastructure.SecurityGroupETCDNodesID = ""
+	return status.Terminated, nil
 }
 
 func (s *securityGroup) createGroupForMasterNodes(ctx context.Context, clusterName, vpcID string) (*ec2.CreateSecurityGroupOutput, error) {

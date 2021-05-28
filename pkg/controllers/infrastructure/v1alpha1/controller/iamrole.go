@@ -23,7 +23,8 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/kiterr"
+	"github.com/prateekgogia/kit/pkg/errors"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -70,7 +71,7 @@ var assumeRolePolicyDocument = `{
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (i *iamRole) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (i *iamRole) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	desiredRoles := []string{
 		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
@@ -79,44 +80,44 @@ func (i *iamRole) Reconcile(ctx context.Context, object controllers.Object) (rec
 	// Create desired roles if not exist
 	for _, roleName := range desiredRoles {
 		role, err := i.getRole(ctx, roleName)
-		if kiterr.IsIAMResourceNotFound(err) {
+		if errors.IsIAMResourceNotFound(err) {
 			// Create role in IAM
 			role, err := i.iam.CreateRole(&iam.CreateRoleInput{
 				AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
 				RoleName:                 aws.String(roleName),
 			})
 			if err != nil {
-				return ResourceFailedProgressing, fmt.Errorf("creating role, %w", err)
+				return nil, fmt.Errorf("creating role, %w", err)
 			}
 			zap.S().Infof("Successfully created role %v for cluster %v", *role.Role.RoleName, controlPlane.Name)
 			continue
 		} else if err != nil {
-			return ResourceFailedProgressing, fmt.Errorf("getting role, %w", err)
+			return nil, fmt.Errorf("getting role, %w", err)
 		}
 		zap.S().Debugf("Successfully discovered role %v for cluster %v", *role.Role.RoleName, controlPlane.Name)
 	}
-	return ResourceCreated, nil
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (i *iamRole) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (i *iamRole) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	desiredRoles := []string{
 		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
 		fmt.Sprintf(ETCDInstanceRoleName, controlPlane.Name),
 	}
 	for _, roleName := range desiredRoles {
-		if _, err := i.getRole(ctx, roleName); err != nil && kiterr.IsIAMResourceNotFound(err) {
+		if _, err := i.getRole(ctx, roleName); err != nil && errors.IsIAMResourceNotFound(err) {
 			continue
 		}
 		if _, err := i.iam.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
 			RoleName: aws.String(roleName),
 		}); err != nil {
-			return ResourceFailedProgressing, err
+			return nil, err
 		}
 		zap.S().Infof("Successfully deleted role %s", roleName)
 	}
-	return ResourceTerminated, nil
+	return status.Terminated, nil
 }
 
 func (i *iamRole) getRole(ctx context.Context, roleName string) (*iam.GetRoleOutput, error) {

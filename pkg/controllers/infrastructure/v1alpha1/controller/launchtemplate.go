@@ -25,6 +25,7 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
+	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -57,11 +58,11 @@ func (l *launchTemplate) For() controllers.Object {
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (l *launchTemplate) Reconcile(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (l *launchTemplate) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	templates, err := l.getLaunchTemplates(ctx, controlPlane.Name)
 	if err != nil {
-		return ResourceFailedProgressing, fmt.Errorf("getting launch template, %w", err)
+		return nil, fmt.Errorf("getting launch template, %w", err)
 	}
 	for _, templateName := range l.desiredLaunchTemplates(controlPlane.Name) {
 		if existingTemplateMatchesDesired(templates, templateName) { // TODO check if existing LT is same as desired LT
@@ -69,30 +70,30 @@ func (l *launchTemplate) Reconcile(ctx context.Context, object controllers.Objec
 			continue
 		}
 		if _, err := l.createLaunchTemplate(ctx, templateName, controlPlane.Name); err != nil {
-			return ResourceFailedProgressing, fmt.Errorf("creating launch template, %w", err)
+			return nil, fmt.Errorf("creating launch template, %w", err)
 		}
 		zap.S().Infof("Successfully created launch template %v for cluster %v", templateName, controlPlane.Name)
 	}
-	return ResourceCreated, nil
+	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
-func (l *launchTemplate) Finalize(ctx context.Context, object controllers.Object) (reconcile.Result, error) {
+func (l *launchTemplate) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	launchTemplates, err := l.getLaunchTemplates(ctx, controlPlane.Name)
 	if err != nil {
-		return ResourceFailedProgressing, fmt.Errorf("getting launch template, %w", err)
+		return nil, fmt.Errorf("getting launch template, %w", err)
 	}
 	for _, launchTemplate := range launchTemplates {
 		_, err := l.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
 			LaunchTemplateName: launchTemplate.LaunchTemplateName,
 		})
 		if err != nil {
-			return ResourceFailedProgressing, err
+			return nil, err
 		}
 		zap.S().Infof("Successfully deleted launch template %v for cluster %v", *launchTemplate.LaunchTemplateName, controlPlane.Name)
 	}
-	return ResourceTerminated, nil
+	return status.Terminated, nil
 }
 
 func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName, clusterName string) (*ec2.CreateLaunchTemplateOutput, error) {

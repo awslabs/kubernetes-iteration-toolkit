@@ -18,6 +18,7 @@ import (
 	"errors"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/iam"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -67,4 +68,22 @@ func IsWhileRemovingFinalizer(err error) bool {
 
 func KubeObjNotFound(err error) bool {
 	return kubeerrors.IsNotFound(err)
+}
+
+func IsIAMResourceNotFound(err error) bool {
+	if err != nil {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			return aerr.Code() == iam.ErrCodeNoSuchEntityException
+		}
+	}
+	return false
+}
+
+func IsIAMResourceDependencyExists(err error) bool {
+	if err != nil {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			return aerr.Code() == iam.ErrCodeDeleteConflictException
+		}
+	}
+	return false
 }
