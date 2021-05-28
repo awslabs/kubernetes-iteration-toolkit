@@ -44,37 +44,42 @@ func (e *elasticIP) Name() string {
 
 // For returns the resource this controller is for.
 func (e *elasticIP) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.ElasticIP{}
 }
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with the ControlPlane.Status
+// else create the resource and then sync status with the eipObj.Status
 // object
 func (e *elasticIP) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
+	eipObj := object.(*v1alpha1.ElasticIP)
 	// 1. Check if the elastic IP for this cluster already exists in AWS
-	eip, err := e.getElasticIP(ctx, controlPlane.Name)
+	eip, err := e.getElasticIP(ctx, eipObj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("getting elastic-ip, %w", err)
 	}
+	publicIP := ""
 	// 2. create an elastic-ip in AWS if required
 	if eip == nil {
-		if _, err := e.createElasticIP(ctx, controlPlane.Name); err != nil {
+		output, err := e.createElasticIP(ctx, eipObj.Name)
+		if err != nil {
 			return nil, fmt.Errorf("creating elastic-ip, %w", err)
 		}
+		publicIP = *output.PublicIp
 	} else {
-		zap.S().Debugf("Successfully discovered elastic-ip %v for cluster %v", *eip.AllocationId, controlPlane.Name)
+		publicIP = *eip.PublicIp
+		zap.S().Debugf("Successfully discovered elastic-ip %v for cluster %v", *eip.AllocationId, eipObj.Name)
 	}
+	eipObj.Status.PublicIP = publicIP
 	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (e *elasticIP) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	// TODO check if we need to disassociate elastic IP from instance
-	if err := e.deleteElasticIP(ctx, controlPlane.Name); err != nil {
+	eipObj := object.(*v1alpha1.ElasticIP)
+	if err := e.deleteElasticIP(ctx, eipObj.Name); err != nil {
 		return nil, err
 	}
+	eipObj.Status.PublicIP = ""
 	return status.Terminated, nil
 }
 
