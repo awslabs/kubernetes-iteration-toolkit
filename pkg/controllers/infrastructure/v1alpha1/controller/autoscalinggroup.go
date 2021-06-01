@@ -30,11 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	MasterInstanceASGName = "master-instance-auto-scaling-group-cluster-%s"
-	ETCDInstanceASGName   = "etcd-instance-auto-scaling-group-cluster-%s"
-)
-
 type autoScalingGroup struct {
 	ec2api         *awsprovider.EC2
 	autoscalingAPI *awsprovider.AutoScaling
