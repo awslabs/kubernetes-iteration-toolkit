@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -46,87 +47,68 @@ func (i *iamPolicy) Name() string {
 
 // For returns the resource this controller is for.
 func (i *iamPolicy) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.Policy{}
 }
-
-const (
-	MasterInstancePolicyName = "master-instance-policy"
-	ETCDInstancePolicyName   = "etcd-instance-policy"
-)
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
 func (i *iamPolicy) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	roles := []string{
-		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
-		fmt.Sprintf(ETCDInstanceRoleName, controlPlane.Name),
+	policyObj := object.(*v1alpha1.Policy)
+	policyName := v1alpha1.PolicyName(policyObj.Name)
+	roleName := fmt.Sprintf("%s-role", policyObj.Name)
+	policyDocument := i.getPolicyDocument(policyObj.Name)
+	// check role exists
+	if _, err := getRole(ctx, i.iam, roleName); err != nil && errors.IsIAMResourceNotFound(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("getting role, %w", err)
 	}
-	for _, roleName := range roles {
-		desiredPolicies := i.policyRoleMapping(roleName, controlPlane.Name)
-		for policyName, desiredPolicy := range desiredPolicies {
-			// check role exists
-			if _, err := getRole(ctx, i.iam, roleName); err != nil && errors.IsIAMResourceNotFound(err) {
-				return nil, nil
-			} else if err != nil {
-				return nil, fmt.Errorf("getting role, %w", err)
-			}
-			// check policy exists on the role
-			output, err := i.getRolePolicy(ctx, policyName, roleName)
-			if err != nil && !errors.IsIAMResourceNotFound(err) {
-				return nil, fmt.Errorf("getting role policy, %w", err)
-			}
-			if !policyFoundEqualsDesired(output, desiredPolicy) {
-				// Policy is not found or doesn't match the desired policy
-				if _, err := i.iam.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
-					RoleName:       aws.String(roleName),
-					PolicyName:     aws.String(policyName),
-					PolicyDocument: aws.String(desiredPolicy),
-				}); err != nil {
-					return nil, fmt.Errorf("adding policy to role, %w", err)
-				}
-				zap.S().Infof("Successfully added policy %v to role %v", policyName, roleName)
-				continue
-			}
-			zap.S().Debugf("Successfully discovered policy %v to role %v", policyName, roleName)
+	// check policy exists on the role
+	output, err := i.getRolePolicy(ctx, policyName, roleName)
+	if err != nil && !errors.IsIAMResourceNotFound(err) {
+		return nil, fmt.Errorf("getting role policy, %w", err)
+	}
+	if !policyFoundEqualsDesired(output, policyDocument) {
+		// Policy is not found or doesn't match the desired policy
+		if _, err := i.iam.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
+			RoleName:       aws.String(roleName),
+			PolicyName:     aws.String(policyName),
+			PolicyDocument: aws.String(policyDocument),
+		}); err != nil {
+			return nil, fmt.Errorf("adding policy to role, %w", err)
 		}
+		zap.S().Infof("Successfully added policy %v to role %v", policyName, roleName)
+	} else {
+		zap.S().Debugf("Successfully discovered policy %v to role %v", policyName, roleName)
 	}
 	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (i *iamPolicy) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	roles := []string{
-		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
-		fmt.Sprintf(ETCDInstanceRoleName, controlPlane.Name),
+	policyObj := object.(*v1alpha1.Policy)
+	policyName := v1alpha1.PolicyName(policyObj.Name)
+	roleName := fmt.Sprintf("%s-role", policyObj.Name)
+	if _, err := i.iam.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
+		PolicyName: aws.String(policyName),
+		RoleName:   aws.String(roleName),
+	}); err != nil {
+		zap.S().Errorf("Failed to delete role policy, %v", err)
+		return nil, err
 	}
-	for _, roleName := range roles {
-		desiredPolicies := i.policyRoleMapping(roleName, controlPlane.Name)
-		for policyName := range desiredPolicies {
-			_, err := i.iam.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
-				PolicyName: aws.String(policyName),
-				RoleName:   aws.String(roleName),
-			})
-			if err != nil {
-				zap.S().Errorf("Failed to delete role policy, %v", err)
-				return nil, err
-			}
-			zap.S().Infof("Successfully removed policy %s from role %s", policyName, roleName)
-		}
-	}
+	zap.S().Infof("Successfully removed policy %s from role %s", policyName, roleName)
 	return status.Terminated, nil
 }
 
-func (i *iamPolicy) policyRoleMapping(roleName, clusterName string) map[string]string {
-	switch roleName {
-	case fmt.Sprintf(MasterInstanceRoleName, clusterName):
-		return map[string]string{MasterInstancePolicyName: masterPolicy}
-	case fmt.Sprintf(ETCDInstanceRoleName, clusterName):
-		return map[string]string{ETCDInstancePolicyName: etcdPolicy}
+func (i *iamPolicy) getPolicyDocument(policyName string) string {
+	switch {
+	case strings.Contains(policyName, v1alpha1.MasterInstances):
+		return masterPolicy
+	case strings.Contains(policyName, v1alpha1.ETCDInstances):
+		return etcdPolicy
 	}
-	return map[string]string{}
+	return ""
 }
 
 func (i *iamPolicy) getRolePolicy(ctx context.Context, policy, role string) (*iam.GetRolePolicyOutput, error) {

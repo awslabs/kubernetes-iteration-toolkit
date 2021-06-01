@@ -197,7 +197,7 @@ func (s *securityGroup) createIngressInputFor(securitygroupID, groupName, contro
 // Finalize deletes the resource from AWS
 func (s *securityGroup) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	sgObj := object.(*v1alpha1.SecurityGroup)
-	existingGroups, err := s.getSecurityGroups(ctx, sgObj.Name)
+	existingGroups, err := s.getSecurityGroups(ctx, sgObj.Spec.ClusterName)
 	if err != nil {
 		return nil, err
 	}

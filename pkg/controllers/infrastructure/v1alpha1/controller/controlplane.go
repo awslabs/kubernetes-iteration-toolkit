@@ -65,6 +65,9 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 		&resource.NatGateway{KubeClient: c.Client},
 		&resource.RouteTable{KubeClient: c.Client},
 		&resource.SecurityGroup{KubeClient: c.Client},
+		&resource.Role{KubeClient: c.Client},
+		&resource.Profile{KubeClient: c.Client},
+		&resource.Policy{KubeClient: c.Client},
 	}
 	for _, resource := range resources {
 		if err := resource.Create(ctx, controlPlane); err != nil {

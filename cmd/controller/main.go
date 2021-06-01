@@ -71,9 +71,9 @@ func main() {
 		infra.NewNatGWController(awsprovider.EC2Client(session)),
 		infra.NewRouteTableController(awsprovider.EC2Client(session)),
 		infra.NewSecurityGroupController(awsprovider.EC2Client(session)),
-		// infra.NewIAMRoleController(awsprovider.IAMClient(session)),
-		// infra.NewIAMProfileController(awsprovider.IAMClient(session)),
-		// infra.NewIAMPolicyController(awsprovider.IAMClient(session)),
+		infra.NewIAMRoleController(awsprovider.IAMClient(session)),
+		infra.NewIAMProfileController(awsprovider.IAMClient(session)),
+		infra.NewIAMPolicyController(awsprovider.IAMClient(session)),
 		// infra.NewLaunchTemplateController(
 		// 	awsprovider.EC2Client(session),
 		// 	awsprovider.SSMClient(session),

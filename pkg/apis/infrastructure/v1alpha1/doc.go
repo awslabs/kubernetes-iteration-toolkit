@@ -55,4 +55,7 @@ func init() {
 	SchemeBuilder.Register(&ElasticIP{}, &ElasticIPList{})
 	SchemeBuilder.Register(&RouteTable{}, &RouteTableList{})
 	SchemeBuilder.Register(&SecurityGroup{}, &SecurityGroupList{})
+	SchemeBuilder.Register(&Role{}, &RoleList{})
+	SchemeBuilder.Register(&Profile{}, &ProfileList{})
+	SchemeBuilder.Register(&Policy{}, &PolicyList{})
 }

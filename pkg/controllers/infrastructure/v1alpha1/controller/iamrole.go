@@ -45,7 +45,7 @@ func (i *iamRole) Name() string {
 
 // For returns the resource this controller is for.
 func (i *iamRole) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.Role{}
 }
 
 const (
@@ -72,51 +72,38 @@ var assumeRolePolicyDocument = `{
 // else create the resource and then sync status with the ControlPlane.Status
 // object
 func (i *iamRole) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	desiredRoles := []string{
-		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
-		fmt.Sprintf(ETCDInstanceRoleName, controlPlane.Name),
-	}
-	// Create desired roles if not exist
-	for _, roleName := range desiredRoles {
-		role, err := i.getRole(ctx, roleName)
-		if errors.IsIAMResourceNotFound(err) {
-			// Create role in IAM
-			role, err := i.iam.CreateRole(&iam.CreateRoleInput{
-				AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
-				RoleName:                 aws.String(roleName),
-			})
-			if err != nil {
-				return nil, fmt.Errorf("creating role, %w", err)
-			}
-			zap.S().Infof("Successfully created role %v for cluster %v", *role.Role.RoleName, controlPlane.Name)
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("getting role, %w", err)
+	roleObj := object.(*v1alpha1.Role)
+	role, err := i.getRole(ctx, roleObj.Spec.RoleName)
+	if errors.IsIAMResourceNotFound(err) {
+		// Create role in IAM
+		role, err := i.iam.CreateRole(&iam.CreateRoleInput{
+			AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
+			RoleName:                 aws.String(roleObj.Spec.RoleName),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("creating role, %w", err)
 		}
-		zap.S().Debugf("Successfully discovered role %v for cluster %v", *role.Role.RoleName, controlPlane.Name)
+		zap.S().Infof("Successfully created role %v for cluster %v", *role.Role.RoleName, roleObj.Spec.ClusterName)
+		return status.Created, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("getting role, %w", err)
 	}
+	zap.S().Debugf("Successfully discovered role %v for cluster %v", *role.Role.RoleName, roleObj.Spec.ClusterName)
 	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (i *iamRole) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	desiredRoles := []string{
-		fmt.Sprintf(MasterInstanceRoleName, controlPlane.Name),
-		fmt.Sprintf(ETCDInstanceRoleName, controlPlane.Name),
+	roleObj := object.(*v1alpha1.Role)
+	if _, err := i.getRole(ctx, roleObj.Spec.RoleName); err != nil && errors.IsIAMResourceNotFound(err) {
+		return status.Terminated, nil
 	}
-	for _, roleName := range desiredRoles {
-		if _, err := i.getRole(ctx, roleName); err != nil && errors.IsIAMResourceNotFound(err) {
-			continue
-		}
-		if _, err := i.iam.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
-			RoleName: aws.String(roleName),
-		}); err != nil {
-			return nil, err
-		}
-		zap.S().Infof("Successfully deleted role %s", roleName)
+	if _, err := i.iam.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
+		RoleName: aws.String(roleObj.Spec.RoleName),
+	}); err != nil {
+		return nil, err
 	}
+	zap.S().Infof("Successfully deleted role %s", roleObj.Spec.RoleName)
 	return status.Terminated, nil
 }
 

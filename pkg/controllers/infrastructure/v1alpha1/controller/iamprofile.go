@@ -45,7 +45,7 @@ func (i *iamProfile) Name() string {
 
 // For returns the resource this controller is for.
 func (i *iamProfile) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.Profile{}
 }
 
 const (
@@ -57,36 +57,31 @@ const (
 // else create the resource and then sync status with the ControlPlane.Status
 // object
 func (i *iamProfile) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	desiredProfilesRolesMapping := i.profileToRoleMapping(controlPlane.Name)
-	actualProfilesRolesMapping := map[string][]*iam.Role{}
+	profileObj := object.(*v1alpha1.Profile)
 	// Create desired profiles if not exist
-	for profileName := range desiredProfilesRolesMapping {
-		profile, err := i.getInstanceProfile(ctx, profileName)
-		if errors.IsIAMResourceNotFound(err) {
-			// Create profile in IAM
-			result, err := i.iam.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
-				InstanceProfileName: aws.String(profileName),
-			})
-			if err != nil {
-				return nil, fmt.Errorf("creating profile, %w", err)
-			}
-			zap.S().Infof("Successfully created instance profile %v", *result.InstanceProfile.InstanceProfileName)
-			actualProfilesRolesMapping[profileName] = result.InstanceProfile.Roles
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("getting instance profile, %w", err)
+	var roles []*iam.Role
+	profileName := v1alpha1.ProfileName(profileObj.Name)
+	// for profileName := range desiredProfilesRolesMapping {
+	profile, err := i.getInstanceProfile(ctx, profileName)
+	if errors.IsIAMResourceNotFound(err) {
+		// Create profile in IAM
+		result, err := i.iam.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
+			InstanceProfileName: aws.String(profileName),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("creating profile, %w", err)
 		}
-		actualProfilesRolesMapping[profileName] = profile.InstanceProfile.Roles
-		zap.S().Debugf("Successfully discovered profile %v for cluster %v", *profile.InstanceProfile.InstanceProfileName, controlPlane.Name)
+		zap.S().Infof("Successfully created instance profile %v", *result.InstanceProfile.InstanceProfileName)
+		roles = result.InstanceProfile.Roles
+	} else if err != nil {
+		return nil, fmt.Errorf("getting instance profile, %w", err)
+	} else {
+		roles = profile.InstanceProfile.Roles
+		zap.S().Debugf("Successfully discovered profile %v", *profile.InstanceProfile.InstanceProfileName)
 	}
 	// Add roles to the Instance Profile
-	for profileName, roles := range actualProfilesRolesMapping {
-		roleName := desiredProfilesRolesMapping[profileName]
-		// if the roles are already to the instance profile
-		if rolesContains(roles, roleName) {
-			continue
-		}
+	roleName := fmt.Sprintf("%s-role", profileObj.Name)
+	if !rolesContains(roles, roleName) {
 		if _, err := i.iam.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName),
 			RoleName:            aws.String(roleName),
@@ -102,26 +97,20 @@ func (i *iamProfile) Reconcile(ctx context.Context, object controllers.Object) (
 
 // Finalize deletes the resource from AWS
 func (i *iamProfile) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	for profileName, roleName := range i.profileToRoleMapping(controlPlane.Name) {
-		if _, err := i.iam.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
-			InstanceProfileName: aws.String(profileName),
-			RoleName:            aws.String(roleName),
-		}); err != nil {
-			if errors.IsIAMResourceNotFound(err) {
-				continue
-			}
-			return nil, err
-		}
-		if _, err := i.iam.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
-			InstanceProfileName: aws.String(profileName),
-		}); err != nil {
-			if errors.IsIAMResourceNotFound(err) ||
-				errors.IsIAMResourceDependencyExists(err) {
-				continue
-			}
-			return status.Waiting, err
-		}
+	profileObj := object.(*v1alpha1.Profile)
+	profileName := v1alpha1.ProfileName(profileObj.Name)
+	roleName := fmt.Sprintf("%s-role", profileObj.Name)
+	if _, err := i.iam.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
+		InstanceProfileName: aws.String(profileName),
+		RoleName:            aws.String(roleName),
+	}); err != nil {
+		return nil, err
+	}
+	if _, err := i.iam.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
+		InstanceProfileName: aws.String(profileName),
+	}); err != nil {
+
+		return nil, err
 	}
 	return status.Terminated, nil
 }
@@ -133,15 +122,6 @@ func rolesContains(roles []*iam.Role, roleName string) bool {
 		}
 	}
 	return false
-}
-
-func (i *iamProfile) profileToRoleMapping(clusterName string) map[string]string {
-	masterInstanceProfile := fmt.Sprintf(MasterInstanceProfileName, clusterName)
-	etcdInstanceProfile := fmt.Sprintf(ETCDInstanceProfileName, clusterName)
-	return map[string]string{
-		masterInstanceProfile: fmt.Sprintf(MasterInstanceRoleName, clusterName),
-		etcdInstanceProfile:   fmt.Sprintf(ETCDInstanceRoleName, clusterName),
-	}
 }
 
 func (i *iamProfile) getInstanceProfile(ctx context.Context, profileName string) (*iam.GetInstanceProfileOutput, error) {
