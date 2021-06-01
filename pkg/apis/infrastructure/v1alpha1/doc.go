@@ -58,4 +58,6 @@ func init() {
 	SchemeBuilder.Register(&Role{}, &RoleList{})
 	SchemeBuilder.Register(&Profile{}, &ProfileList{})
 	SchemeBuilder.Register(&Policy{}, &PolicyList{})
+	SchemeBuilder.Register(&LaunchTemplate{}, &LaunchTemplateList{})
+	SchemeBuilder.Register(&AutoScalingGroup{}, &AutoScalingGroupList{})
 }

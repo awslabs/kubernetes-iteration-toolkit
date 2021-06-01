@@ -24,6 +24,7 @@ import (
 	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/prateekgogia/kit/pkg/awsprovider"
 	"github.com/prateekgogia/kit/pkg/controllers"
+	"github.com/prateekgogia/kit/pkg/errors"
 	"github.com/prateekgogia/kit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -51,77 +52,70 @@ func (a *autoScalingGroup) Name() string {
 
 // For returns the resource this controller is for.
 func (a *autoScalingGroup) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.AutoScalingGroup{}
 }
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
 func (a *autoScalingGroup) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	asgNames := a.desiredAutoScalingGroups(controlPlane.Name)
-	asgs, err := a.getAutoScalingGroup(ctx, asgNames)
+	asgObj := object.(*v1alpha1.AutoScalingGroup)
+	existingASG, err := a.getAutoScalingGroup(ctx, asgObj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("getting autoscaling groups, %w", err)
 	}
-	for _, asgName := range asgNames {
-		if a.existingASGMatchesDesrired(asgs, asgName) {
-			zap.S().Debugf("Successfully discovered autoscaling group %v for cluster %v", asgName, controlPlane.Name)
-			continue
-		}
-		if err := a.createAutoScalingGroup(ctx, asgName, controlPlane.Name); err != nil {
+	// If doesn't match or doesn't exists
+	if existingASG == nil {
+		if err := a.createAutoScalingGroup(ctx, asgObj); err != nil {
 			return nil, err
 		}
-		zap.S().Infof("Successfully created autoscaling group %v for cluster %v", asgName, controlPlane.Name)
+		zap.S().Infof("Successfully created autoscaling group %v for cluster %v", asgObj.Name, asgObj.Spec.ClusterName)
+	} else {
+		zap.S().Debugf("Successfully discovered autoscaling group %v for cluster %v", asgObj.Name, asgObj.Spec.ClusterName)
 	}
 	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (a *autoScalingGroup) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	asgNames := a.desiredAutoScalingGroups(controlPlane.Name)
-	existingASGs, err := a.getAutoScalingGroup(ctx, asgNames)
+	asgObj := object.(*v1alpha1.AutoScalingGroup)
+	existingASG, err := a.getAutoScalingGroup(ctx, asgObj.Name)
 	if err != nil {
-		return nil, fmt.Errorf("getting auto-scaling-groups, %w", err)
+		return nil, fmt.Errorf("getting autoscaling groups, %w", err)
 	}
-	for _, asg := range existingASGs {
-		if asg.Status == aws.String("Delete in progress") {
-			continue
-		}
+	if existingASG != nil &&
+		aws.StringValue(existingASG.Status) != "Delete in progress" {
 		if _, err := a.autoscalingAPI.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
-			AutoScalingGroupName: asg.AutoScalingGroupName,
+			AutoScalingGroupName: existingASG.AutoScalingGroupName,
 			ForceDelete:          aws.Bool(true),
 		}); err != nil {
 			return nil, err
 		}
-		zap.S().Infof("Successfully deleted auto-scaling-group %v", *asg.AutoScalingGroupName)
+		zap.S().Infof("Successfully deleted auto-scaling-group %v", *existingASG.AutoScalingGroupName)
 	}
 	return status.Terminated, nil
 }
 
-func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, name, clusterName string) error {
-	zones := availabilityZonesForRegion(*a.ec2api.Config.Region)
-	privateSubnets, err := getPrivateSubnetIDs(ctx, a.ec2api, clusterName)
+func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, asg *v1alpha1.AutoScalingGroup) error {
+	// zones :=
+	privateSubnets, err := getPrivateSubnetIDs(ctx, a.ec2api, asg.Spec.ClusterName)
 	if err != nil {
 		return err
 	}
-	subnets := strings.Join(privateSubnets, ",")
-	launchTemplateName := a.desiredLaunchTemplateName(name, clusterName)
-	if len(zones) == 0 || len(privateSubnets) == 0 || launchTemplateName == "" {
-		return fmt.Errorf("failed to get zones/subnets/launch template")
+	if len(privateSubnets) == 0 {
+		return fmt.Errorf("waiting for private subnets, %w", errors.WaitingForSubResources)
 	}
 	input := &autoscaling.CreateAutoScalingGroupInput{
-		AutoScalingGroupName: aws.String(name),
+		AutoScalingGroupName: aws.String(asg.Name),
 		// AvailabilityZones:    aws.StringSlice(zones),
-		DesiredCapacity: aws.Int64(1),
-		MaxSize:         aws.Int64(3),
+		DesiredCapacity: aws.Int64(int64(asg.Spec.InstanceCount)),
+		MaxSize:         aws.Int64(4),
 		MinSize:         aws.Int64(1),
 		LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-			LaunchTemplateName: aws.String(launchTemplateName),
+			LaunchTemplateName: aws.String(asg.Name),
 		},
-		VPCZoneIdentifier: aws.String(subnets),
-		Tags:              generateAutoScalingTags(name, clusterName),
+		VPCZoneIdentifier: aws.String(strings.Join(privateSubnets, ",")),
+		Tags:              generateAutoScalingTags(asg.Name, asg.Spec.ClusterName),
 	}
 	if _, err := a.autoscalingAPI.CreateAutoScalingGroup(input); err != nil {
 		return fmt.Errorf("creating autoscaling group, %w", err)
@@ -129,26 +123,9 @@ func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, name, clu
 	return nil
 }
 
-func (a *autoScalingGroup) desiredAutoScalingGroups(clusterName string) []string {
-	return []string{
-		fmt.Sprintf(MasterInstanceASGName, clusterName),
-		fmt.Sprintf(ETCDInstanceASGName, clusterName),
-	}
-}
-
-func (a *autoScalingGroup) desiredLaunchTemplateName(name, clusterName string) string {
-	switch name {
-	case fmt.Sprintf(MasterInstanceASGName, clusterName):
-		return fmt.Sprintf(MasterInstanceLaunchTemplateName, clusterName)
-	case fmt.Sprintf(ETCDInstanceASGName, clusterName):
-		return fmt.Sprintf(ETCDInstanceLaunchTemplateName, clusterName)
-	}
-	return ""
-}
-
-func (a *autoScalingGroup) getAutoScalingGroup(ctx context.Context, groupNames []string) ([]*autoscaling.Group, error) {
+func (a *autoScalingGroup) getAutoScalingGroup(ctx context.Context, groupName string) (*autoscaling.Group, error) {
 	output, err := a.autoscalingAPI.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
-		AutoScalingGroupNames: aws.StringSlice(groupNames),
+		AutoScalingGroupNames: aws.StringSlice([]string{groupName}),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("getting autoscaling group, %w", err)
@@ -156,14 +133,8 @@ func (a *autoScalingGroup) getAutoScalingGroup(ctx context.Context, groupNames [
 	if len(output.AutoScalingGroups) == 0 {
 		return nil, nil
 	}
-	return output.AutoScalingGroups, nil
-}
-
-func (a *autoScalingGroup) existingASGMatchesDesrired(groups []*autoscaling.Group, asgName string) bool {
-	for _, group := range groups {
-		if *group.AutoScalingGroupName == asgName {
-			return true
-		}
+	if len(output.AutoScalingGroups) > 1 {
+		return nil, fmt.Errorf("expected asg count one found asgs %d", len(output.AutoScalingGroups))
 	}
-	return false
+	return output.AutoScalingGroups[0], nil
 }

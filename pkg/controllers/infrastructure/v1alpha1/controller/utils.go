@@ -49,18 +49,15 @@ func ec2FilterFor(clusterName string) []*ec2.Filter {
 
 // TODO fix this naming
 func generateAutoScalingTags(svcName, clusterName string) []*autoscaling.Tag {
-	return []*autoscaling.Tag{
-		&autoscaling.Tag{
-			Key:               aws.String(TagKeyNameForAWSResources),
-			Value:             aws.String(clusterName),
-			PropagateAtLaunch: aws.Bool(true),
-		},
-		&autoscaling.Tag{
-			Key:               aws.String("Name"),
-			Value:             aws.String(svcName),
-			PropagateAtLaunch: aws.Bool(true),
-		},
-	}
+	return []*autoscaling.Tag{{
+		Key:               aws.String(TagKeyNameForAWSResources),
+		Value:             aws.String(clusterName),
+		PropagateAtLaunch: aws.Bool(true),
+	}, {
+		Key:               aws.String("Name"),
+		Value:             aws.String(svcName),
+		PropagateAtLaunch: aws.Bool(true),
+	}}
 }
 
 // TODO get all AZs for a region from an API

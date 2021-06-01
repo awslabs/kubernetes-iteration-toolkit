@@ -52,57 +52,57 @@ func (l *launchTemplate) Name() string {
 
 // For returns the resource this controller is for.
 func (l *launchTemplate) For() controllers.Object {
-	return &v1alpha1.ControlPlane{}
+	return &v1alpha1.LaunchTemplate{}
 }
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
 func (l *launchTemplate) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	templates, err := l.getLaunchTemplates(ctx, controlPlane.Name)
+	ltObj := object.(*v1alpha1.LaunchTemplate)
+	templates, err := l.getLaunchTemplates(ctx, ltObj.Spec.ClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("getting launch template, %w", err)
 	}
-	for _, templateName := range l.desiredLaunchTemplates(controlPlane.Name) {
-		if existingTemplateMatchesDesired(templates, templateName) { // TODO check if existing LT is same as desired LT
-			zap.S().Debugf("Successfully discovered launch template %v for cluster %v", templateName, controlPlane.Name)
-			continue
-		}
-		if _, err := l.createLaunchTemplate(ctx, templateName, controlPlane.Name); err != nil {
+	if !existingTemplateMatchesDesired(templates, ltObj.Name) { // TODO check if existing LT is same as desired LT
+		if _, err := l.createLaunchTemplate(ctx, ltObj); err != nil {
 			return nil, fmt.Errorf("creating launch template, %w", err)
 		}
-		zap.S().Infof("Successfully created launch template %v for cluster %v", templateName, controlPlane.Name)
+		zap.S().Infof("Successfully created launch template %v for cluster %v", ltObj.Name, ltObj.Spec.ClusterName)
+	} else {
+		zap.S().Debugf("Successfully discovered launch template %v for cluster %v", ltObj.Name, ltObj.Spec.ClusterName)
 	}
 	return status.Created, nil
 }
 
 // Finalize deletes the resource from AWS
 func (l *launchTemplate) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
-	controlPlane := object.(*v1alpha1.ControlPlane)
-	launchTemplates, err := l.getLaunchTemplates(ctx, controlPlane.Name)
+	ltObj := object.(*v1alpha1.LaunchTemplate)
+	launchTemplates, err := l.getLaunchTemplates(ctx, ltObj.Spec.ClusterName)
 	if err != nil {
 		return nil, fmt.Errorf("getting launch template, %w", err)
 	}
 	for _, launchTemplate := range launchTemplates {
-		_, err := l.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
-			LaunchTemplateName: launchTemplate.LaunchTemplateName,
-		})
-		if err != nil {
-			return nil, err
+		if aws.StringValue(launchTemplate.LaunchTemplateName) == ltObj.Name {
+			_, err := l.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
+				LaunchTemplateName: launchTemplate.LaunchTemplateName,
+			})
+			if err != nil {
+				return nil, err
+			}
+			zap.S().Infof("Successfully deleted launch template %v for cluster %v", ltObj.Name, ltObj.Spec.ClusterName)
 		}
-		zap.S().Infof("Successfully deleted launch template %v for cluster %v", *launchTemplate.LaunchTemplateName, controlPlane.Name)
 	}
 	return status.Terminated, nil
 }
 
-func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName, clusterName string) (*ec2.CreateLaunchTemplateOutput, error) {
+func (l *launchTemplate) createLaunchTemplate(ctx context.Context, launchTemplate *v1alpha1.LaunchTemplate) (*ec2.CreateLaunchTemplateOutput, error) {
 	// Get Security group
-	securityGroupID := l.desiredSecurityGroupID(ctx, templateName, clusterName)
+	securityGroupID := l.desiredSecurityGroupID(ctx, launchTemplate.Name, launchTemplate.Spec.ClusterName)
 	// Get IAM instance profile ARN
-	instanceProfileName := l.desiredInstanceProfileName(templateName, clusterName)
-	if securityGroupID == "" || instanceProfileName == "" {
-		return nil, fmt.Errorf("failed to find security group and profile ")
+	// instanceProfileName :=
+	if securityGroupID == "" {
+		return nil, fmt.Errorf("failed to find security group ")
 	}
 	paramOutput, err := l.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"),
@@ -127,15 +127,15 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName,
 			ImageId:      aws.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
 				// Arn:  aws.String("arn:aws:iam::674320443449:instance-profile/cluster-foo-master-instance-profile"),
-				Name: aws.String(fmt.Sprintf(instanceProfileName, clusterName)),
+				Name: aws.String(v1alpha1.ProfileName(launchTemplate.Name)),
 			},
 			Monitoring: &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 			// SecurityGroupIds: []*string{aws.String("sg-0c44ff3e16005d370")},
 			SecurityGroupIds: []*string{aws.String(securityGroupID)},
 			UserData:         aws.String(base64.StdEncoding.EncodeToString([]byte(userData))),
 		},
-		LaunchTemplateName: aws.String(templateName),
-		TagSpecifications:  generateEC2Tags(l.Name(), clusterName),
+		LaunchTemplateName: aws.String(launchTemplate.Name),
+		TagSpecifications:  generateEC2Tags(l.Name(), launchTemplate.Spec.ClusterName),
 	}
 	output, err := l.ec2api.CreateLaunchTemplate(input)
 	if err != nil {
@@ -144,30 +144,15 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, templateName,
 	return output, nil
 }
 
-func (l *launchTemplate) desiredLaunchTemplates(clusterName string) []string {
-	return []string{
-		fmt.Sprintf(MasterInstanceLaunchTemplateName, clusterName),
-		fmt.Sprintf(ETCDInstanceLaunchTemplateName, clusterName),
-	}
-}
-
 func (l *launchTemplate) desiredSecurityGroupID(ctx context.Context, templateName, clusterName string) string {
 	securityGroups, err := getSecurityGroups(ctx, l.ec2api, clusterName)
 	if err != nil || len(securityGroups) == 0 {
 		return ""
 	}
-	switch templateName {
-	case fmt.Sprintf(MasterInstanceLaunchTemplateName, clusterName):
-		for _, group := range securityGroups {
-			if *group.GroupName == masterInstancesGroupName {
-				return *group.GroupId
-			}
-		}
-	case fmt.Sprintf(ETCDInstanceLaunchTemplateName, clusterName):
-		for _, group := range securityGroups {
-			if *group.GroupName == etcdInstancesGroupName {
-				return *group.GroupId
-			}
+	desiredGroupName := fmt.Sprintf("%s-security-group", templateName)
+	for _, group := range securityGroups {
+		if aws.StringValue(group.GroupName) == desiredGroupName {
+			return aws.StringValue(group.GroupId)
 		}
 	}
 	return ""
@@ -183,15 +168,15 @@ func (l *launchTemplate) desiredSecurityGroupID(ctx context.Context, templateNam
 // 	return ""
 // }
 
-func (l *launchTemplate) desiredInstanceProfileName(templateName string, clusterName string) string {
-	switch templateName {
-	case fmt.Sprintf(MasterInstanceLaunchTemplateName, clusterName):
-		return MasterInstanceProfileName
-	case fmt.Sprintf(ETCDInstanceLaunchTemplateName, clusterName):
-		return ETCDInstanceProfileName
-	}
-	return ""
-}
+// func (l *launchTemplate) desiredInstanceProfileName(templateName string, clusterName string) string {
+// 	switch templateName {
+// 	case fmt.Sprintf(MasterInstanceLaunchTemplateName, clusterName):
+// 		return MasterInstanceProfileName
+// 	case fmt.Sprintf(ETCDInstanceLaunchTemplateName, clusterName):
+// 		return ETCDInstanceProfileName
+// 	}
+// 	return ""
+// }
 
 func (l *launchTemplate) getLaunchTemplates(ctx context.Context, clusterName string) ([]*ec2.LaunchTemplate, error) {
 	return getLaunchTemplates(ctx, l.ec2api, clusterName)
