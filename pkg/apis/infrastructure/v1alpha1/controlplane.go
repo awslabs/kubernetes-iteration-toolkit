@@ -18,6 +18,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	MasterInstances = "master-instances"
+	ETCDInstances   = "etcd-instances"
+
+	SecurityGroupKey = "security-group"
+)
+
+var ComponentsSupported = []string{ETCDInstances, MasterInstances}
+
 // ControlPlane is the Schema for the ControlPlanes API
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status

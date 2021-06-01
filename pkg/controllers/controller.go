@@ -47,15 +47,16 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		}
 		return reconcile.Result{}, err
 	}
+	zap.S().Infof("Controller %v reconciling for resource %v", c.Name(), resource.GetName())
 	// 2. Copy object for merge patch base
 	persisted := resource.DeepCopyObject()
 	// 3. reconcile else finalize if object is deleted
 	result, err := c.reconcile(ctx, resource)
 	if err != nil {
 		resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
-		if errors.SafeToIgnore(err) {
-			return reconcile.Result{}, err
-		}
+		// if errors.SafeToIgnore(err) {
+		// 	return reconcile.Result{}, err
+		// }
 		zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
 		return reconcile.Result{}, err
 	}
@@ -79,10 +80,13 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object) (*re
 		}
 		return result, nil
 	}
+	zap.S().Infof("FInalizing for resource %v controller %v", resource.GetName(), c.Name())
 	result, err := c.Controller.Finalize(ctx, resource)
 	if err != nil {
-		return result, fmt.Errorf("finalizing resource controller name %v, %w", c.Controller.Name(), err)
+		zap.S().Errorf("Error while finalizing resource %v controller %v %v", resource.GetName(), c.Name(), err)
+		return nil, fmt.Errorf("finalizing resource controller name %v, %w", c.Controller.Name(), err)
 	}
+	zap.S().Infof("Removing finalizer for resource %v controller %v", resource.GetName(), c.Name())
 	if err := c.removeFinalizer(ctx, resource); err != nil {
 		return status.Waiting, fmt.Errorf("removing finalizers, %w", err)
 	}

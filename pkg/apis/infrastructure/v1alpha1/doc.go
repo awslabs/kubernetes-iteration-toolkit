@@ -54,4 +54,5 @@ func init() {
 	SchemeBuilder.Register(&NatGateway{}, &NatGatewayList{})
 	SchemeBuilder.Register(&ElasticIP{}, &ElasticIPList{})
 	SchemeBuilder.Register(&RouteTable{}, &RouteTableList{})
+	SchemeBuilder.Register(&SecurityGroup{}, &SecurityGroupList{})
 }

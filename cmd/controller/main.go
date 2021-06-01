@@ -70,7 +70,7 @@ func main() {
 		infra.NewElasticIPController(awsprovider.EC2Client(session)),
 		infra.NewNatGWController(awsprovider.EC2Client(session)),
 		infra.NewRouteTableController(awsprovider.EC2Client(session)),
-		// infra.NewSecurityGroupController(awsprovider.EC2Client(session)),
+		infra.NewSecurityGroupController(awsprovider.EC2Client(session)),
 		// infra.NewIAMRoleController(awsprovider.IAMClient(session)),
 		// infra.NewIAMProfileController(awsprovider.IAMClient(session)),
 		// infra.NewIAMPolicyController(awsprovider.IAMClient(session)),
