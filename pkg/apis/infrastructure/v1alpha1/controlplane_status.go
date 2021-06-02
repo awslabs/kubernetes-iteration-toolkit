@@ -23,18 +23,6 @@ type ControlPlaneStatus struct {
 	// its objects, and indicates whether or not those conditions are met.
 	// +optional
 	Conditions apis.Conditions `json:"conditions,omitempty"`
-	// Infrastructure is the status of the infrastructure for the ControlPlane.
-	// It gets updated by the infrastructure controller as the resources as are
-	// being created in AWS
-	Infrastructure Infrastructure `json:"infrastructure,omitempty"`
-}
-
-type Infrastructure struct {
-	VPCID             string   `json:"vpcID,omitempty"`
-	PrivateSubnets    []string `json:"privateSubnets,omitempty"`
-	PublicSubnets     []string `json:"publicSubnets,omitempty"`
-	InternetGatewayID string   `json:"internetGateway,omitempty"`
-	NatGatewayID      string   `json:"natGateway,omitempty"`
 }
 
 func (c *ControlPlane) StatusConditions() apis.ConditionManager {

@@ -30,7 +30,76 @@ spec:
           metadata:
             type: object
           spec:
-            description: ControlPlaneSpec
+            description: ControlPlaneSpec specifies the shape of the cluster and how components like master and etcd are configured to run. By default, KIT uses all the default values and ControlPlaneSpec can be empty.
+            properties:
+              etcd:
+                description: ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
+                properties:
+                  ami:
+                    type: string
+                  args:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  count:
+                    type: integer
+                  image:
+                    type: string
+                  type:
+                    type: string
+                type: object
+              kubernetesVersion:
+                type: string
+              master:
+                description: MasterSpec provides a way for the user to configure master instances and custom flags for components running on master nodes like apiserver, KCM and scheduler.
+                properties:
+                  ami:
+                    type: string
+                  apiServer:
+                    description: Config provides a generic way to pass in args and images to master and etcd components. If a user wants to change the QPS they need to provide the following flag with the desired value -`kube-api-qps:100` in the args.
+                    properties:
+                      args:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      image:
+                        type: string
+                    type: object
+                  controllerManager:
+                    description: Config provides a generic way to pass in args and images to master and etcd components. If a user wants to change the QPS they need to provide the following flag with the desired value -`kube-api-qps:100` in the args.
+                    properties:
+                      args:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      image:
+                        type: string
+                    type: object
+                  count:
+                    type: integer
+                  scheduler:
+                    description: Config provides a generic way to pass in args and images to master and etcd components. If a user wants to change the QPS they need to provide the following flag with the desired value -`kube-api-qps:100` in the args.
+                    properties:
+                      args:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      image:
+                        type: string
+                    type: object
+                  type:
+                    type: string
+                type: object
+              privateSubnets:
+                items:
+                  type: string
+                type: array
+              vpccidr:
+                type: string
+              zones:
+                items:
+                  type: string
+                type: array
             type: object
           status:
             description: ControlPlaneStatus defines the observed state of the ControlPlane of a cluster
@@ -63,24 +132,6 @@ spec:
                   - type
                   type: object
                 type: array
-              infrastructure:
-                description: Infrastructure is the status of the infrastructure for the ControlPlane. It gets updated by the infrastructure controller as the resources as are being created in AWS
-                properties:
-                  internetGateway:
-                    type: string
-                  natGateway:
-                    type: string
-                  privateSubnets:
-                    items:
-                      type: string
-                    type: array
-                  publicSubnets:
-                    items:
-                      type: string
-                    type: array
-                  vpcID:
-                    type: string
-                type: object
             type: object
         type: object
     served: true
