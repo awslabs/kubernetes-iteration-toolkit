@@ -70,6 +70,8 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 		&resource.Policy{KubeClient: c.Client},
 		&resource.LaunchTemplate{KubeClient: c.Client},
 		&resource.AutoScalingGroup{KubeClient: c.Client},
+		&resource.NetworkLoadBalancer{KubeClient: c.Client},
+		&resource.TargetGroup{KubeClient: c.Client},
 	}
 	for _, resource := range resources {
 		if err := resource.Create(ctx, controlPlane); err != nil {

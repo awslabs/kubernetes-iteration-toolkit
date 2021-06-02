@@ -65,7 +65,11 @@ func main() {
 	err := manager.RegisterWebhooks().RegisterControllers(
 		infra.NewControlPlaneController(awsprovider.EC2Client(session), manager.GetClient()),
 		infra.NewVPCController(awsprovider.EC2Client(session)),
+		infra.NewLoadBalancerController(awsprovider.EC2Client(session),
+			awsprovider.ELBClient(session)),
 		infra.NewSubnetController(awsprovider.EC2Client(session)),
+		infra.NewTargetGroupController(awsprovider.EC2Client(session),
+			awsprovider.ELBClient(session)),
 		infra.NewInternetGWController(awsprovider.EC2Client(session)),
 		infra.NewElasticIPController(awsprovider.EC2Client(session)),
 		infra.NewNatGWController(awsprovider.EC2Client(session)),
@@ -81,6 +85,7 @@ func main() {
 		infra.NewAutoScalingGroupController(
 			awsprovider.EC2Client(session),
 			awsprovider.AutoScalingClient(session),
+			awsprovider.ELBClient(session),
 		),
 	).Start(controllerruntime.SetupSignalHandler())
 	log.PanicIfError(err, "Unable to start manager")

@@ -60,7 +60,7 @@ func (i *iamPolicy) Reconcile(ctx context.Context, object controllers.Object) (*
 	policyDocument := i.getPolicyDocument(policyObj.Name)
 	// check role exists
 	if _, err := getRole(ctx, i.iam, roleName); err != nil && errors.IsIAMResourceNotFound(err) {
-		return nil, nil
+		return nil, fmt.Errorf("waiting for the role to be created, %w", errors.WaitingForSubResources)
 	} else if err != nil {
 		return nil, fmt.Errorf("getting role, %w", err)
 	}

@@ -203,11 +203,10 @@ func (s *securityGroup) Finalize(ctx context.Context, object controllers.Object)
 	}
 	// get groupName to group ID mapping
 	groups := groupsCreated(existingGroups)
-	// We have to delete etcd SG before master SG because master SG is added as a referenced in etcd SG
 	groupID := groups[sgObj.Spec.GroupName]
 	if groupID == "" {
 		zap.S().Errorf("When removing security group not found in AWS %s", sgObj.Spec.GroupName)
-		return nil, nil
+		return status.Terminated, nil
 	}
 	if _, err := s.ec2api.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
 		GroupId: aws.String(groupID),

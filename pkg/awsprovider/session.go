@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
@@ -88,4 +89,12 @@ type SSM struct {
 
 func SSMClient(sess *session.Session) *SSM {
 	return &SSM{SSMAPI: ssm.New(sess)}
+}
+
+type ELBV2 struct {
+	*elbv2.ELBV2
+}
+
+func ELBClient(sess *session.Session) *ELBV2 {
+	return &ELBV2{ELBV2: elbv2.New(sess)}
 }

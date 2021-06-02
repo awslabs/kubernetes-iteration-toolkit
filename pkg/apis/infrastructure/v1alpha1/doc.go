@@ -60,4 +60,6 @@ func init() {
 	SchemeBuilder.Register(&Policy{}, &PolicyList{})
 	SchemeBuilder.Register(&LaunchTemplate{}, &LaunchTemplateList{})
 	SchemeBuilder.Register(&AutoScalingGroup{}, &AutoScalingGroupList{})
+	SchemeBuilder.Register(&LoadBalancer{}, &LoadBalancerList{})
+	SchemeBuilder.Register(&TargetGroup{}, &TargetGroupList{})
 }

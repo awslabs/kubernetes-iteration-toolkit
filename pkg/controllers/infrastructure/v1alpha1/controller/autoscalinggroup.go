@@ -33,11 +33,12 @@ import (
 type autoScalingGroup struct {
 	ec2api         *awsprovider.EC2
 	autoscalingAPI *awsprovider.AutoScaling
+	elbv2api       *awsprovider.ELBV2
 }
 
 // NewAutoScalingGroupController returns a controller for managing autoScalingGroup in AWS
-func NewAutoScalingGroupController(ec2api *awsprovider.EC2, autoscalingAPI *awsprovider.AutoScaling) *autoScalingGroup {
-	return &autoScalingGroup{ec2api: ec2api, autoscalingAPI: autoscalingAPI}
+func NewAutoScalingGroupController(ec2api *awsprovider.EC2, autoscalingAPI *awsprovider.AutoScaling, elbv2api *awsprovider.ELBV2) *autoScalingGroup {
+	return &autoScalingGroup{ec2api: ec2api, autoscalingAPI: autoscalingAPI, elbv2api: elbv2api}
 }
 
 // Name returns the name of the controller
@@ -67,6 +68,37 @@ func (a *autoScalingGroup) Reconcile(ctx context.Context, object controllers.Obj
 		zap.S().Infof("Successfully created autoscaling group %v for cluster %v", asgObj.Name, asgObj.Spec.ClusterName)
 	} else {
 		zap.S().Debugf("Successfully discovered autoscaling group %v for cluster %v", asgObj.Name, asgObj.Spec.ClusterName)
+	}
+	// Attach a target group if not connected
+	output, err := a.autoscalingAPI.DescribeLoadBalancerTargetGroupsWithContext(ctx, &autoscaling.DescribeLoadBalancerTargetGroupsInput{
+		AutoScalingGroupName: aws.String(asgObj.Name),
+	})
+	if err != nil {
+		return nil, err
+	}
+	targetGroup, err := getTargetGroup(ctx, a.elbv2api, asgObj.Name)
+	if err != nil && errors.IsTargetGroupNotExists(err) {
+		return nil, fmt.Errorf("waiting for target group, %w", errors.WaitingForSubResources)
+	}
+	// There is a possibility that the target group is deleted and in that case `DescribeLoadBalancerTargetGroups` will still return the stale target group
+	if output == nil || len(output.LoadBalancerTargetGroups) == 0 {
+		if _, err = a.autoscalingAPI.AttachLoadBalancerTargetGroupsWithContext(ctx, &autoscaling.AttachLoadBalancerTargetGroupsInput{
+			AutoScalingGroupName: aws.String(asgObj.Name),
+			TargetGroupARNs:      aws.StringSlice([]string{*targetGroup.TargetGroupArn}),
+		}); err != nil {
+			return nil, err
+		}
+		zap.S().Infof("Successfully attached autoscaling group %s to target group %s", asgObj.Name, asgObj.Name)
+	} else if aws.StringValue(output.LoadBalancerTargetGroups[0].LoadBalancerTargetGroupARN) != aws.StringValue(targetGroup.TargetGroupArn) {
+		if _, err := a.autoscalingAPI.DetachLoadBalancerTargetGroupsWithContext(ctx, &autoscaling.DetachLoadBalancerTargetGroupsInput{
+			AutoScalingGroupName: aws.String(asgObj.Name),
+			TargetGroupARNs:      aws.StringSlice([]string{*output.LoadBalancerTargetGroups[0].LoadBalancerTargetGroupARN}),
+		}); err != nil {
+			return nil, fmt.Errorf("detaching old target group, %w", err)
+		}
+		zap.S().Debugf("Successfully removed stale target group ARN %v", aws.StringValue(output.LoadBalancerTargetGroups[0].LoadBalancerTargetGroupARN))
+	} else {
+		zap.S().Debugf("Successfully discovered autoscaling group %s attached to target group %s", asgObj.Name, asgObj.Name)
 	}
 	return status.Created, nil
 }

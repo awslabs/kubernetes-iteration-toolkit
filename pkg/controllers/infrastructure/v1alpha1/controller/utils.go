@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 )
 
 const (
@@ -57,6 +58,16 @@ func generateAutoScalingTags(svcName, clusterName string) []*autoscaling.Tag {
 		Key:               aws.String("Name"),
 		Value:             aws.String(svcName),
 		PropagateAtLaunch: aws.Bool(true),
+	}}
+}
+
+func generateLBTags(svcName, clusterName string) []*elbv2.Tag {
+	return []*elbv2.Tag{{
+		Key:   aws.String(TagKeyNameForAWSResources),
+		Value: aws.String(clusterName),
+	}, {
+		Key:   aws.String("Name"),
+		Value: aws.String(svcName),
 	}}
 }
 

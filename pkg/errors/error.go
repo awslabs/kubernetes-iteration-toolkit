@@ -18,6 +18,7 @@ import (
 	"errors"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -83,6 +84,24 @@ func IsIAMResourceDependencyExists(err error) bool {
 	if err != nil {
 		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
 			return aerr.Code() == iam.ErrCodeDeleteConflictException
+		}
+	}
+	return false
+}
+
+func IsELBLoadBalancerNotExists(err error) bool {
+	if err != nil {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			return aerr.Code() == elbv2.ErrCodeLoadBalancerNotFoundException
+		}
+	}
+	return false
+}
+
+func IsTargetGroupNotExists(err error) bool {
+	if err != nil {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			return aerr.Code() == elbv2.ErrCodeTargetGroupNotFoundException
 		}
 	}
 	return false

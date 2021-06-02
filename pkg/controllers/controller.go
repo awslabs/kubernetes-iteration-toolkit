@@ -47,7 +47,6 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		}
 		return reconcile.Result{}, err
 	}
-	zap.S().Infof("Controller %v reconciling for resource %v", c.Name(), resource.GetName())
 	// 2. Copy object for merge patch base
 	persisted := resource.DeepCopyObject()
 	// 3. reconcile else finalize if object is deleted

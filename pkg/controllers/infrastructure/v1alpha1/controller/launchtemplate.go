@@ -158,26 +158,6 @@ func (l *launchTemplate) desiredSecurityGroupID(ctx context.Context, templateNam
 	return ""
 }
 
-// func (l *launchTemplate) desiredSecurityGroupName(ctx context.Context, templateName, clusterName string) string {
-// 	switch templateName {
-// 	case fmt.Sprintf(MasterInstanceLaunchTemplateName, clusterName):
-// 		return masterInstancesGroupName
-// 	case fmt.Sprintf(ETCDInstanceLaunchTemplateName, clusterName):
-// 		return etcdInstancesGroupName
-// 	}
-// 	return ""
-// }
-
-// func (l *launchTemplate) desiredInstanceProfileName(templateName string, clusterName string) string {
-// 	switch templateName {
-// 	case fmt.Sprintf(MasterInstanceLaunchTemplateName, clusterName):
-// 		return MasterInstanceProfileName
-// 	case fmt.Sprintf(ETCDInstanceLaunchTemplateName, clusterName):
-// 		return ETCDInstanceProfileName
-// 	}
-// 	return ""
-// }
-
 func (l *launchTemplate) getLaunchTemplates(ctx context.Context, clusterName string) ([]*ec2.LaunchTemplate, error) {
 	return getLaunchTemplates(ctx, l.ec2api, clusterName)
 }
