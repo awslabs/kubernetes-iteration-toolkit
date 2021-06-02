@@ -20,11 +20,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/awsprovider"
-	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/errors"
-	"github.com/prateekgogia/kit/pkg/status"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -80,7 +80,7 @@ func (n *LoadBalancer) Reconcile(ctx context.Context, object controllers.Object)
 		}
 		zap.S().Infof("Successfully created listener %v for load balancer %v", lbObj.Name, lbObj.Name)
 	} else {
-		zap.S().Infof("Successfully discovered listener %v for load balancer %v", lbObj.Name, lbObj.Name)
+		zap.S().Debugf("Successfully discovered listener %v for load balancer %v", lbObj.Name, lbObj.Name)
 	}
 	return status.Created, nil
 

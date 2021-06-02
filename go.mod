@@ -1,4 +1,4 @@
-module github.com/prateekgogia/kit
+module github.com/awslabs/kubernetes-iteration-toolkit
 
 go 1.16
 

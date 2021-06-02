@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/awsprovider"
-	"github.com/prateekgogia/kit/pkg/controllers"
-	infra "github.com/prateekgogia/kit/pkg/controllers/infrastructure/v1alpha1/controller"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers"
+	infra "github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers/infrastructure/v1alpha1/controller"
 
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"go.uber.org/zap/zapcore"
@@ -65,6 +65,7 @@ func main() {
 	err := manager.RegisterWebhooks().RegisterControllers(
 		infra.NewControlPlaneController(awsprovider.EC2Client(session), manager.GetClient()),
 		infra.NewVPCController(awsprovider.EC2Client(session)),
+		infra.NewS3Controller(awsprovider.S3Client(session)),
 		infra.NewLoadBalancerController(awsprovider.EC2Client(session),
 			awsprovider.ELBClient(session)),
 		infra.NewSubnetController(awsprovider.EC2Client(session)),

@@ -18,11 +18,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/awsprovider"
-	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/resource"
-	"github.com/prateekgogia/kit/pkg/status"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/resource"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/status"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -59,6 +59,7 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	resources := []ResourceManager{
 		&resource.VPC{KubeClient: c.Client},
+		&resource.S3{KubeClient: c.Client},
 		&resource.Subnet{KubeClient: c.Client, Region: *c.ec2api.Config.Region},
 		&resource.InternetGateway{KubeClient: c.Client},
 		&resource.ElasticIP{KubeClient: c.Client},

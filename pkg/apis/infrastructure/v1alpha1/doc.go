@@ -49,6 +49,7 @@ const (
 func init() {
 	SchemeBuilder.Register(&ControlPlane{}, &ControlPlaneList{})
 	SchemeBuilder.Register(&VPC{}, &VPCList{})
+	SchemeBuilder.Register(&S3{}, &S3List{})
 	SchemeBuilder.Register(&Subnet{}, &SubnetList{})
 	SchemeBuilder.Register(&InternetGateway{}, &InternetGatewayList{})
 	SchemeBuilder.Register(&NatGateway{}, &NatGatewayList{})

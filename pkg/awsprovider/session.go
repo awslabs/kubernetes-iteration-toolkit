@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/awslabs/karpenter/pkg/utils/log"
@@ -97,4 +98,12 @@ type ELBV2 struct {
 
 func ELBClient(sess *session.Session) *ELBV2 {
 	return &ELBV2{ELBV2: elbv2.New(sess)}
+}
+
+type S3 struct {
+	*s3.S3
+}
+
+func S3Client(sess *session.Session) *S3 {
+	return &S3{S3: s3.New(sess)}
 }

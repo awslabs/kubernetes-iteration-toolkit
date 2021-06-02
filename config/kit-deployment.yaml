@@ -124,7 +124,7 @@ spec:
       serviceAccountName: kit
       containers:
       - name: manager
-        image: ko://github.com/prateekgogia/kit/cmd/controller
+        image: ko://github.com/awslabs/kubernetes-iteration-toolkit/cmd/controller
         resources:
           requests:
             cpu: 100m

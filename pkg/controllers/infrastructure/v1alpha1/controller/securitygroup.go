@@ -20,11 +20,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/awsprovider"
-	"github.com/prateekgogia/kit/pkg/controllers"
-	"github.com/prateekgogia/kit/pkg/errors"
-	"github.com/prateekgogia/kit/pkg/status"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -82,7 +82,7 @@ func (s *securityGroup) Reconcile(ctx context.Context, object controllers.Object
 		groupID = *output.GroupId
 		zap.S().Infof("Successfully created security group %v for cluster %v", sgObj.Spec.GroupName, sgObj.Spec.ClusterName)
 	} else {
-		zap.S().Infof("Successfully discovered security groups %v for cluster %v", sgObj.Spec.GroupName, sgObj.Spec.ClusterName)
+		zap.S().Debugf("Successfully discovered security groups %v for cluster %v", sgObj.Spec.GroupName, sgObj.Spec.ClusterName)
 	}
 	if !ingressRuleExists(existingGroups, sgObj.Spec.GroupName) {
 		if err := s.addIngressRuleFor(ctx, groupID, sgObj.Spec.GroupName, sgObj.Spec.ClusterName, existingGroupIDs); err != nil {

@@ -18,9 +18,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/errors"
-	"github.com/prateekgogia/kit/pkg/status"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -79,7 +79,7 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object) (*re
 		}
 		return result, nil
 	}
-	zap.S().Infof("FInalizing for resource %v controller %v", resource.GetName(), c.Name())
+	zap.S().Infof("Finalizing for resource %v controller %v", resource.GetName(), c.Name())
 	result, err := c.Controller.Finalize(ctx, resource)
 	if err != nil {
 		zap.S().Errorf("Error while finalizing resource %v controller %v %v", resource.GetName(), c.Name(), err)

@@ -24,38 +24,40 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type InternetGateway struct {
+type S3 struct {
 	KubeClient client.Client
 }
 
-func (i *InternetGateway) Create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	if err := i.exists(ctx, controlPlane.Namespace, controlPlane.Name); err != nil {
+func (s *S3) Create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	if err := s.exists(ctx, controlPlane.Namespace, controlPlane.Name); err != nil {
 		if errors.IsNotFound(err) {
-			if err := i.create(ctx, controlPlane); err != nil {
-				return fmt.Errorf("creating internet gateway kube object, %w", err)
+			if err := s.create(ctx, controlPlane); err != nil {
+				return fmt.Errorf("creating kube object, %w", err)
 			}
 			return nil
 		}
-		return fmt.Errorf("getting internet gateway object, %w", err)
+		return fmt.Errorf("getting S3 object, %w", err)
 	}
 	// TODO verify existing object matches the desired else update
 	return nil
 }
 
-func (i *InternetGateway) create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	if err := i.KubeClient.Create(ctx, &v1alpha1.InternetGateway{
+func (s *S3) create(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	if err := s.KubeClient.Create(ctx, &v1alpha1.S3{
 		ObjectMeta: ObjectMeta(controlPlane, ""),
-		Spec:       v1alpha1.InternetGatewaySpec{},
+		Spec: v1alpha1.S3Spec{
+			BucketName: fmt.Sprintf("kit-%s", controlPlane.Name), // TODO add random ID
+		},
 	}); err != nil {
-		return fmt.Errorf("creating internet gateway kube object, %w", err)
+		return fmt.Errorf("creating kube object, %w", err)
 	}
-	zap.S().Debugf("Successfully created internet gateway object for cluster %v", controlPlane.Name)
+	zap.S().Debugf("Successfully created S3 object for cluster %v", controlPlane.Name)
 	return nil
 }
 
-func (i *InternetGateway) exists(ctx context.Context, ns, objName string) error {
-	result := &v1alpha1.InternetGateway{}
-	if err := i.KubeClient.Get(ctx, NamespacedName(ns, objName), result); err != nil {
+func (s *S3) exists(ctx context.Context, ns, objName string) error {
+	result := &v1alpha1.S3{}
+	if err := s.KubeClient.Get(ctx, NamespacedName(ns, objName), result); err != nil {
 		return err
 	}
 	return nil

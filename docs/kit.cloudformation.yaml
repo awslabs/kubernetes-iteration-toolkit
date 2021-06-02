@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Resources used by https://github.com/prateekgogia/kit
+Description: Resources used by https://github.com/awslabs/kubernetes-iteration-toolkit
 Parameters:
   OpenIDConnectIdentityProvider:
     Type: String

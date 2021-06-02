@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
