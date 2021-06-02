@@ -24,6 +24,9 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/resource"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/status"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -79,9 +82,32 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 			return nil, fmt.Errorf("creating resources %v", err)
 		}
 	}
+	// Once these resources are created we need to create PKI and Kube objects and push them to S3
 	return status.Created, nil
 }
 
 func (c *controlPlane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
 	return status.Terminated, nil
+}
+
+func (c *controlPlane) CreateETCDCA() error {
+
+	cfg, err := c.generateInitConfig()
+	if err != nil {
+		return err
+	}
+	ca := certsphase.KubeadmCertEtcdCA()
+	return certsphase.CreateCACertAndKeyFiles(ca, cfg)
+}
+
+func (c *controlPlane) generateInitConfig() (*kubeadmapi.InitConfiguration, error) {
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
+	if err != nil {
+		return nil, err
+	}
+	// Get DNS name for ETCD loadbalancer
+	// Get DNS name for Master loadbalancer
+	internalcfg.CertificatesDir = "/tmp/etcd-certs"
+	// internalcfg.ClusterConfiguration.ImageRepository = "public.ecr.aws/eks-distro/kubernetes"
+	return internalcfg, nil
 }

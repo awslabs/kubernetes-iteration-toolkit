@@ -134,6 +134,7 @@ func (c *GenericController) removeFinalizer(ctx context.Context, resource Object
 
 func (c *GenericController) patchFinalizersToResource(ctx context.Context, resource Object, finalizers []string) error {
 	persisted := resource.DeepCopyObject()
+	zap.S().Infof("Patching finalizers")
 	resource.SetFinalizers(finalizers)
 	if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
 		return fmt.Errorf("merging changes to kube object, %w", err)
