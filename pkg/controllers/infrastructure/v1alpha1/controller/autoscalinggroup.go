@@ -124,7 +124,6 @@ func (a *autoScalingGroup) Finalize(ctx context.Context, object controllers.Obje
 }
 
 func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, asg *v1alpha1.AutoScalingGroup) error {
-	// zones :=
 	privateSubnets, err := getPrivateSubnetIDs(ctx, a.ec2api, asg.Spec.ClusterName)
 	if err != nil {
 		return err

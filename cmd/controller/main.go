@@ -63,9 +63,12 @@ func main() {
 
 	session := awsprovider.NewSession()
 	err := manager.RegisterWebhooks().RegisterControllers(
-		infra.NewControlPlaneController(awsprovider.EC2Client(session), manager.GetClient()),
+		infra.NewControlPlaneController(awsprovider.EC2Client(session),
+			awsprovider.S3ManagerClient(session),
+			awsprovider.ELBClient(session),
+			manager.GetClient()),
 		// infra.NewVPCController(awsprovider.EC2Client(session)),
-		infra.NewS3Controller(awsprovider.S3Client(session)),
+		// infra.NewS3Controller(awsprovider.S3Client(session)),
 		// infra.NewLoadBalancerController(awsprovider.EC2Client(session),
 		// 	awsprovider.ELBClient(session)),
 		// infra.NewSubnetController(awsprovider.EC2Client(session)),
@@ -76,9 +79,9 @@ func main() {
 		// infra.NewNatGWController(awsprovider.EC2Client(session)),
 		// infra.NewRouteTableController(awsprovider.EC2Client(session)),
 		// infra.NewSecurityGroupController(awsprovider.EC2Client(session)),
-		// infra.NewIAMRoleController(awsprovider.IAMClient(session)),
-		// infra.NewIAMProfileController(awsprovider.IAMClient(session)),
-		// infra.NewIAMPolicyController(awsprovider.IAMClient(session)),
+		infra.NewIAMRoleController(awsprovider.IAMClient(session)),
+		infra.NewIAMProfileController(awsprovider.IAMClient(session)),
+		infra.NewIAMPolicyController(awsprovider.IAMClient(session)),
 		// infra.NewLaunchTemplateController(
 		// 	awsprovider.EC2Client(session),
 		// 	awsprovider.SSMClient(session),

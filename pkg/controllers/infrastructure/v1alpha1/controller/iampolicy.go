@@ -136,41 +136,24 @@ func policyFoundEqualsDesired(output *iam.GetRolePolicyOutput, expectedPolicy st
 
 var (
 	masterPolicy = `{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Action": [
-                "ec2:DescribeInstances",
-                "ec2:DescribeTags",
-                "ec2:AssociateTrunkInterface",
-                "ecr:GetAuthorizationToken"
-            ],
-            "Resource": "*",
-            "Effect": "Allow"
-        },
+	"Version": "2012-10-17",
+	"Statement": [
 		{
-            "Action": [
-                "ec2:DescribeInstances",
-                "ec2:DescribeTags",
-                "ec2:AssociateTrunkInterface",
-                "ecr:GetAuthorizationToken"
-            ],
-            "Resource": "*",
-            "Effect": "Allow"
-        }
-    ]
+			"Effect": "Allow",
+			"Action": "*",
+			"Resource": "*"
+		}
+	]
 }`
 
 	etcdPolicy = `{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Action": [
-                "ecr:GetAuthorizationToken"
-            ],
-            "Resource": "*",
-            "Effect": "Allow"
-        }
-    ]
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": "*",
+			"Resource": "*"
+		}
+	]
 }`
 )

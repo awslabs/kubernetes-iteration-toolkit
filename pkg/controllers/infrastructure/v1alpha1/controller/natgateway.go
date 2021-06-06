@@ -94,15 +94,17 @@ func (n *natGateway) createNatGateway(ctx context.Context, natGwObj *v1alpha1.Na
 		return nil, fmt.Errorf("elastic IP does not exist %w", errors.WaitingForSubResources)
 	}
 	// 2. Get a private subnet ID
-	privateSubnets, err := getPrivateSubnetIDs(ctx, n.ec2api, natGwObj.Name)
+	publicSubnets, err := getPublicSubnetIDs(ctx, n.ec2api, natGwObj.Name)
 	if err != nil {
 		return nil, fmt.Errorf("getting private subnets, %w", err)
 	}
-	privateSubnetID := privateSubnets[0]
+	if len(publicSubnets) == 0 {
+		return nil, fmt.Errorf("waiting for public subnets, %w", errors.WaitingForSubResources)
+	}
 	// 3. Create NAT Gateway
 	output, err := n.ec2api.CreateNatGatewayWithContext(ctx, &ec2.CreateNatGatewayInput{
 		AllocationId:      elasticIP.AllocationId,
-		SubnetId:          aws.String(privateSubnetID),
+		SubnetId:          aws.String(publicSubnets[0]),
 		TagSpecifications: generateEC2Tags(n.Name(), natGwObj.Name),
 	})
 	if err != nil {

@@ -34,11 +34,11 @@ func (n *NetworkLoadBalancer) Create(ctx context.Context, controlPlane *v1alpha1
 		if err := n.exists(ctx, controlPlane.Namespace, ObjectName(controlPlane, component)); err != nil {
 			if errors.IsNotFound(err) {
 				if err := n.create(ctx, component, controlPlane); err != nil {
-					return fmt.Errorf("creating auto scaling group kube object, %w", err)
+					return fmt.Errorf("creating load balancer kube object, %w", err)
 				}
 				continue
 			}
-			return fmt.Errorf("getting auto scaling group object, %w", err)
+			return fmt.Errorf("getting load balancer object, %w", err)
 		}
 	}
 	// TODO verify existing object matches the desired else update
@@ -61,9 +61,9 @@ func (n *NetworkLoadBalancer) create(ctx context.Context, component string, cont
 		input.Spec.Scheme = elbv2.LoadBalancerSchemeEnumInternal
 	}
 	if err := n.KubeClient.Create(ctx, input); err != nil {
-		return fmt.Errorf("creating auto scaling group kube object, %w", err)
+		return fmt.Errorf("creating load balancer kube object, %w", err)
 	}
-	zap.S().Debugf("Successfully created auto scaling group object %v for cluster %v",
+	zap.S().Debugf("Successfully created load balancer object %v for cluster %v",
 		ObjectMeta(controlPlane, component).Name, controlPlane.Name)
 	return nil
 }

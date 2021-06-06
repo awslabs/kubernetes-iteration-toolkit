@@ -102,15 +102,6 @@ func (r *routeTable) createRouteTables(ctx context.Context, tableObj *v1alpha1.R
 func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID string, tableObj *v1alpha1.RouteTable) (*reconcile.Result, error) {
 	routeInput := &ec2.CreateRouteInput{DestinationCidrBlock: aws.String("0.0.0.0/0")}
 	if tableObj.Spec.ForPrivateSubnets {
-		igw, err := getInternetGateway(ctx, r.ec2api, tableObj.Spec.ClusterName)
-		if err != nil {
-			return nil, fmt.Errorf("getting internet-gateway %w", err)
-		}
-		if igw == nil {
-			return status.Waiting, fmt.Errorf("internet-gateway does not exist %w", errors.WaitingForSubResources)
-		}
-		routeInput.GatewayId = igw.InternetGatewayId
-	} else {
 		// We need to get nat gateway which is available else we might add a route to
 		// GW which is pending and GW might end up in the failed state in few
 		// minutes.
@@ -122,6 +113,15 @@ func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID string, tab
 			return status.Waiting, fmt.Errorf("nat-gateway does not exist %w", errors.WaitingForSubResources)
 		}
 		routeInput.NatGatewayId = natGW.NatGatewayId
+	} else {
+		igw, err := getInternetGateway(ctx, r.ec2api, tableObj.Spec.ClusterName)
+		if err != nil {
+			return nil, fmt.Errorf("getting internet-gateway %w", err)
+		}
+		if igw == nil {
+			return status.Waiting, fmt.Errorf("internet-gateway does not exist %w", errors.WaitingForSubResources)
+		}
+		routeInput.GatewayId = igw.InternetGatewayId
 	}
 	routeTableID, err := r.createTable(ctx, vpcID, tableObj.Name, tableObj.Spec.ClusterName)
 	if err != nil {

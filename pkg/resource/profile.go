@@ -55,7 +55,7 @@ func (p *Profile) create(ctx context.Context, component string, controlPlane *v1
 		return fmt.Errorf("creating profile kube object, %w", err)
 	}
 	zap.S().Debugf("Successfully created profile object %v for cluster %v",
-		ObjectMeta(controlPlane, component), controlPlane.Name)
+		ObjectMeta(controlPlane, component).Name, controlPlane.Name)
 	return nil
 }
 

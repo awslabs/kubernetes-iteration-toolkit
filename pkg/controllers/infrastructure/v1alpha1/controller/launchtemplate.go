@@ -132,7 +132,7 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, launchTemplat
 			Monitoring: &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 			// SecurityGroupIds: []*string{aws.String("sg-0c44ff3e16005d370")},
 			SecurityGroupIds: []*string{aws.String(securityGroupID)},
-			UserData:         aws.String(base64.StdEncoding.EncodeToString([]byte(userData))),
+			UserData:         aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData, launchTemplate.Spec.ClusterName)))),
 		},
 		LaunchTemplateName: aws.String(launchTemplate.Name),
 		TagSpecifications:  generateEC2Tags(l.Name(), launchTemplate.Spec.ClusterName),
@@ -191,8 +191,15 @@ yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/li
 sudo swapoff -a
 sudo yum install -y docker
 sudo yum install -y conntrack-tools
-sudo systemctl start docker
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+  "exec-opts": ["native.cgroupdriver=systemd"]
+}
+EOF
+
 sudo systemctl enable docker
+sudo systemctl daemon-reload
+sudo systemctl restart docker
 
 # Pull and tag Docker images
 sudo docker pull public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1;\
@@ -238,8 +245,47 @@ chmod +x kubeadm kubectl kubelet
 
 sudo mkdir -p /var/lib/kubelet
 cat > /var/lib/kubelet/kubeadm-flags.env <<EOF
-KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd —network-plugin=cni —pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:3.2"
+KUBELET_KUBEADM_ARGS="--cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:3.2"
 EOF
 
-sudo systemctl enable --now kubelet`
+sudo systemctl enable --now kubelet
+
+sudo mkdir -p /etc/systemd/system/kubelet.service.d
+cat <<EOF | sudo tee /etc/systemd/system/kubelet.service.d/20-etcd-service-manager.conf
+[Service]
+ExecStart=
+#  Replace "systemd" with the cgroup driver of your container runtime. The default value in the kubelet is "cgroupfs".
+ExecStart=/usr/bin/kubelet --address=127.0.0.1 --pod-manifest-path=/etc/kubernetes/manifests --cgroup-driver=systemd
+Restart=always
+EOF
+
+systemctl daemon-reload
+systemctl restart kubelet
+
+sudo mkdir -p /etc/kit/
+cat <<EOF | sudo tee /etc/kit/sync.sh
+#!/bin/env bash
+while [ true ]; do
+ dirs=("/etc/systemd/system/kubelet.service.d/" "/etc/kubernetes")
+ INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+ CLUSTERNAME=%s
+ for dir in "\${dirs[@]}"; do
+    echo "\$(date) Syncing S3 files for \$dir"
+    mkdir -p \$dir
+    existing_checksum=\$(ls -alR \$dir | md5sum)
+    aws s3 sync s3://kit-\$CLUSTERNAME/tmp/\$CLUSTERNAME/\$INSTANCE_ID"\$dir" "\$dir"
+    new_checksum=\$(ls -alR \$dir | md5sum)
+    if [ "\$new_checksum" != "\$existing_checksum" ]; then
+		echo "Successfully synced from S3 \$dir"
+	  	echo "Restarting Kubelet service" 
+	   	systemctl daemon-reload
+	   	systemctl restart kubelet
+    fi
+ done
+ sleep 30
+done
+EOF
+
+chmod a+x /etc/kit/sync.sh
+/etc/kit/sync.sh > /tmp/sync-kit-files.log&`
 )

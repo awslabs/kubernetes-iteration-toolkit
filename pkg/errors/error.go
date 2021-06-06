@@ -30,7 +30,7 @@ var (
 func SafeToIgnore(err error) bool {
 	return IsWaitingForSubResource(err) ||
 		IsDependencyExists(err) ||
-		IsWhileRemovingFinalizer(err)
+		IsIAMResourceDependencyExists(err)
 }
 
 func IsWaitingForSubResource(err error) bool {

@@ -53,6 +53,7 @@ type Webhook interface {
 // methods necessary to standardize reconciliation behavior in kit.
 type Object interface {
 	client.Object
+	// DeepCopy() runtime.Object
 	StatusConditions() apis.ConditionManager
 }
 

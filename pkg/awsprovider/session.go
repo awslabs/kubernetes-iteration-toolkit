@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/awslabs/karpenter/pkg/utils/log"
@@ -106,4 +107,12 @@ type S3 struct {
 
 func S3Client(sess *session.Session) *S3 {
 	return &S3{S3: s3.New(sess)}
+}
+
+type S3Manager struct {
+	*s3manager.Uploader
+}
+
+func S3ManagerClient(sess *session.Session) *S3Manager {
+	return &S3Manager{Uploader: s3manager.NewUploader(sess)}
 }

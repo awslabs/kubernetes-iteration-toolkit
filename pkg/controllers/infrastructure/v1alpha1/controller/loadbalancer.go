@@ -149,7 +149,11 @@ func (n *LoadBalancer) createLoadBalancer(ctx context.Context, lb *v1alpha1.Load
 }
 
 func (n *LoadBalancer) getLoadBalancer(ctx context.Context, name string) (*elbv2.LoadBalancer, error) {
-	output, err := n.elbv2.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
+	return getLoadBalancer(ctx, name, n.elbv2)
+}
+
+func getLoadBalancer(ctx context.Context, name string, elbv2api *awsprovider.ELBV2) (*elbv2.LoadBalancer, error) {
+	output, err := elbv2api.DescribeLoadBalancersWithContext(ctx, &elbv2.DescribeLoadBalancersInput{
 		Names: []*string{
 			aws.String(name),
 		},
@@ -161,4 +165,12 @@ func (n *LoadBalancer) getLoadBalancer(ctx context.Context, name string) (*elbv2
 		return nil, fmt.Errorf("expected load balancer count one found count %d", len(output.LoadBalancers))
 	}
 	return output.LoadBalancers[0], nil
+}
+
+func getEtcdLoadBalancer(ctx context.Context, clusterName string, elbv2api *awsprovider.ELBV2) (*elbv2.LoadBalancer, error) {
+	return getLoadBalancer(ctx, fmt.Sprintf("%s-%s", clusterName, v1alpha1.ETCDInstances), elbv2api)
+}
+
+func getMasterLoadBalancer(ctx context.Context, clusterName string, elbv2api *awsprovider.ELBV2) (*elbv2.LoadBalancer, error) {
+	return getLoadBalancer(ctx, fmt.Sprintf("%s-%s", clusterName, v1alpha1.MasterInstances), elbv2api)
 }

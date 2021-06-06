@@ -45,7 +45,7 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		if errors.KubeObjNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, fmt.Errorf("getting resource %s, %w", req.NamespacedName, err)
 	}
 	// 2. Copy object for merge patch base
 	persisted := resource.DeepCopyObject()
@@ -53,16 +53,24 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	result, err := c.reconcile(ctx, resource)
 	if err != nil {
 		resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
-		// if errors.SafeToIgnore(err) {
-		// 	return reconcile.Result{}, err
-		// }
+		if errors.SafeToIgnore(err) {
+			zap.S().Infof("Safe to ignore error, %v", err)
+			return reconcile.Result{}, nil
+		}
 		zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
 		return reconcile.Result{}, err
 	}
 	resource.StatusConditions().MarkTrue(v1alpha1.Active)
 	// 4. Update Status using a merge patch
 	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
+		if errors.KubeObjNotFound(err) {
+			return reconcile.Result{}, nil
+		}
 		return reconcile.Result{}, fmt.Errorf("failed to persist changes to %s, %w", req.NamespacedName, err)
+	}
+	if result == nil {
+		zap.S().Infof("TODO remove resource: %s controller: %s", resource.GetName(), c.Name())
+		return reconcile.Result{}, fmt.Errorf("FAILED to get result")
 	}
 	return *result, nil
 }
@@ -71,7 +79,7 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object) (*re
 	if resource.GetDeletionTimestamp() == nil {
 		// Add finalizer for this controller if not exists
 		if err := c.addFinalizerIfNotExists(ctx, resource); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("addng finalizer to resource %v, err %w,", resource.GetName(), err)
 		}
 		result, err := c.Controller.Reconcile(ctx, resource)
 		if err != nil {
@@ -79,16 +87,15 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object) (*re
 		}
 		return result, nil
 	}
-	zap.S().Infof("Finalizing for resource %v controller %v", resource.GetName(), c.Name())
 	result, err := c.Controller.Finalize(ctx, resource)
 	if err != nil {
-		zap.S().Errorf("Error while finalizing resource %v controller %v %v", resource.GetName(), c.Name(), err)
+		// zap.S().Errorf("Error while finalizing resource %v controller %v %v", resource.GetName(), c.Name(), err)
 		return nil, fmt.Errorf("finalizing resource controller name %v, %w", c.Controller.Name(), err)
 	}
-	zap.S().Infof("Removing finalizer for resource %v controller %v", resource.GetName(), c.Name())
 	if err := c.removeFinalizer(ctx, resource); err != nil {
 		return status.Waiting, fmt.Errorf("removing finalizers, %w", err)
 	}
+	zap.S().Infof("Successfully removed for resource %v and controller %v", resource.GetName(), c.Name())
 	return result, nil
 }
 
@@ -99,7 +106,7 @@ func (c *GenericController) addFinalizerIfNotExists(ctx context.Context, resourc
 	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
 	finalizers := append(resource.GetFinalizers(), finalizerStr)
 	if err := c.patchFinalizersToResource(ctx, resource, finalizers); err != nil {
-		return err
+		return fmt.Errorf("patching finalier, %w,", err)
 	}
 	return nil
 }
@@ -134,7 +141,6 @@ func (c *GenericController) removeFinalizer(ctx context.Context, resource Object
 
 func (c *GenericController) patchFinalizersToResource(ctx context.Context, resource Object, finalizers []string) error {
 	persisted := resource.DeepCopyObject()
-	zap.S().Infof("Patching finalizers")
 	resource.SetFinalizers(finalizers)
 	if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
 		return fmt.Errorf("merging changes to kube object, %w", err)
