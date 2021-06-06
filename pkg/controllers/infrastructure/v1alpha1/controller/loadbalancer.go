@@ -90,8 +90,10 @@ func (n *LoadBalancer) Reconcile(ctx context.Context, object controllers.Object)
 func (n *LoadBalancer) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	lbObj := object.(*v1alpha1.LoadBalancer)
 	existingLB, err := n.getLoadBalancer(ctx, lbObj.Name)
-	if err != nil {
-		return nil, fmt.Errorf("getting  load balancer, %w", err)
+	if err != nil && errors.IsELBLoadBalancerNotExists(err) {
+		return status.Terminated, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("getting load balancer, %w", err)
 	}
 	if existingLB != nil {
 		if _, err := n.elbv2.DeleteLoadBalancerWithContext(ctx, &elbv2.DeleteLoadBalancerInput{
@@ -134,7 +136,6 @@ func (n *LoadBalancer) createLoadBalancer(ctx context.Context, lb *v1alpha1.Load
 	if len(privateSubnets) == 0 {
 		return nil, fmt.Errorf("waiting for private subnets, %w", errors.WaitingForSubResources)
 	}
-	zap.S().Infof("private subnets are %v", privateSubnets)
 	output, err := n.elbv2.CreateLoadBalancerWithContext(ctx, &elbv2.CreateLoadBalancerInput{
 		Name:    aws.String(lb.Name),
 		Subnets: aws.StringSlice(privateSubnets),
@@ -159,7 +160,7 @@ func getLoadBalancer(ctx context.Context, name string, elbv2api *awsprovider.ELB
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting load balancer %w", err)
+		return nil, fmt.Errorf("describe load balancer %w", err)
 	}
 	if len(output.LoadBalancers) > 1 {
 		return nil, fmt.Errorf("expected load balancer count one found count %d", len(output.LoadBalancers))

@@ -131,26 +131,25 @@ func (s *S3) deleteBucket(ctx context.Context, bucketName string) error {
 	return nil
 }
 
-func uploadFilesToS3(ctx context.Context, bucketName, filePath, keyName string, s3api *awsprovider.S3) error {
-	content, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file %v, %w", filePath, err)
-	}
-
-	_, err = s3api.PutObjectWithContext(ctx, &s3.PutObjectInput{
-		Body:   content,
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(keyName),
-	})
-	return err
-}
+// func uploadFilesToS3(ctx context.Context, bucketName, filePath, keyName string, s3api *awsprovider.S3) error {
+// 	content, err := os.Open(filePath)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to open file %v, %w", filePath, err)
+// 	}
+// 	_, err = s3api.PutObjectWithContext(ctx, &s3.PutObjectInput{
+// 		Body:   content,
+// 		Bucket: aws.String(bucketName),
+// 		Key:    aws.String(keyName),
+// 	})
+// 	return err
+// }
 
 func uploadDirectories(ctx context.Context, bucket, path string, uploader *awsprovider.S3Manager) error {
 	di := NewDirectoryIterator(bucket, path)
 	if err := uploader.UploadWithIterator(aws.BackgroundContext(), di); err != nil {
 		return fmt.Errorf("failed to upload %w", err)
 	}
-	fmt.Printf("successfully uploaded %q to %q\n", path, bucket)
+	zap.S().Infof("successfully uploaded %q to %q", path, bucket)
 	return nil
 }
 

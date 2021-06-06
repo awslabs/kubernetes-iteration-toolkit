@@ -110,7 +110,7 @@ func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID string, tab
 		// active NAT GW.
 		natGW, err := getNatGateway(ctx, r.ec2api, tableObj.Spec.ClusterName)
 		if err != nil || natGW == nil || aws.StringValue(natGW.State) != "available" {
-			return status.Waiting, fmt.Errorf("nat-gateway does not exist %w", errors.WaitingForSubResources)
+			return status.Waiting, fmt.Errorf("waiting for nat-gateway, %w", errors.WaitingForSubResources)
 		}
 		routeInput.NatGatewayId = natGW.NatGatewayId
 	} else {
@@ -119,7 +119,7 @@ func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID string, tab
 			return nil, fmt.Errorf("getting internet-gateway %w", err)
 		}
 		if igw == nil {
-			return status.Waiting, fmt.Errorf("internet-gateway does not exist %w", errors.WaitingForSubResources)
+			return status.Waiting, fmt.Errorf("waiting for internet-gateway, %w", errors.WaitingForSubResources)
 		}
 		routeInput.GatewayId = igw.InternetGatewayId
 	}
@@ -140,12 +140,12 @@ func (r *routeTable) reconcileTableAssociations(ctx context.Context, routeTable 
 	if desiredObj.Spec.ForPrivateSubnets {
 		subnets, err = getPrivateSubnetIDs(ctx, r.ec2api, desiredObj.Spec.ClusterName)
 		if err != nil {
-			return fmt.Errorf("getting private subnets %w", err)
+			return fmt.Errorf("waiting for private subnets %w", errors.WaitingForSubResources)
 		}
 	} else {
 		subnets, err = getPublicSubnetIDs(ctx, r.ec2api, desiredObj.Spec.ClusterName)
 		if err != nil {
-			return fmt.Errorf("getting public subnets %w", err)
+			return fmt.Errorf("waiting for public subnets %w", errors.WaitingForSubResources)
 		}
 	}
 	remaining := []string{}

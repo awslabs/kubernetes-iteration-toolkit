@@ -17,6 +17,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/errors"
@@ -54,10 +55,9 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	if err != nil {
 		resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
 		if errors.SafeToIgnore(err) {
-			zap.S().Infof("Safe to ignore error, %v", err)
-			return reconcile.Result{}, nil
+			zap.S().Debugf("Ignored error, will retry, %v", err)
+			return reconcile.Result{RequeueAfter: time.Second * 30}, nil
 		}
-		zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
 		return reconcile.Result{}, err
 	}
 	resource.StatusConditions().MarkTrue(v1alpha1.Active)
@@ -83,19 +83,18 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object) (*re
 		}
 		result, err := c.Controller.Reconcile(ctx, resource)
 		if err != nil {
-			return nil, fmt.Errorf("reconciling resource, %w", err)
+			return nil, fmt.Errorf("reconciling resource: %v, controller: %v, %w", resource.GetName(), c.Name(), err)
 		}
 		return result, nil
 	}
 	result, err := c.Controller.Finalize(ctx, resource)
 	if err != nil {
-		// zap.S().Errorf("Error while finalizing resource %v controller %v %v", resource.GetName(), c.Name(), err)
 		return nil, fmt.Errorf("finalizing resource controller name %v, %w", c.Controller.Name(), err)
 	}
 	if err := c.removeFinalizer(ctx, resource); err != nil {
 		return status.Waiting, fmt.Errorf("removing finalizers, %w", err)
 	}
-	zap.S().Infof("Successfully removed for resource %v and controller %v", resource.GetName(), c.Name())
+	zap.S().Infof("Successfully deleted resource %v and controller %v", resource.GetName(), c.Name())
 	return result, nil
 }
 
@@ -134,7 +133,7 @@ func (c *GenericController) removeFinalizer(ctx context.Context, resource Object
 		if err := c.patchFinalizersToResource(ctx, resource, remainingFinalizers); err != nil {
 			return err
 		}
-		zap.S().Infof("Successfully deleted finalizer %s for cluster name %s", finalizerStr, resource.GetName())
+		zap.S().Debugf("Successfully deleted finalizer %s for cluster name %s", finalizerStr, resource.GetName())
 	}
 	return nil
 }

@@ -16,10 +16,12 @@ package errors
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"go.uber.org/zap"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -30,7 +32,9 @@ var (
 func SafeToIgnore(err error) bool {
 	return IsWaitingForSubResource(err) ||
 		IsDependencyExists(err) ||
-		IsIAMResourceDependencyExists(err)
+		IsIAMResourceDependencyExists(err) ||
+		IsTargetGroupResourceInUse(err) ||
+		IsElasticIPInUse(err)
 }
 
 func IsWaitingForSubResource(err error) bool {
@@ -93,6 +97,28 @@ func IsELBLoadBalancerNotExists(err error) bool {
 	if err != nil {
 		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
 			return aerr.Code() == elbv2.ErrCodeLoadBalancerNotFoundException
+		}
+	}
+	return false
+}
+
+func IsTargetGroupResourceInUse(err error) bool {
+	if err != nil {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			return aerr.Code() == elbv2.ErrCodeResourceInUseException
+		}
+	}
+	return false
+}
+
+func IsElasticIPInUse(err error) bool {
+	if err != nil && strings.Contains(err.Error(), "AuthFailure: You do not have permission to access the specified resource") {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			zap.S().Errorf("err is %T", aerr)
+			zap.S().Errorf("Code is %s", aerr.Code())
+			zap.S().Errorf("Code is %s", aerr.Error())
+			zap.S().Errorf("Code is %s", aerr.Message())
+			return true
 		}
 	}
 	return false

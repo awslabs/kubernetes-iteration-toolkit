@@ -25,6 +25,7 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/errors"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/status"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -99,10 +100,8 @@ func (l *launchTemplate) Finalize(ctx context.Context, object controllers.Object
 func (l *launchTemplate) createLaunchTemplate(ctx context.Context, launchTemplate *v1alpha1.LaunchTemplate) (*ec2.CreateLaunchTemplateOutput, error) {
 	// Get Security group
 	securityGroupID := l.desiredSecurityGroupID(ctx, launchTemplate.Name, launchTemplate.Spec.ClusterName)
-	// Get IAM instance profile ARN
-	// instanceProfileName :=
 	if securityGroupID == "" {
-		return nil, fmt.Errorf("failed to find security group ")
+		return nil, fmt.Errorf("waiting for security group, %w", errors.WaitingForSubResources)
 	}
 	paramOutput, err := l.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"),
@@ -129,8 +128,7 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, launchTemplat
 				// Arn:  aws.String("arn:aws:iam::674320443449:instance-profile/cluster-foo-master-instance-profile"),
 				Name: aws.String(v1alpha1.ProfileName(launchTemplate.Name)),
 			},
-			Monitoring: &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
-			// SecurityGroupIds: []*string{aws.String("sg-0c44ff3e16005d370")},
+			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 			SecurityGroupIds: []*string{aws.String(securityGroupID)},
 			UserData:         aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData, launchTemplate.Spec.ClusterName)))),
 		},
@@ -216,6 +214,18 @@ sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
 cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
 br_netfilter
 EOF
+
+ETCD_VER=v3.4.16
+GITHUB_URL=https://github.com/etcd-io/etcd/releases/download
+DOWNLOAD_URL=${GITHUB_URL}
+
+rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+rm -rf /tmp/etcd-download-test && mkdir -p /tmp/etcd-download-test
+
+curl -L ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+tar xzvf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C /tmp/etcd-download-test --strip-components=1
+rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+/tmp/etcd-download-test/etcdctl version
 
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-ip6tables = 1

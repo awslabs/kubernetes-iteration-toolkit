@@ -121,7 +121,7 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 			return nil, err
 		}
 		cfg.CertificatesDir = path.Join("/tmp/", controlPlane.Name)
-		zap.S().Infof("Certificates dir is ", cfg.CertificatesDir)
+		zap.S().Infof("Certificates dir is %s", cfg.CertificatesDir)
 		if err := c.CreateKubeletConfigFilesForETCDNodes(ctx, cfg, controlPlane.Name, nodeNames); err != nil {
 			return nil, err
 		}
