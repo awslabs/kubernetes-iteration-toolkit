@@ -168,6 +168,9 @@ type DirectoryIterator struct {
 func NewDirectoryIterator(bucket, dir string) s3manager.BatchUploadIterator {
 	var paths []string
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !info.IsDir() {
 			paths = append(paths, path)
 		}

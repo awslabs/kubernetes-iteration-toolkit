@@ -16,6 +16,8 @@ package controller
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -78,4 +80,34 @@ func availabilityZonesForRegion(region string) []string {
 		azs = append(azs, fmt.Sprintf(region+azPrefix))
 	}
 	return azs
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("creating file, %w", err)
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func createDir(path string) error {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(path, 0777); err != nil {
+			return err
+		}
+		return nil
+	}
+	return err
+
 }

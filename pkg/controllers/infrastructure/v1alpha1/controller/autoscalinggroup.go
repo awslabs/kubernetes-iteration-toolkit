@@ -133,10 +133,9 @@ func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, asg *v1al
 	}
 	input := &autoscaling.CreateAutoScalingGroupInput{
 		AutoScalingGroupName: aws.String(asg.Name),
-		// AvailabilityZones:    aws.StringSlice(zones),
-		DesiredCapacity: aws.Int64(int64(asg.Spec.InstanceCount)),
-		MaxSize:         aws.Int64(4),
-		MinSize:         aws.Int64(1),
+		DesiredCapacity:      aws.Int64(int64(asg.Spec.InstanceCount)),
+		MaxSize:              aws.Int64(4),
+		MinSize:              aws.Int64(1),
 		LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
 			LaunchTemplateName: aws.String(asg.Name),
 		},

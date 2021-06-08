@@ -24,14 +24,24 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
 )
 
-// type instances struct {
-// 	ec2api *awsprovider.EC2
-// }
-
-// // NewInstancesController returns a controller for managing elasticIPs in AWS
-// func NewInstancesController(ec2api *awsprovider.EC2) *elasticIP {
-// 	return &elasticIP{ec2api: ec2api}
-// }
+func getMasterInstancesFor(ctx context.Context, clusterName string, ec2api *awsprovider.EC2) ([]*ec2.Instance, error) {
+	instances, err := getInstancesFor(ctx, clusterName, ec2api)
+	if err != nil {
+		return nil, err
+	}
+	result := []*ec2.Instance{}
+	for _, instance := range instances {
+		if aws.StringValue(instance.State.Name) == "pending" || aws.StringValue(instance.State.Name) == "running" {
+			for _, tag := range instance.Tags {
+				if aws.StringValue(tag.Key) == "Name" &&
+					aws.StringValue(tag.Value) == fmt.Sprintf("%s-%s", clusterName, v1alpha1.MasterInstances) {
+					result = append(result, instance)
+				}
+			}
+		}
+	}
+	return result, nil
+}
 
 func getEtcdInstancesFor(ctx context.Context, clusterName string, ec2api *awsprovider.EC2) ([]*ec2.Instance, error) {
 	instances, err := getInstancesFor(ctx, clusterName, ec2api)

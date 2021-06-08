@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"go.uber.org/zap"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -114,11 +113,7 @@ func IsTargetGroupResourceInUse(err error) bool {
 func IsElasticIPInUse(err error) bool {
 	if err != nil && strings.Contains(err.Error(), "AuthFailure: You do not have permission to access the specified resource") {
 		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
-			zap.S().Errorf("err is %T", aerr)
-			zap.S().Errorf("Code is %s", aerr.Code())
-			zap.S().Errorf("Code is %s", aerr.Error())
-			zap.S().Errorf("Code is %s", aerr.Message())
-			return true
+			return aerr.Code() == "AuthFailure"
 		}
 	}
 	return false

@@ -261,13 +261,6 @@ EOF
 sudo systemctl enable --now kubelet
 
 sudo mkdir -p /etc/systemd/system/kubelet.service.d
-cat <<EOF | sudo tee /etc/systemd/system/kubelet.service.d/20-etcd-service-manager.conf
-[Service]
-ExecStart=
-#  Replace "systemd" with the cgroup driver of your container runtime. The default value in the kubelet is "cgroupfs".
-ExecStart=/usr/bin/kubelet --address=127.0.0.1 --pod-manifest-path=/etc/kubernetes/manifests --cgroup-driver=systemd
-Restart=always
-EOF
 
 systemctl daemon-reload
 systemctl restart kubelet
@@ -276,7 +269,7 @@ sudo mkdir -p /etc/kit/
 cat <<EOF | sudo tee /etc/kit/sync.sh
 #!/bin/env bash
 while [ true ]; do
- dirs=("/etc/systemd/system/kubelet.service.d/" "/etc/kubernetes")
+ dirs=("/etc/systemd/system/kubelet.service.d/" "/etc/kubernetes" "/var/lib/kubelet")
  INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
  CLUSTERNAME=%s
  for dir in "\${dirs[@]}"; do

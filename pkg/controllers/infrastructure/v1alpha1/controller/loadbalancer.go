@@ -129,16 +129,16 @@ func (n *LoadBalancer) createListener(ctx context.Context, lbARN string, lb *v1a
 }
 
 func (n *LoadBalancer) createLoadBalancer(ctx context.Context, lb *v1alpha1.LoadBalancer) (*elbv2.LoadBalancer, error) {
-	privateSubnets, err := getPrivateSubnetIDs(ctx, n.ec2api, lb.Spec.ClusterName)
+	publicSubnets, err := getPublicSubnetIDs(ctx, n.ec2api, lb.Spec.ClusterName)
 	if err != nil {
 		return nil, err
 	}
-	if len(privateSubnets) == 0 {
+	if len(publicSubnets) == 0 {
 		return nil, fmt.Errorf("waiting for private subnets, %w", errors.WaitingForSubResources)
 	}
 	output, err := n.elbv2.CreateLoadBalancerWithContext(ctx, &elbv2.CreateLoadBalancerInput{
 		Name:    aws.String(lb.Name),
-		Subnets: aws.StringSlice(privateSubnets),
+		Subnets: aws.StringSlice(publicSubnets),
 		Tags:    generateLBTags(n.Name(), lb.Spec.ClusterName),
 		Type:    aws.String(lb.Spec.Type),
 		Scheme:  aws.String(lb.Spec.Scheme),
