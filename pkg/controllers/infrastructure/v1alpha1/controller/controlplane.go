@@ -102,6 +102,7 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	if err != nil {
 		return nil, err
 	}
+
 	etcdLoadBalancer, err := getEtcdLoadBalancer(context.TODO(), controlPlane.Name, c.elbv2)
 	if err != nil && errors.IsELBLoadBalancerNotExists(err) {
 		return nil, fmt.Errorf("waiting for ETCD loadbalancer, %w", errors.WaitingForSubResources)
@@ -148,9 +149,23 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 		masterNodeNames = append(masterNodeNames, aws.StringValue(instance.InstanceId))
 	}
 	zap.S().Infof("Master Instance IP %v and nodes are %v", masterNodeIPs, masterNodeNames)
+	cfg.CertificatesDir = path.Join("/tmp/", controlPlane.Name)
+	// Generate ROOT CA
+	certs := certsphase.Certificates{certsphase.KubeadmCertRootCA()}
+	certTree, err := certs.AsMap().CertTree()
+	if err != nil {
+		return nil, err
+	}
+	if err := certTree.CreateTree(cfg); err != nil {
+		return nil, fmt.Errorf("error creating root CA, %w", err)
+	}
 	for _, node := range masterNodeNames {
 		if err := copyETCDCertsToMaster(etcdNodeName, node, controlPlane.Name); err != nil {
 			return nil, fmt.Errorf("failed to copy ETCD certificates to master for testing, %w", err)
+		}
+		// Copy root CA to this node
+		if err := copyRootCerts(controlPlane.Name, node); err != nil {
+			return nil, fmt.Errorf("failed to copy certs, %w", err)
 		}
 	}
 	if err := c.CreateKubeletConfigFilesForNodes(ctx, cfg, masterNodeNames); err != nil {
@@ -163,6 +178,8 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	} else if err != nil {
 		return nil, err
 	}
+	// Root CA is already created at /tmp/clustername/
+	// copy to every master node to use that
 	for _, masterNodeName := range masterNodeNames {
 		for _, etcdNodeIP := range etcdNodeIPs {
 			cfg.Etcd.External.Endpoints = append(cfg.Etcd.External.Endpoints, fmt.Sprintf("https://%s:2379", etcdNodeIP))
@@ -177,7 +194,6 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 		cfg.NodeRegistration = kubeadmapi.NodeRegistrationOptions{
 			Name: masterNodeName,
 		}
-		// check if we have the root CA
 		// Generate Master PKI and config on one of the master nodes
 		if err := c.BootstrapMasterConfigFiles(ctx, cfg, masterNodeName, controlPlane.Name); err != nil {
 			return nil, fmt.Errorf("failed to bootstrap master node %v, %w", masterNodeName, err)
@@ -212,6 +228,7 @@ func (c *controlPlane) BootstrapMasterConfigFiles(ctx context.Context, cfg *kube
 	if err := certs.CreatePKIAssets(cfg); err != nil {
 		return fmt.Errorf("creating PKI assets, %w", err)
 	}
+	zap.S().Infof("Created PKI assets")
 	// Generate Kube config files for master components
 	for _, kubeConfigFileName := range []string{kubeadmconstants.AdminKubeConfigFileName,
 		kubeadmconstants.KubeletKubeConfigFileName,
@@ -340,6 +357,20 @@ func (c *controlPlane) CreateEtcdFiles(cfg *kubeadmapi.InitConfiguration, cluste
 func CopyCA(src, dst string) error {
 	for _, fileName := range []string{"/ca.crt", "/ca.key"} {
 		if err := copyFile(path.Join(src, fileName), path.Join(dst, fileName)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyRootCerts(clusterName, masterNodeName string) error {
+	for _, s := range []string{"ca.crt", "ca.key"} {
+		src := path.Join("/tmp/", clusterName, s)
+		dest := path.Join("/tmp/", clusterName, masterNodeName, "/etc/kubernetes/pki", s)
+		if err := createDir(path.Dir(dest)); err != nil {
+			return fmt.Errorf("creating directory %v, %w", path.Dir(dest), err)
+		}
+		if err := copyFile(src, dest); err != nil {
 			return err
 		}
 	}
