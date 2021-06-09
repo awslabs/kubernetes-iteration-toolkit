@@ -24,18 +24,28 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
 )
 
-func getMasterInstancesFor(ctx context.Context, clusterName string, ec2api *awsprovider.EC2) ([]*ec2.Instance, error) {
+type Node struct {
+	ID         string
+	IPAddress  string
+	PrivateDNS string
+}
+
+func getMasterInstancesFor(ctx context.Context, clusterName string, ec2api *awsprovider.EC2) ([]*Node, error) {
 	instances, err := getInstancesFor(ctx, clusterName, ec2api)
 	if err != nil {
 		return nil, err
 	}
-	result := []*ec2.Instance{}
+	result := []*Node{}
 	for _, instance := range instances {
 		if aws.StringValue(instance.State.Name) == "pending" || aws.StringValue(instance.State.Name) == "running" {
 			for _, tag := range instance.Tags {
 				if aws.StringValue(tag.Key) == "Name" &&
 					aws.StringValue(tag.Value) == fmt.Sprintf("%s-%s", clusterName, v1alpha1.MasterInstances) {
-					result = append(result, instance)
+					result = append(result, &Node{
+						ID:         *instance.InstanceId,
+						IPAddress:  *instance.PrivateIpAddress,
+						PrivateDNS: *instance.PrivateDnsName,
+					})
 				}
 			}
 		}
@@ -43,23 +53,27 @@ func getMasterInstancesFor(ctx context.Context, clusterName string, ec2api *awsp
 	return result, nil
 }
 
-func getEtcdInstancesFor(ctx context.Context, clusterName string, ec2api *awsprovider.EC2) ([]*ec2.Instance, error) {
-	instances, err := getInstancesFor(ctx, clusterName, ec2api)
+func getEtcdInstancesFor(ctx context.Context, clusterName string, ec2api *awsprovider.EC2) ([]*Node, error) {
+	output, err := getInstancesFor(ctx, clusterName, ec2api)
 	if err != nil {
 		return nil, err
 	}
-	result := []*ec2.Instance{}
-	for _, instance := range instances {
+	nodes := []*Node{}
+	for _, instance := range output {
 		if aws.StringValue(instance.State.Name) == "pending" || aws.StringValue(instance.State.Name) == "running" {
 			for _, tag := range instance.Tags {
 				if aws.StringValue(tag.Key) == "Name" &&
 					aws.StringValue(tag.Value) == fmt.Sprintf("%s-%s", clusterName, v1alpha1.ETCDInstances) {
-					result = append(result, instance)
+					nodes = append(nodes, &Node{
+						ID:         *instance.InstanceId,
+						IPAddress:  *instance.PrivateIpAddress,
+						PrivateDNS: *instance.PrivateDnsName,
+					})
 				}
 			}
 		}
 	}
-	return result, nil
+	return nodes, nil
 }
 
 func getInstancesFor(ctx context.Context, clusterName string, ec2api *awsprovider.EC2) ([]*ec2.Instance, error) {

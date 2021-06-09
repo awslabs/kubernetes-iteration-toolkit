@@ -18,11 +18,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	"go.uber.org/zap"
 )
 
 const (
@@ -80,6 +82,26 @@ func availabilityZonesForRegion(region string) []string {
 		azs = append(azs, fmt.Sprintf(region+azPrefix))
 	}
 	return azs
+}
+
+func CopyCACertsFrom(src, dst string) error {
+	for _, fileName := range []string{"/ca.crt", "/ca.key"} {
+		if err := copyCerts(path.Join(src, fileName), path.Join(dst, fileName)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyCerts(src, dst string) error {
+	if err := createDir(path.Dir(dst)); err != nil {
+		return fmt.Errorf("creating directory %v, %w", path.Dir(dst), err)
+	}
+	zap.S().Info("Created directory ", path.Dir(dst))
+	if err := copyFile(src, dst); err != nil {
+		return err
+	}
+	return nil
 }
 
 func copyFile(src, dst string) error {
