@@ -1,3 +1,17 @@
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controller
 
 import (
@@ -25,12 +39,6 @@ func (c *controlPlane) createMasterBootstrapFiles(ctx context.Context, controlPl
 	if err != nil {
 		return err
 	}
-	// masterNodeIPs := []string{}
-	// masterNodeNames := []string{}
-	// for _, instance := range masterInstances {
-	// 	masterNodeIPs = append(masterNodeIPs, aws.StringValue(instance.PrivateIpAddress))
-	// 	masterNodeNames = append(masterNodeNames, aws.StringValue(instance.InstanceId))
-	// }
 	masterLB, err := getMasterLoadBalancer(ctx, controlPlane.Name, c.elbv2)
 	if err != nil && errors.IsELBLoadBalancerNotExists(err) {
 		return fmt.Errorf("waiting for master load balancer, %w", errors.WaitingForSubResources)
@@ -68,6 +76,18 @@ func (c *controlPlane) createMasterBootstrapFiles(ctx context.Context, controlPl
 				"advertise-address": cfg.LocalAPIEndpoint.AdvertiseAddress,
 				"secure-port":       "443",
 			}
+			if cfg.APIServer.ExtraArgs == nil {
+				cfg.APIServer.ExtraArgs = map[string]string{}
+			}
+			if cfg.Scheduler.ExtraArgs == nil {
+				cfg.Scheduler.ExtraArgs = map[string]string{}
+			}
+			if cfg.ControllerManager.ExtraArgs == nil {
+				cfg.ControllerManager.ExtraArgs = map[string]string{}
+			}
+			unifyKeys(cfg.APIServer.ExtraArgs, controlPlane.Spec.Master.APIServer.Args)
+			unifyKeys(cfg.Scheduler.ExtraArgs, controlPlane.Spec.Master.Scheduler.Args)
+			unifyKeys(cfg.ControllerManager.ExtraArgs, controlPlane.Spec.Master.ControllerManager.Args)
 			cfg.NodeRegistration = kubeadmapi.NodeRegistrationOptions{
 				Name: masterNode.ID,
 			}
@@ -77,6 +97,12 @@ func (c *controlPlane) createMasterBootstrapFiles(ctx context.Context, controlPl
 			}
 			if err := uploadDirectories(ctx, bucketName(controlPlane.Name), path.Join(clusterCertsBasePath, controlPlane.Name, masterNode.ID), c.s3uploader); err != nil {
 				return fmt.Errorf("uploading files to S3 %v, %w", masterNode.ID, err)
+			}
+		}
+		nodes := append(masterNodes, etcdNodes...)
+		for _, node := range nodes {
+			if err := uploadDirectories(ctx, bucketName(controlPlane.Name), path.Join(clusterCertsBasePath, controlPlane.Name, node.ID), c.s3uploader); err != nil {
+				return fmt.Errorf("uploading files to S3 %v, %w", node.ID, err)
 			}
 		}
 		// Connect with any master node to create a client

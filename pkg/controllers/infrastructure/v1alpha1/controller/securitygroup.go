@@ -79,31 +79,26 @@ func (s *securityGroup) Reconcile(ctx context.Context, object controllers.Object
 		if err != nil {
 			return nil, fmt.Errorf("creating group, %w", err)
 		}
-		groupID = *output.GroupId
+		groupID = output.GroupId
 		zap.S().Infof("Successfully created security group %v for cluster %v", sgObj.Spec.GroupName, sgObj.Spec.ClusterName)
 	} else {
 		zap.S().Debugf("Successfully discovered security groups %v for cluster %v", sgObj.Spec.GroupName, sgObj.Spec.ClusterName)
 	}
 	if !ingressRuleExists(existingGroups, sgObj.Spec.GroupName) {
-		if err := s.addIngressRuleFor(ctx, groupID, sgObj.Spec.GroupName, sgObj.Spec.ClusterName, existingGroupIDs); err != nil {
+		if err := s.addIngressRuleFor(ctx, *groupID, sgObj.Spec, existingGroupIDs); err != nil {
 			return nil, fmt.Errorf("adding ingress rule, %w", err)
 		}
 		zap.S().Infof("Successfully added ingress rules for security group %v for cluster %v",
 			sgObj.Spec.GroupName, sgObj.Name)
 	}
-	switch sgObj.Spec.GroupName {
-	case v1alpha1.GroupName(sgObj.Spec.ClusterName, v1alpha1.MasterInstances):
-		sgObj.Status.MasterSecurityGroupID = groupID
-	case v1alpha1.GroupName(sgObj.Spec.ClusterName, v1alpha1.MasterInstances):
-		sgObj.Status.ETCDSecurityGroupID = groupID
-	}
+	sgObj.Status.SecurityGroupID = *groupID
 	return status.Created, nil
 }
 
-func groupsCreated(sgs []*ec2.SecurityGroup) map[string]string {
-	groupNameID := map[string]string{}
+func groupsCreated(sgs []*ec2.SecurityGroup) map[string]*string {
+	groupNameID := map[string]*string{}
 	for _, sg := range sgs {
-		groupNameID[*sg.GroupName] = *sg.GroupId
+		groupNameID[*sg.GroupName] = sg.GroupId
 	}
 	return groupNameID
 }
@@ -131,8 +126,8 @@ func (s *securityGroup) createFor(ctx context.Context, groupName, clusterName, v
 	return result, nil
 }
 
-func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID, groupName, clusterName string, groups map[string]string) error {
-	input, err := s.createIngressInputFor(groupID, groupName, clusterName, groups)
+func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID string, groupSpec v1alpha1.SecurityGroupSpec, groups map[string]*string) error {
+	input, err := s.createIngressInputFor(groupID, groupSpec, groups)
 	if err != nil {
 		return nil
 	}
@@ -153,45 +148,57 @@ func (s *securityGroup) createDescriptionFor(groupName, clusterName string) stri
 	return ""
 }
 
-func (s *securityGroup) createIngressInputFor(securitygroupID, groupName, controlPlaneName string, groups map[string]string) (*ec2.AuthorizeSecurityGroupIngressInput, error) {
-	switch groupName {
-	case v1alpha1.GroupName(controlPlaneName, v1alpha1.MasterInstances):
-		return &ec2.AuthorizeSecurityGroupIngressInput{
-			GroupId: aws.String(securitygroupID),
-			IpPermissions: []*ec2.IpPermission{{
-				FromPort: aws.Int64(443),
-				ToPort:   aws.Int64(443),
-				IpRanges: []*ec2.IpRange{{
-					CidrIp: aws.String("0.0.0.0/0"),
-				}},
-				IpProtocol: aws.String("tcp"),
-			}},
-		}, nil
-	case v1alpha1.GroupName(controlPlaneName, v1alpha1.ETCDInstances):
-		masterGroupID, ok := groups[v1alpha1.GroupName(controlPlaneName, v1alpha1.MasterInstances)]
-		if !ok {
-			return nil, fmt.Errorf("master security group ID not found, %w", errors.WaitingForSubResources)
+func (s *securityGroup) createIngressInputFor(securitygroupID string, groupSpec v1alpha1.SecurityGroupSpec, groupNameID map[string]*string) (*ec2.AuthorizeSecurityGroupIngressInput, error) {
+	permissions := []*ec2.IpPermission{}
+	for _, perm := range groupSpec.Permissions {
+		permission := &ec2.IpPermission{
+			FromPort:   perm.FromPort,
+			ToPort:     perm.ToPort,
+			IpProtocol: perm.IpProtocol,
 		}
-		return &ec2.AuthorizeSecurityGroupIngressInput{
-			GroupId: aws.String(securitygroupID),
-			IpPermissions: []*ec2.IpPermission{{
-				FromPort:   aws.Int64(2379),
-				ToPort:     aws.Int64(2380),
-				IpProtocol: aws.String("tcp"),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{{
-					GroupId: aws.String(securitygroupID),
-				}},
-			}, {
-				FromPort:   aws.Int64(2379),
-				ToPort:     aws.Int64(2379),
-				IpProtocol: aws.String("tcp"),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{{
-					GroupId: aws.String(masterGroupID),
-				}},
-			}},
-		}, nil
+		if perm.CidrIP != nil && *perm.CidrIP != "" {
+			permission.IpRanges = []*ec2.IpRange{{CidrIp: perm.CidrIP}}
+		}
+		if perm.GroupName != nil && *perm.GroupName != "" {
+			groupID := groupNameID[*perm.GroupName]
+			if groupID == nil || *groupID == "" {
+				return nil, fmt.Errorf("waiting for group %v, %w", *perm.GroupName, errors.WaitingForSubResources)
+			}
+			permission.UserIdGroupPairs = []*ec2.UserIdGroupPair{{GroupId: groupID}}
+		}
+		permissions = append(permissions, permission)
 	}
-	return nil, nil
+	return &ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId:       aws.String(securitygroupID),
+		IpPermissions: permissions,
+	}, nil
+	// switch groupSpec.GroupName {
+	// case v1alpha1.GroupName(groupSpec.ClusterName, v1alpha1.MasterInstances):
+	// 	return &ec2.AuthorizeSecurityGroupIngressInput{
+	// 		GroupId:       aws.String(securitygroupID),
+	// 		IpPermissions: permissions,
+	// 	}, nil
+	// case v1alpha1.GroupName(groupSpec.ClusterName, v1alpha1.ETCDInstances):
+	// 	return &ec2.AuthorizeSecurityGroupIngressInput{
+	// 		GroupId: aws.String(securitygroupID),
+	// 		IpPermissions: []*ec2.IpPermission{{
+	// 			FromPort:   aws.Int64(2379),
+	// 			ToPort:     aws.Int64(2380),
+	// 			IpProtocol: aws.String("tcp"),
+	// 			UserIdGroupPairs: []*ec2.UserIdGroupPair{{
+	// 				GroupId: aws.String(securitygroupID),
+	// 			}},
+	// 		}, {
+	// 			FromPort:   aws.Int64(2379),
+	// 			ToPort:     aws.Int64(2379),
+	// 			IpProtocol: aws.String("tcp"),
+	// 			UserIdGroupPairs: []*ec2.UserIdGroupPair{{
+	// 				GroupId: aws.String(masterGroupID),
+	// 			}},
+	// 		}},
+	// 	}, nil
+	// }
+	// return nil, nil
 }
 
 // Finalize deletes the resource from AWS
@@ -204,21 +211,15 @@ func (s *securityGroup) Finalize(ctx context.Context, object controllers.Object)
 	// get groupName to group ID mapping
 	groups := groupsCreated(existingGroups)
 	groupID := groups[sgObj.Spec.GroupName]
-	if groupID == "" {
-		zap.S().Errorf("When removing security group not found in AWS %s", sgObj.Spec.GroupName)
+	if groupID == nil || *groupID == "" {
 		return status.Terminated, nil
 	}
 	if _, err := s.ec2api.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
-		GroupId: aws.String(groupID),
+		GroupId: aws.String(*groupID),
 	}); err != nil {
 		return nil, err
 	}
-	switch sgObj.Spec.GroupName {
-	case v1alpha1.GroupName(sgObj.Spec.ClusterName, v1alpha1.MasterInstances):
-		sgObj.Status.MasterSecurityGroupID = ""
-	case v1alpha1.GroupName(sgObj.Spec.ClusterName, v1alpha1.MasterInstances):
-		sgObj.Status.ETCDSecurityGroupID = ""
-	}
+	sgObj.Status.SecurityGroupID = ""
 	return status.Terminated, nil
 }
 

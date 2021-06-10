@@ -2,4 +2,8 @@ apiVersion: kit.k8s.amazonaws.com/v1alpha1
 kind: ControlPlane
 metadata:
   name: foo # Desired Cluster Name
-spec: {}
+spec:
+  master:
+    apiServer:
+      args:
+        goaway-chance: ".001"

@@ -184,8 +184,6 @@ func existingTemplateMatchesDesired(templates []*ec2.LaunchTemplate, templateNam
 
 const (
 	userData = `#!/bin/bash
-yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
-
 sudo swapoff -a
 sudo yum install -y docker
 sudo yum install -y conntrack-tools
@@ -269,7 +267,7 @@ sudo mkdir -p /etc/kit/
 cat <<EOF | sudo tee /etc/kit/sync.sh
 #!/bin/env bash
 while [ true ]; do
- dirs=("/etc/systemd/system/kubelet.service.d/" "/etc/kubernetes" "/var/lib/kubelet")
+ dirs=("/etc/systemd/system/kubelet.service.d" "/etc/kubernetes" "/var/lib/kubelet")
  INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
  CLUSTERNAME=%s
  for dir in "\${dirs[@]}"; do
@@ -285,10 +283,12 @@ while [ true ]; do
 	   	systemctl restart kubelet
     fi
  done
- sleep 30
+ sleep 10
 done
 EOF
 
 chmod a+x /etc/kit/sync.sh
 /etc/kit/sync.sh > /tmp/sync-kit-files.log&`
 )
+
+// 2021-06-09T21:23:00.365-0500	ERROR	controller-runtime.manager.controller.auto-scaling-group	Reconciler error	{"reconciler group": "kit.k8s.amazonaws.com", "reconciler kind": "AutoScalingGroup", "name": "foo-etcd-instances", "namespace": "kit", "error": "reconciling resource: foo-etcd-instances, controller: auto-scaling-group, creating autoscaling group, ValidationError: You must use a valid fully-formed launch template. Value (foo-etcd-instances-profile) for parameter iamInstanceProfile.name is invalid. Invalid IAM Instance Profile name\n\tstatus code: 400, request id: d7215fe1-9cfd-4b71-a7ca-58e6d5914bc8"}

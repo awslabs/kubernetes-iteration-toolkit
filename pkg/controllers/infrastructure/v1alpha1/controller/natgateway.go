@@ -122,6 +122,7 @@ func (n *natGateway) createNatGateway(ctx context.Context, natGwObj *v1alpha1.Na
 	}); err != nil {
 		return nil, err
 	}
+	zap.S().Infof("Nat-gateway %v is available for cluster %v", *output.NatGateway.NatGatewayId, natGwObj.Name)
 	return output.NatGateway, nil
 }
 

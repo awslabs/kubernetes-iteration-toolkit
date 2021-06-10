@@ -21,11 +21,14 @@ import (
 const (
 	MasterInstances = "master-instances"
 	ETCDInstances   = "etcd-instances"
+	WorkerInstances = "worker-instances"
 
 	SecurityGroupKey = "security-group"
 )
 
 var ComponentsSupported = []string{ETCDInstances, MasterInstances}
+
+// var ComponentsSupportedWithWorkerNodes = []string{ETCDInstances, MasterInstances, WorkerInstances}
 
 // ControlPlane is the Schema for the ControlPlanes API
 // +kubebuilder:object:root=true
@@ -67,15 +70,15 @@ type Infrastructure struct {
 // scheduler.
 type MasterSpec struct {
 	Instances         `json:",inline"`
-	Scheduler         *Config `json:"scheduler,omitempty"`
-	ControllerManager *Config `json:"controllerManager,omitempty"`
-	APIServer         *Config `json:"apiServer,omitempty"`
+	Scheduler         Config `json:"scheduler,omitempty"`
+	ControllerManager Config `json:"controllerManager,omitempty"`
+	APIServer         Config `json:"apiServer,omitempty"`
 }
 
 // ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
 type ETCDSpec struct {
 	Instances `json:",inline"`
-	*Config   `json:",inline"`
+	Config    `json:",inline"`
 }
 
 // Config provides a generic way to pass in args and images to master and etcd
@@ -93,4 +96,14 @@ type Instances struct {
 	AMI   string `json:"ami,omitempty"`
 	Type  string `json:"type,omitempty"`
 	Count int    `json:"count,omitempty"`
+}
+
+func (c *ControlPlane) MasterSecurePort() string {
+	return c.Spec.Master.APIServer.Args["secure-port"]
+}
+
+func (c *ControlPlane) MasterSecurePortInt64() int64 {
+	_ = c.Spec.Master.APIServer.Args["secure-port"]
+	// TODO hardcoded for nowsudo -
+	return 443
 }

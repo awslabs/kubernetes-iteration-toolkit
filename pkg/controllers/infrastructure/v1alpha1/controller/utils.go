@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
-	"go.uber.org/zap"
+	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
 )
 
 const (
@@ -75,13 +75,37 @@ func generateLBTags(svcName, clusterName string) []*elbv2.Tag {
 	}}
 }
 
-// TODO get all AZs for a region from an API
-func availabilityZonesForRegion(region string) []string {
-	azs := []string{}
-	for _, azPrefix := range []string{"a", "b", "c"} {
-		azs = append(azs, fmt.Sprintf(region+azPrefix))
+// // TODO get all AZs for a region from an API
+// func availabilityZonesForRegion(region string) []string {
+// 	azs := []string{}
+// 	for _, azPrefix := range []string{"a", "b", "c"} {
+// 		azs = append(azs, fmt.Sprintf(region+azPrefix))
+// 	}
+// 	return azs
+// }
+
+func unifyKeys(existing, overrides map[string]string) {
+	for key, value := range overrides {
+		existing[key] = value
 	}
-	return azs
+}
+
+func setDefaults(controlPlane *v1alpha1.ControlPlane) {
+	if controlPlane.Spec.Master.Count == 0 {
+		controlPlane.Spec.Master.Count = 3
+	}
+	if controlPlane.Spec.Etcd.Count == 0 {
+		controlPlane.Spec.Etcd.Count = 3
+	}
+	if controlPlane.Spec.Master.APIServer.Args["secure-port"] == "0" {
+		controlPlane.Spec.Master.APIServer.Args["secure-port"] = "443"
+	}
+	if controlPlane.Spec.Master.ControllerManager.Args == nil {
+		controlPlane.Spec.Master.ControllerManager.Args = map[string]string{}
+	}
+	if controlPlane.Spec.Master.Scheduler.Args == nil {
+		controlPlane.Spec.Master.Scheduler.Args = map[string]string{}
+	}
 }
 
 func CopyCACertsFrom(src, dst string) error {
@@ -97,7 +121,6 @@ func copyCerts(src, dst string) error {
 	if err := createDir(path.Dir(dst)); err != nil {
 		return fmt.Errorf("creating directory %v, %w", path.Dir(dst), err)
 	}
-	zap.S().Info("Created directory ", path.Dir(dst))
 	if err := copyFile(src, dst); err != nil {
 		return err
 	}

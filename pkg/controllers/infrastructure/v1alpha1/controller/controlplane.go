@@ -24,7 +24,6 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/resource"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/status"
-	"go.uber.org/zap"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -86,6 +85,7 @@ type ResourceManager interface {
 // object
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
+	setDefaults(controlPlane) // TODO moved to webhook defaults for CR object
 	resources := []ResourceManager{
 		&resource.VPC{KubeClient: c.Client},
 		&resource.S3{KubeClient: c.Client},
@@ -113,48 +113,12 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	if err != nil {
 		return nil, err
 	}
-
-	// etcdLoadBalancer, err := getEtcdLoadBalancer(ctx, controlPlane.Name, c.elbv2)
-	// if err != nil && errors.IsELBLoadBalancerNotExists(err) {
-	// 	return nil, fmt.Errorf("waiting for ETCD loadbalancer, %w", errors.WaitingForSubResources)
-	// }
-	// instances, err := getEtcdInstancesFor(ctx, controlPlane.Name, c.ec2api)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// etcdNodeIPs := []string{}
-	// etcdNodeNames := []string{}
-	// for _, instance := range instances {
-	// 	etcdNodeIPs = append(etcdNodeIPs, aws.StringValue(instance.PrivateIpAddress))
-	// 	etcdNodeNames = append(etcdNodeNames, aws.StringValue(instance.InstanceId))
-	// }
-	// zap.S().Infof("ETCD Instance IP %v and nodes are %v", etcdNodeIPs, etcdNodeNames)
-	// etcdNodeName := ""
-	// if len(etcdNodeIPs) == 3 {
-	// 	etcdNodeName = etcdNodeNames[0]
-
-	// 	cfg.CertificatesDir = path.Join("/tmp/", controlPlane.Name)
-	// 	if err := c.CreateEtcdFiles(cfg, controlPlane.Name, aws.StringValue(etcdLoadBalancer.DNSName), etcdNodeIPs, etcdNodeNames); err != nil {
-	// 		return nil, fmt.Errorf("error creating ETCD CA %w", err)
-	// 	}
-	// 	cfg, err = c.generateInitConfig(controlPlane, cfg)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	cfg.CertificatesDir = path.Join("/tmp/", controlPlane.Name)
-	// 	if err := c.CreateKubeletConfigFilesForNodes(ctx, cfg, etcdNodeNames); err != nil {
-	// 		return nil, err
-	// 	}
-	// 	if err := c.CreatekubeletSystemServiceForETCD(ctx, cfg, etcdNodeNames); err != nil {
-	// 		return nil, err
-	// 	}
-	// }
+	// Generate ETCD bootstrap files
 	if err := c.createETCDBootstrapFiles(ctx, controlPlane, cfg); err != nil {
 		return nil, err
 	}
-
-	cfg.CertificatesDir = path.Join("/tmp/", controlPlane.Name)
-	// Generate ROOT CA
+	cfg.CertificatesDir = path.Join(clusterCertsBasePath, controlPlane.Name)
+	// Generate ROOT CA for the Master components
 	certs := certsphase.Certificates{certsphase.KubeadmCertRootCA()}
 	certTree, err := certs.AsMap().CertTree()
 	if err != nil {
@@ -163,103 +127,13 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	if err := certTree.CreateTree(cfg); err != nil {
 		return nil, fmt.Errorf("error creating root CA, %w", err)
 	}
-	// for _, node := range masterNodeNames {
-	// 	if err := copyETCDCertsToMaster(etcdNodeName, node, controlPlane.Name); err != nil {
-	// 		return nil, fmt.Errorf("failed to copy ETCD certificates to master for testing, %w", err)
-	// 	}
-	// 	// Copy root CA to this node
-	// 	if err := copyRootCerts(controlPlane.Name, node); err != nil {
-	// 		return nil, fmt.Errorf("failed to copy certs, %w", err)
-	// 	}
-	// }
-	// if err := c.CreateKubeletConfigFilesForNodes(ctx, cfg, masterNodeNames); err != nil {
-	// 	return nil, err
-	// }
-	zap.S().Infof("ETCD bootstrap complete starting master bootstrap")
+	// Generate Master bootstrap files
 	if err := c.createMasterBootstrapFiles(ctx, controlPlane, cfg); err != nil {
 		return nil, err
 	}
-	// masterLB, err := getMasterLoadBalancer(ctx, controlPlane.Name, c.elbv2)
-	// if err != nil && errors.IsELBLoadBalancerNotExists(err) {
-	// 	return nil, fmt.Errorf("waiting for master load balancer, %w", errors.WaitingForSubResources)
-	// } else if err != nil {
-	// 	return nil, err
-	// }
-	// Root CA is already created at /tmp/clustername/
-	// copy to every master node to use that
-	// for _, masterNodeName := range masterNodeNames {
-	// 	for _, etcdNodeIP := range etcdNodeIPs {
-	// 		cfg.Etcd.External.Endpoints = append(cfg.Etcd.External.Endpoints, fmt.Sprintf("https://%s:2379", etcdNodeIP))
-	// 	}
-	// 	cfg.LocalAPIEndpoint.AdvertiseAddress = masterNodeIPs[0]
-	// 	cfg.ControlPlaneEndpoint = aws.StringValue(masterLB.DNSName) + ":443"
-	// 	cfg.APIServer.CertSANs = []string{aws.StringValue(masterLB.DNSName), masterNodeIPs[0], masterNodeNames[0], "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local", "10.96.0.1"}
-	// 	cfg.APIServer.ExtraArgs = map[string]string{
-	// 		"advertise-address": cfg.LocalAPIEndpoint.AdvertiseAddress,
-	// 		"secure-port":       "443",
-	// 	}
-	// 	cfg.NodeRegistration = kubeadmapi.NodeRegistrationOptions{
-	// 		Name: masterNodeName,
-	// 	}
-	// 	// Generate Master PKI and config on one of the master nodes
-	// 	if err := c.BootstrapMasterConfigFiles(ctx, cfg, masterNodeName, controlPlane.Name); err != nil {
-	// 		return nil, fmt.Errorf("failed to bootstrap master node %v, %w", masterNodeName, err)
-	// 	}
-	// }
-	// Upload to S3 for all instances
-	// for _, nodeName := range append(masterNodeNames, etcdNodeNames...) {
-	// 	bucketName := fmt.Sprintf("kit-%s", controlPlane.Name)
-	// 	if err := uploadDirectories(ctx, bucketName, path.Join("/tmp/", controlPlane.Name, nodeName), c.s3uploader); err != nil {
-	// 		return nil, fmt.Errorf("uploading files to S3 %v, %w", nodeName, err)
-	// 	}
-	// }
-	// Generate RBAC, tokens to the cluster
-	// if len(masterNodeNames) > 0 {
-	// 	masterNodeName := masterNodeNames[0]
-	// 	zap.S().Infof("Starting Bootstrap for master nodes")
-	// 	if err := c.bootstrapMasterNodes(ctx, controlPlane.Name, masterNodeName, cfg); err != nil {
-	// 		zap.S().Errorf("Failed to bootstrap, %v", err)
-	// 	}
-	// }
+	// Generate Kubeconfig files for just the worker nodes
 	return status.Created, nil
 }
-
-// func (c *controlPlane) BootstrapMasterConfigFiles(ctx context.Context, cfg *kubeadmapi.InitConfiguration, nodeName, clusterName string) error {
-// 	tmp := cfg.CertificatesDir
-// 	defer func() {
-// 		cfg.CertificatesDir = tmp
-// 	}()
-// 	// Create all the config files for one of the master node in the cluster
-// 	cfg.CertificatesDir = path.Join(cfg.CertificatesDir, nodeName, "/etc/kubernetes/pki")
-// 	// Generate PKI for node in the master
-// 	if err := certs.CreatePKIAssets(cfg); err != nil {
-// 		return fmt.Errorf("creating PKI assets, %w", err)
-// 	}
-// 	zap.S().Infof("Created PKI assets")
-// 	// Generate Kube config files for master components
-// 	for _, kubeConfigFileName := range []string{kubeadmconstants.AdminKubeConfigFileName,
-// 		kubeadmconstants.KubeletKubeConfigFileName,
-// 		kubeadmconstants.ControllerManagerKubeConfigFileName,
-// 		kubeadmconstants.SchedulerKubeConfigFileName} {
-// 		err := kubeconfig.CreateKubeConfigFile(kubeConfigFileName, path.Join(tmp, nodeName, "/etc/kubernetes"), cfg)
-// 		if err != nil {
-// 			return fmt.Errorf("creating kubeconfig file for %v, %w", kubeConfigFileName, err)
-// 		}
-// 	}
-// 	// Generate static pod files for kube components
-// 	cfg.CertificatesDir = "/etc/kubernetes/pki"
-// 	for _, componentName := range []string{kubeadmconstants.KubeAPIServer,
-// 		kubeadmconstants.KubeControllerManager,
-// 		kubeadmconstants.KubeScheduler} {
-// 		err := controlplane.CreateStaticPodFiles(path.Join(tmp, nodeName, "/etc/kubernetes/manifests"), "",
-// 			&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, componentName)
-// 		if err != nil {
-// 			return fmt.Errorf("creating static pod file for %v, %w", componentName, err)
-// 		}
-// 	}
-// 	zap.S().Infof("Master components created for node %s", nodeName)
-// 	return nil
-// }
 
 func (c *controlPlane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
 	return status.Terminated, nil
@@ -270,7 +144,7 @@ func (c *controlPlane) CreateKubeletConfigFilesForNodes(ctx context.Context, clu
 		kubeletConfigDir := path.Join(clusterCertsBasePath, clusterName, node.ID, kubeletConfigPath)
 		cfg.NodeRegistration.KubeletExtraArgs = map[string]string{"cgroup-driver": "systemd",
 			"network-plugin":            "cni",
-			"pod-infra-container-image": "public.ecr.aws/eks-distro/kubernetes/pause:3.2",
+			"pod-infra-container-image": "public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1",
 		}
 		cfg.NodeRegistration.Name = node.ID
 		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.ClusterConfiguration, &cfg.NodeRegistration, false, kubeletConfigDir); err != nil {
@@ -283,125 +157,6 @@ func (c *controlPlane) CreateKubeletConfigFilesForNodes(ctx context.Context, clu
 	return nil
 }
 
-// func (c *controlPlane) CreatekubeletSystemServiceForETCD(ctx context.Context, cfg *kubeadmapi.InitConfiguration, nodeNames []string) error {
-// 	for _, nodeName := range nodeNames {
-// 		if err := createDir(path.Join(cfg.CertificatesDir, nodeName, "/etc/systemd/system/kubelet.service.d/")); err != nil {
-// 			return err
-// 		}
-// 		kubeletSvcPath := path.Join(cfg.CertificatesDir, nodeName, "/etc/systemd/system/kubelet.service.d/20-etcd-service-manager.conf")
-// 		if err := ioutil.WriteFile(kubeletSvcPath, []byte(kubeletServiceForETCDNodes), 0644); err != nil {
-// 			return fmt.Errorf("writing kubelet configuration %q, %w", kubeletSvcPath, err)
-// 		}
-// 	}
-// 	return nil
-// }
 func bucketName(clusterName string) string {
 	return fmt.Sprintf("kit-%s", clusterName)
-}
-
-// func (c *controlPlane) CreateEtcdFiles(cfg *kubeadmapi.InitConfiguration, clusterName, lbName string, nodeIPs, nodeNames []string) error {
-
-// 	ca := certsphase.KubeadmCertEtcdCA()
-// 	if err := certsphase.CreateCACertAndKeyFiles(ca, cfg); err != nil {
-// 		return err
-// 	}
-// 	hosts := []string{}
-// 	for i := 0; i < len(nodeIPs); i++ {
-// 		hosts = append(hosts, fmt.Sprintf("%s=https://%s:2380", nodeNames[i], nodeIPs[i]))
-// 		pkiPath := path.Join("/tmp/", clusterName, nodeNames[i], "/etc/kubernetes/pki/etcd")
-// 		if err := createDir(pkiPath); err != nil {
-// 			return err
-// 		}
-// 		if err := CopyCA(path.Join(cfg.CertificatesDir, "/etcd"), pkiPath); err != nil {
-// 			return err
-// 		}
-// 	}
-// 	// bucketName := fmt.Sprintf("kit-%s", clusterName)
-// 	for i := 0; i < len(nodeIPs); i++ {
-// 		cfg.CertificatesDir = path.Join("/tmp/", clusterName, nodeNames[i], "/etc/kubernetes/pki/")
-// 		cfg.Etcd.Local = &kubeadm.LocalEtcd{
-// 			ServerCertSANs: []string{nodeIPs[i], lbName},
-// 			PeerCertSANs:   []string{nodeIPs[i], lbName},
-// 			DataDir:        "/var/lib/etcd",
-// 			ExtraArgs: map[string]string{
-// 				"initial-cluster":             strings.Join(hosts, ","),
-// 				"initial-cluster-state":       "new",
-// 				"name":                        nodeNames[i],
-// 				"listen-peer-urls":            fmt.Sprintf("https://%s:2380", nodeIPs[i]),
-// 				"listen-client-urls":          fmt.Sprintf("https://%s:2379", nodeIPs[i]),
-// 				"advertise-client-urls":       fmt.Sprintf("https://%s:2379", nodeIPs[i]),
-// 				"initial-advertise-peer-urls": fmt.Sprintf("https://%s:2380", nodeIPs[i]),
-// 			},
-// 		}
-// 		for _, cert := range []*certsphase.KubeadmCert{
-// 			certsphase.KubeadmCertEtcdServer(),
-// 			certsphase.KubeadmCertEtcdPeer(),
-// 			certsphase.KubeadmCertEtcdHealthcheck(),
-// 			certsphase.KubeadmCertEtcdAPIClient(),
-// 		} {
-// 			if err := certsphase.CreateCertAndKeyFilesWithCA(cert, ca, cfg); err != nil {
-// 				return fmt.Errorf("creating %v, %w", cert.Name, err)
-// 			}
-// 		}
-// 		manifest := path.Join("/tmp", clusterName, nodeNames[i], "/etc/kubernetes/manifests")
-// 		cfg.CertificatesDir = "/etc/kubernetes/pki"
-// 		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifest, "", cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
-// 			return fmt.Errorf("error creating local etcd static pod manifest file %w", err)
-// 		}
-// 		zap.S().Infof("ETCD Pod manifest created for node %s", nodeNames[i])
-// 		// if err := uploadDirectories(context.TODO(), bucketName, path.Join("/tmp/", clusterName, nodeNames[i]), c.s3uploader); err != nil {
-// 		// 	zap.S().Errorf("failed to upload %w", err)
-// 		// }
-// 	}
-// 	return nil
-// }
-
-// func copyRootCerts(clusterName, masterNodeName string) error {
-// 	for _, s := range []string{"ca.crt", "ca.key"} {
-// 		src := path.Join("/tmp/", clusterName, s)
-// 		dest := path.Join("/tmp/", clusterName, masterNodeName, "/etc/kubernetes/pki", s)
-// 		if err := createDir(path.Dir(dest)); err != nil {
-// 			return fmt.Errorf("creating directory %v, %w", path.Dir(dest), err)
-// 		}
-// 		if err := copyFile(src, dest); err != nil {
-// 			return err
-// 		}
-// 	}
-// 	return nil
-// }
-
-// func copyETCDCertsToMaster(etcdNodeName, masterNodeName, clusterName string) error {
-// 	for _, p := range []string{"etcd/ca.crt", "apiserver-etcd-client.crt", "apiserver-etcd-client.key"} {
-// 		src := path.Join("/tmp/", clusterName, etcdNodeName, "/etc/kubernetes/pki", p)
-// 		dest := path.Join("/tmp/", clusterName, masterNodeName, "/etc/kubernetes/pki", p)
-// 		if err := createDir(path.Dir(dest)); err != nil {
-// 			return fmt.Errorf("creating directory %v, %w", path.Dir(dest), err)
-// 		}
-// 		if err := copyFile(src, dest); err != nil {
-// 			return err
-// 		}
-// 	}
-// 	// scp /etc/kubernetes/pki/etcd/ca.crt "${CONTROL_PLANE}":
-// 	// 	scp /etc/kubernetes/pki/apiserver-etcd-client.crt "${CONTROL_PLANE}":
-// 	// 	scp /etc/kubernetes/pki/apiserver-etcd-client.key "${CONTROL_PLANE}":
-
-// 	return nil
-// }
-
-func (c *controlPlane) generateInitConfig(controlPlane *v1alpha1.ControlPlane, internalcfg *kubeadmapi.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
-	// internalcfg.Etcd.Local = nil
-	// internalcfg.Etcd.External = &kubeadm.ExternalEtcd{
-	// 	CAFile:   "/etc/kubernetes/pki/etcd/ca.crt",
-	// 	CertFile: "/etc/kubernetes/pki/apiserver-etcd-client.crt",
-	// 	KeyFile:  "/etc/kubernetes/pki/apiserver-etcd-client.key",
-	// }
-	// internalcfg.LocalAPIEndpoint.BindPort = 443 // TODO get from controlPlane spec
-	// version := "v1.19.8-eks-1-19-4"
-	// if controlPlane.Spec.KubernetesVersion != "" {
-	// 	version = controlPlane.Spec.KubernetesVersion
-	// }
-	// internalcfg.ClusterConfiguration.KubernetesVersion = version
-	// internalcfg.ClusterConfiguration.ImageRepository = "public.ecr.aws/eks-distro/kubernetes"
-	// // internalcfg.APIServer.CertSANs = []string{aws.StringValue(masterLoadBalancer.DNSName)}
-	return internalcfg, nil
 }

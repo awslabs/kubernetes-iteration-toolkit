@@ -52,7 +52,7 @@ func (n *NetworkLoadBalancer) create(ctx context.Context, component string, cont
 	}
 	switch component {
 	case v1alpha1.MasterInstances:
-		input.Spec.Port = 443
+		input.Spec.Port = controlPlane.MasterSecurePortInt64()
 		input.Spec.Type = elbv2.LoadBalancerTypeEnumNetwork
 		input.Spec.Scheme = elbv2.LoadBalancerSchemeEnumInternetFacing
 	case v1alpha1.ETCDInstances:

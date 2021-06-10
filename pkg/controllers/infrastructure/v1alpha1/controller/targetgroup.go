@@ -103,7 +103,7 @@ func (t *TargetGroup) createTargetGroup(ctx context.Context, tg *v1alpha1.Target
 		VpcId:    aws.String(vpcID),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("creating target group %w", err)
+		return nil, fmt.Errorf("creating target group, %w", err)
 	}
 	return output.TargetGroups[0], nil
 }

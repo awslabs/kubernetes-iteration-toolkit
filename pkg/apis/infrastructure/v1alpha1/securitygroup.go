@@ -34,8 +34,9 @@ type SecurityGroup struct {
 
 // SecurityGroupSpec
 type SecurityGroupSpec struct {
-	GroupName   string `json:"groupName,omitempty"`
-	ClusterName string `json:"clusterName,omitempty"`
+	GroupName   string          `json:"groupName,omitempty"`
+	ClusterName string          `json:"clusterName,omitempty"`
+	Permissions []*IpPermission `json:"permissions,omitempty"`
 }
 
 // SecurityGroupList contains a list of SecurityGroup
@@ -51,9 +52,16 @@ type SecurityGroupStatus struct {
 	// Conditions is the set of conditions required for this SecurityGroup to create
 	// its objects, and indicates whether or not those conditions are met.
 	// +optional
-	Conditions            apis.Conditions `json:"conditions,omitempty"`
-	MasterSecurityGroupID string          `json:"masterSecurityGroup,omitempty"`
-	ETCDSecurityGroupID   string          `json:"etcdSecurityGroup,omitempty"`
+	Conditions      apis.Conditions `json:"conditions,omitempty"`
+	SecurityGroupID string          `json:"securityGroup,omitempty"`
+}
+
+type IpPermission struct {
+	FromPort   *int64  `json:"fromPort,omitempty"`
+	ToPort     *int64  `json:"toPort,omitempty"`
+	IpProtocol *string `json:"ipProtocol,omitempty"`
+	CidrIP     *string `json:"cidrIP,omitempty"`
+	GroupName  *string `json:"groupID,omitempty"`
 }
 
 func (c *SecurityGroup) StatusConditions() apis.ConditionManager {

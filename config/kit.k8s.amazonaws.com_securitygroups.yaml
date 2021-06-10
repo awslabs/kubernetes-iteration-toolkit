@@ -36,6 +36,23 @@ spec:
                 type: string
               groupName:
                 type: string
+              permissions:
+                items:
+                  properties:
+                    cidrIP:
+                      type: string
+                    fromPort:
+                      format: int64
+                      type: integer
+                    groupID:
+                      type: string
+                    ipProtocol:
+                      type: string
+                    toPort:
+                      format: int64
+                      type: integer
+                  type: object
+                type: array
             type: object
           status:
             description: SecurityGroupStatus defines the observed state of the SecurityGroup of a cluster
@@ -43,7 +60,7 @@ spec:
               conditions:
                 description: Conditions is the set of conditions required for this SecurityGroup to create its objects, and indicates whether or not those conditions are met.
                 items:
-                  description: 'Conditions defines a readiness condition for a Knative resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: 'Condition defines a readiness condition for a Knative resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition transitioned from one status to another. We use VolatileTime in place of metav1.Time to exclude this from creating equality.Semantic differences (all other things held constant).
@@ -68,9 +85,7 @@ spec:
                   - type
                   type: object
                 type: array
-              etcdSecurityGroup:
-                type: string
-              masterSecurityGroup:
+              securityGroup:
                 type: string
             type: object
         type: object

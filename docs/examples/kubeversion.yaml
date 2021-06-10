@@ -2,4 +2,5 @@ apiVersion: kit.k8s.amazonaws.com/v1alpha1
 kind: ControlPlane
 metadata:
   name: foo # Desired Cluster Name
-spec: {}
+spec:
+  kubernetesVersion: v1.20.4-eks-1-20-1
