@@ -21,13 +21,18 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
+	cniaddon "github.com/awslabs/kubernetes-iteration-toolkit/pkg/cni"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/errors"
+
 	"go.uber.org/zap"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
+	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
 func (c *controlPlane) createMasterBootstrapFiles(ctx context.Context, controlPlane *v1alpha1.ControlPlane, cfg *kubeadmapi.InitConfiguration) error {
@@ -45,10 +50,9 @@ func (c *controlPlane) createMasterBootstrapFiles(ctx context.Context, controlPl
 	} else if err != nil {
 		return err
 	}
-	zap.S().Infof("Master nodes are %+v", masterNodes)
 	if len(masterNodes) == 3 && len(etcdNodes) == 3 {
 		for _, node := range masterNodes {
-			zap.S().Infof("Master node is %+v", node)
+			zap.S().Infof("Master node is %#v", node)
 		}
 		etcdNodeID := etcdNodes[0].ID
 		for _, node := range masterNodes {
@@ -95,9 +99,9 @@ func (c *controlPlane) createMasterBootstrapFiles(ctx context.Context, controlPl
 			if err := c.BootstrapMasterConfigFiles(ctx, cfg, masterNode.ID, controlPlane.Name); err != nil {
 				return fmt.Errorf("failed to bootstrap master node %v, %w", masterNode.ID, err)
 			}
-			if err := uploadDirectories(ctx, bucketName(controlPlane.Name), path.Join(clusterCertsBasePath, controlPlane.Name, masterNode.ID), c.s3uploader); err != nil {
-				return fmt.Errorf("uploading files to S3 %v, %w", masterNode.ID, err)
-			}
+			// if err := uploadDirectories(ctx, bucketName(controlPlane.Name), path.Join(clusterCertsBasePath, controlPlane.Name, masterNode.ID), c.s3uploader); err != nil {
+			// 	return fmt.Errorf("uploading files to S3 %v, %w", masterNode.ID, err)
+			// }
 		}
 		nodes := append(masterNodes, etcdNodes...)
 		for _, node := range nodes {
@@ -109,8 +113,31 @@ func (c *controlPlane) createMasterBootstrapFiles(ctx context.Context, controlPl
 		masterNodeID := masterNodes[0].ID
 		zap.S().Infof("Starting Bootstrap for master nodes")
 		if err := c.bootstrapMasterNodes(ctx, controlPlane.Name, masterNodeID, cfg); err != nil {
-			zap.S().Errorf("Failed to bootstrap, %v", err)
+			return err
 		}
+		zap.S().Infof("Creating addons for master nodes")
+		if c.addOns(ctx, controlPlane.Name, masterNodeID, cfg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *controlPlane) addOns(ctx context.Context, clusterName, masterNode string, cfg *kubeadmapi.InitConfiguration) error {
+	kubeconfigAdminPath := path.Join(clusterCertsBasePath, clusterName, masterNode, "etc/kubernetes/admin.conf")
+	client, err := kubeconfigutil.ClientSetFromFile(kubeconfigAdminPath)
+	if err != nil {
+		return err
+	}
+	if err := dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
+		return err
+	}
+	if err := proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
+		return err
+	}
+	if err := cniaddon.EnsureCNIAddOn(client); err != nil {
+		zap.S().Infof("Error creating CNI %v", err)
+		return err
 	}
 	return nil
 }

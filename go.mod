@@ -5,15 +5,17 @@ go 1.16
 require (
 	github.com/aws/aws-sdk-go v1.38.11
 	github.com/awslabs/karpenter v0.2.5
-	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/spf13/cobra v1.1.1
+	github.com/spf13/cobra v1.1.1 // indirect
 	go.uber.org/zap v1.17.0
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+	k8s.io/api v0.21.1
+	k8s.io/apiextensions-apiserver v0.20.1
 	k8s.io/apimachinery v0.21.1
 	k8s.io/client-go v0.21.1
-	k8s.io/klog v1.0.0
-	k8s.io/klog/v2 v2.8.0
+	k8s.io/klog v1.0.0 // indirect
+	k8s.io/klog/v2 v2.8.0 // indirect
 	k8s.io/kubernetes v1.21.1
 	knative.dev/pkg v0.0.0-20210602095030-0e61d6763dd6
 	sigs.k8s.io/controller-runtime v0.8.3

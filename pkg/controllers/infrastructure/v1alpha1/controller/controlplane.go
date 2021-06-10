@@ -131,7 +131,10 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	if err := c.createMasterBootstrapFiles(ctx, controlPlane, cfg); err != nil {
 		return nil, err
 	}
+	// Install add-ons
+
 	// Generate Kubeconfig files for just the worker nodes
+	//
 	return status.Created, nil
 }
 

@@ -39,7 +39,7 @@ func (c *controlPlane) createETCDBootstrapFiles(ctx context.Context, controlPlan
 	// if len(nodes) == controlPlane.Spec.Etcd.Instances.Count {
 	if len(nodes) == 3 {
 		for _, node := range nodes {
-			zap.S().Infof("ETCD node is %+v", node)
+			zap.S().Infof("ETCD node is %#v", node)
 		}
 		cfg.CertificatesDir = path.Join(clusterCertsBasePath, controlPlane.Name)
 		if err := c.CreateEtcdCertsAndManifests(ctx, cfg, controlPlane.Name, nodes); err != nil {

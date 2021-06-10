@@ -34,7 +34,6 @@ func (c *controlPlane) bootstrapMasterNodes(ctx context.Context, clusterName, ma
 	if err != nil {
 		return fmt.Errorf("creating Kube client from admin config, %w", err)
 	}
-
 	zap.S().Info("Created the client for master")
 	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, config.BootstrapTokens); err != nil {
 		return fmt.Errorf("error updating or creating token, %w", err)
