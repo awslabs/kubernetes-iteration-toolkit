@@ -124,11 +124,11 @@ func (a *autoScalingGroup) Finalize(ctx context.Context, object controllers.Obje
 }
 
 func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, asg *v1alpha1.AutoScalingGroup) error {
-	privateSubnets, err := getPrivateSubnetIDs(ctx, a.ec2api, asg.Spec.ClusterName)
+	publicSubnets, err := getPublicSubnetIDs(ctx, a.ec2api, asg.Spec.ClusterName)
 	if err != nil {
 		return err
 	}
-	if len(privateSubnets) == 0 {
+	if len(publicSubnets) == 0 {
 		return fmt.Errorf("waiting for private subnets, %w", errors.WaitingForSubResources)
 	}
 	input := &autoscaling.CreateAutoScalingGroupInput{
@@ -139,7 +139,7 @@ func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, asg *v1al
 		LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
 			LaunchTemplateName: aws.String(asg.Name),
 		},
-		VPCZoneIdentifier: aws.String(strings.Join(privateSubnets, ",")),
+		VPCZoneIdentifier: aws.String(strings.Join(publicSubnets, ",")),
 		Tags:              generateAutoScalingTags(asg.Name, asg.Spec.ClusterName),
 	}
 	if _, err := a.autoscalingAPI.CreateAutoScalingGroup(input); err != nil {

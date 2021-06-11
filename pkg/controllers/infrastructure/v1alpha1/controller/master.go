@@ -21,7 +21,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
-	cniaddon "github.com/awslabs/kubernetes-iteration-toolkit/pkg/cni"
 	"github.com/awslabs/kubernetes-iteration-toolkit/pkg/errors"
 
 	"go.uber.org/zap"
@@ -135,10 +134,10 @@ func (c *controlPlane) addOns(ctx context.Context, clusterName, masterNode strin
 	if err := proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
 		return err
 	}
-	if err := cniaddon.EnsureCNIAddOn(client); err != nil {
-		zap.S().Infof("Error creating CNI %v", err)
-		return err
-	}
+	// if err := cniaddon.EnsureCNIAddOn(client); err != nil {
+	// 	zap.S().Infof("Error creating CNI %v", err)
+	// 	return err
+	// }
 	return nil
 }
 
@@ -153,7 +152,6 @@ func (c *controlPlane) BootstrapMasterConfigFiles(ctx context.Context, cfg *kube
 	if err := certs.CreatePKIAssets(cfg); err != nil {
 		return fmt.Errorf("creating PKI assets, %w", err)
 	}
-	zap.S().Infof("Created PKI assets")
 	// Generate Kube config files for master components
 	for _, kubeConfigFileName := range []string{kubeadmconstants.AdminKubeConfigFileName,
 		kubeadmconstants.KubeletKubeConfigFileName,

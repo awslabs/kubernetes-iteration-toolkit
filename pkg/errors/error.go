@@ -33,7 +33,8 @@ func SafeToIgnore(err error) bool {
 		IsDependencyExists(err) ||
 		IsIAMResourceDependencyExists(err) ||
 		IsTargetGroupResourceInUse(err) ||
-		IsElasticIPInUse(err)
+		IsElasticIPInUse(err) ||
+		IsASGWaitingForIAMResources(err)
 }
 
 func IsWaitingForSubResource(err error) bool {
@@ -65,6 +66,15 @@ func IsWhileRemovingFinalizer(err error) bool {
 	if k := kubeerrors.APIStatus(nil); errors.As(err, &k) {
 		if k.Status().Reason == "Invalid" {
 			return true
+		}
+	}
+	return false
+}
+
+func IsASGWaitingForIAMResources(err error) bool {
+	if err != nil {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			return aerr.Code() == "ValidationError"
 		}
 	}
 	return false
