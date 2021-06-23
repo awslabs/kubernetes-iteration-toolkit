@@ -4,10 +4,9 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/prateekgogia/kit/pkg/apis/infrastructure/v1alpha1"
-	"github.com/prateekgogia/kit/pkg/awsprovider"
-	"github.com/prateekgogia/kit/pkg/controllers"
-	infra "github.com/prateekgogia/kit/pkg/controllers/infrastructure/v1alpha1/controller"
+	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/controllers"
 
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"go.uber.org/zap/zapcore"
@@ -55,11 +54,7 @@ func main() {
 		LeaderElectionNamespace: "kit",
 	})
 
-	session := awsprovider.NewSession()
-	err := manager.RegisterWebhooks().RegisterControllers(
-		infra.NewVPCController(awsprovider.EC2Client(session)),
-		infra.NewSubnetController(awsprovider.EC2Client(session)),
-		infra.NewInternetGWController(awsprovider.EC2Client(session)),
-	).Start(controllerruntime.SetupSignalHandler())
+	_ = awsprovider.NewSession()
+	err := manager.RegisterWebhooks().RegisterControllers().Start(controllerruntime.SetupSignalHandler())
 	log.PanicIfError(err, "Unable to start manager")
 }

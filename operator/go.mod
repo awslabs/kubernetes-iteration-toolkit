@@ -1,4 +1,4 @@
-module github.com/prateekgogia/kit
+module github.com/awslabs/kit/operator
 
 go 1.16
 
