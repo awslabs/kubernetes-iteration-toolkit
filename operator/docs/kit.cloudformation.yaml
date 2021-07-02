@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Resources used by https://github.com/prateekgogia/kit
+Description: Resources used by https://github.com/awslabs/kit/operator
 Parameters:
   OpenIDConnectIdentityProvider:
     Type: String
