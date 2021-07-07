@@ -2,6 +2,7 @@ import cdk = require('@aws-cdk/core');
 import * as eks from '@aws-cdk/aws-eks';
 import { Flux, RepositoryProps } from './addons/flux/construct';
 import { AWSLoadBalancerController } from './addons/awslb/construct';
+import { Karpenter } from './addons/karpenter/construct';
 
 export interface AddonsProps {
   cluster: eks.Cluster
@@ -20,6 +21,10 @@ export class Addons extends cdk.Construct {
     new AWSLoadBalancerController(this, 'AWSLoadBalancerController', {
       cluster: props.cluster,
       namespace: 'kube-system'
+    });
+
+    new Karpenter(this, 'Karpenter', {
+      cluster: props.cluster
     });
   }
 }
