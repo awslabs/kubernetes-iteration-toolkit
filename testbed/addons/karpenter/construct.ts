@@ -4,24 +4,24 @@ import iam = require('@aws-cdk/aws-iam');
 
 export interface KarpenterProps {
     cluster: eks.Cluster;
-    namespace?: string;
 }
 
 export class Karpenter extends cdk.Construct {
     constructor(scope: cdk.Construct, id: string, props: KarpenterProps) {
         super(scope, id);
-
-        const ns = props.cluster.addManifest('namespace', {
-            apiVersion: 'v1',
-            kind: 'Namespace',
-            metadata: {
-                name: props.namespace ?? "karpenter"
+        const namespace = "karpenter";
+        const ns = props.cluster.addManifest('namespace',
+            {
+                apiVersion: 'v1',
+                kind: 'Namespace',
+                metadata: {
+                    name: namespace
+                }
             }
-        });
-
+        );
         const sa = props.cluster.addServiceAccount('karpenter-controller-sa', {
             name: "karpenter",
-            namespace: props.namespace ?? "karpenter"
+            namespace: namespace
         });
         sa.node.addDependency(ns);
         sa.role.attachInlinePolicy(new iam.Policy(this, 'karpenter-controller-policy', {
@@ -47,7 +47,7 @@ export class Karpenter extends cdk.Construct {
             ]
         }),
             {
-                username: `system:node:{{EC2PrivateDNSName}}`,
+                username: 'system:node:{{EC2PrivateDNSName}}',
                 groups: ['system:bootstrappers', 'system:nodes']
             }
         )
@@ -57,7 +57,7 @@ export class Karpenter extends cdk.Construct {
             release: 'karpenter',
             version: 'v0.2.8',
             repository: 'https://awslabs.github.io/karpenter/charts',
-            namespace: "karpenter",
+            namespace: namespace,
             createNamespace: false,
             values: {
                 'serviceAccount': {
