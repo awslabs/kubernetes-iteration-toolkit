@@ -6,11 +6,11 @@ metadata:
   namespace: default
 spec:
   interval: 5m0s
-  path: ./kubernetes-iteration-toolkit/testbed/addons/metrics-server
+  path: ./testbed/addons/metrics-server
   prune: true
   sourceRef:
     kind: GitRepository
-    name: default
+    name: testbed
   validation: client
 
 ---
@@ -21,11 +21,11 @@ metadata:
   namespace: default
 spec:
   interval: 5m0s
-  path: ./kubernetes-iteration-toolkit/testbed/addons/tekton-pipelines
+  path: ./testbed/addons/tekton-pipelines
   prune: true
   sourceRef:
     kind: GitRepository
-    name: default
+    name: testbed
   validation: client
 
 ---
@@ -36,11 +36,11 @@ metadata:
   namespace: default
 spec:
   interval: 5m0s
-  path: ./kubernetes-iteration-toolkit/testbed/addons/tekton-triggers
+  path: ./testbed/addons/tekton-triggers
   prune: true
   sourceRef:
     kind: GitRepository
-    name: default
+    name: testbed
   validation: client
 
 ---
@@ -51,9 +51,9 @@ metadata:
   namespace: default
 spec:
   interval: 5m0s
-  path: ./kubernetes-iteration-toolkit/testbed/addons/tekton-dashboard
+  path: ./testbed/addons/tekton-dashboard
   prune: true
   sourceRef:
     kind: GitRepository
-    name: default
+    name: testbed
   validation: client
