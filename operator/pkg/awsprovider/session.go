@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	userAgent = "operator-kit.sh"
+	userAgent = "kubernetes-iteration-toolkit/operator"
 )
 
 func NewSession() *session.Session {
