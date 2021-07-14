@@ -7,6 +7,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
+	infra "github.com/awslabs/kit/operator/pkg/controllers/infrastructure/v1alpha1/controller"
 
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"go.uber.org/zap/zapcore"
@@ -23,8 +24,8 @@ var (
 )
 
 func init() {
-	log.PanicIfError(clientgoscheme.AddToScheme(scheme), "adding clientgo to scheme")
-	log.PanicIfError(v1alpha1.AddToScheme(scheme), "adding cluster apis to scheme")
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = v1alpha1.AddToScheme(scheme)
 }
 
 // Options for running this binary
@@ -54,7 +55,12 @@ func main() {
 		LeaderElectionNamespace: "kit",
 	})
 
-	_ = awsprovider.NewSession()
-	err := manager.RegisterWebhooks().RegisterControllers().Start(controllerruntime.SetupSignalHandler())
-	log.PanicIfError(err, "Unable to start manager")
+	session := awsprovider.NewSession()
+	err := manager.RegisterWebhooks().RegisterControllers(
+		infra.NewControlPlaneController(awsprovider.EC2Client(session),
+			manager.GetClient()),
+	).Start(controllerruntime.SetupSignalHandler())
+	if err != nil {
+		panic(fmt.Sprintf("Unable to start manager, %v", err))
+	}
 }
