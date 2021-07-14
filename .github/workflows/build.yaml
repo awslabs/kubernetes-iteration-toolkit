@@ -23,6 +23,6 @@ jobs:
           go-version: 1.16
       - name: Build & Test
         run: |
-          go build -v ./cmd/operator
+          go build -v ./cmd/controller
           go test ./...
         working-directory: operator
