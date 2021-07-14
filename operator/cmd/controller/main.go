@@ -23,8 +23,8 @@ var (
 )
 
 func init() {
-	log.PanicIfError(clientgoscheme.AddToScheme(scheme), "adding clientgo to scheme")
-	log.PanicIfError(v1alpha1.AddToScheme(scheme), "adding cluster apis to scheme")
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = v1alpha1.AddToScheme(scheme)
 }
 
 // Options for running this binary
@@ -56,5 +56,7 @@ func main() {
 
 	_ = awsprovider.NewSession()
 	err := manager.RegisterWebhooks().RegisterControllers().Start(controllerruntime.SetupSignalHandler())
-	log.PanicIfError(err, "Unable to start manager")
+	if err != nil {
+		panic(fmt.Sprintf("Unable to start manager, %v", err))
+	}
 }

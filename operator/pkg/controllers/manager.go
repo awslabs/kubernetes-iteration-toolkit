@@ -15,9 +15,8 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
 	"time"
-
-	"github.com/awslabs/karpenter/pkg/utils/log"
 
 	"golang.org/x/time/rate"
 	"k8s.io/client-go/rest"
@@ -35,7 +34,9 @@ type GenericControllerManager struct {
 // NewManagerOrDie instantiates a controller manager or panics
 func NewManagerOrDie(config *rest.Config, options controllerruntime.Options) Manager {
 	manager, err := controllerruntime.NewManager(config, options)
-	log.PanicIfError(err, "Failed to create controller manager")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create controller manager, %v", err))
+	}
 	return &GenericControllerManager{Manager: manager}
 }
 
@@ -51,10 +52,12 @@ func (m *GenericControllerManager) RegisterControllers(controllers ...Controller
 			),
 		})
 		builder.Named(c.Name())
-		log.PanicIfError(builder.Complete(&GenericController{Controller: c, Client: m.GetClient()}),
-			"Failed to register controller to manager for %s", controlledObject)
-		log.PanicIfError(controllerruntime.NewWebhookManagedBy(m).For(controlledObject).Complete(),
-			"Failed to register controller to manager for %s", controlledObject)
+		if err := builder.Complete(&GenericController{Controller: c, Client: m.GetClient()}); err != nil {
+			panic(fmt.Sprintf("Failed to register controller to manager for %s", controlledObject))
+		}
+		if err := controllerruntime.NewWebhookManagedBy(m).For(controlledObject).Complete(); err != nil {
+			panic(fmt.Sprintf("Failed to register webhook for %s", controlledObject))
+		}
 	}
 	return m
 }
