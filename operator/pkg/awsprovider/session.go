@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	Version = "dev"
+	userAgent = "operator-kit.sh"
 )
 
 func NewSession() *session.Session {
@@ -53,7 +53,6 @@ func withRegion(sess *session.Session) *session.Session {
 
 // withUserAgent adds a kit specific user-agent string to AWS session
 func withUserAgent(sess *session.Session) *session.Session {
-	userAgent := fmt.Sprintf("kit.sh-%s", Version)
 	sess.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler(userAgent))
 	return sess
 }
