@@ -128,7 +128,7 @@ spec:
       serviceAccountName: kit
       containers:
       - name: manager
-        image: ko://github.com/awslabs/kit/operator/cmd/operator
+        image: ko://github.com/awslabs/kit/operator/cmd/controller
         resources:
           requests:
             cpu: 100m
