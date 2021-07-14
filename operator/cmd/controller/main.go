@@ -7,7 +7,6 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
-	infra "github.com/awslabs/kit/operator/pkg/controllers/infrastructure/v1alpha1/controller"
 
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"go.uber.org/zap/zapcore"
@@ -55,11 +54,8 @@ func main() {
 		LeaderElectionNamespace: "kit",
 	})
 
-	session := awsprovider.NewSession()
-	err := manager.RegisterWebhooks().RegisterControllers(
-		infra.NewControlPlaneController(awsprovider.EC2Client(session),
-			manager.GetClient()),
-	).Start(controllerruntime.SetupSignalHandler())
+	_ = awsprovider.NewSession()
+	err := manager.RegisterWebhooks().RegisterControllers().Start(controllerruntime.SetupSignalHandler())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start manager, %v", err))
 	}
