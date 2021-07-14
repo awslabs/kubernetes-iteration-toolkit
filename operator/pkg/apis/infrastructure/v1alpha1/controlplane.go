@@ -52,21 +52,21 @@ type ControlPlaneSpec struct {
 // scheduler.
 type MasterSpec struct {
 	Instances         `json:",inline"`
-	Scheduler         *Deployment `json:"scheduler,omitempty"`
-	ControllerManager *Deployment `json:"controllerManager,omitempty"`
-	APIServer         *Deployment `json:"apiServer,omitempty"`
+	Scheduler         *Component `json:"scheduler,omitempty"`
+	ControllerManager *Component `json:"controllerManager,omitempty"`
+	APIServer         *Component `json:"apiServer,omitempty"`
 }
 
 // ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
 type ETCDSpec struct {
-	Instances   `json:",inline"`
-	*Deployment `json:",inline"`
+	Instances  `json:",inline"`
+	*Component `json:",inline"`
 }
 
-// Deployment provides a generic way to pass in args and images to master and etcd
+// Component provides a generic way to pass in args and images to master and etcd
 // components. If a user wants to change the QPS they need to provide the
 // following flag with the desired value -`kube-api-qps:100` in the args.
-type Deployment struct {
+type Component struct {
 	Replicas int         `json:"replicas,omitempty"`
 	Spec     *v1.PodSpec `json:"spec,omitempty"`
 }
@@ -77,4 +77,12 @@ type Deployment struct {
 type Instances struct {
 	AMI  string `json:"ami,omitempty"`
 	Type string `json:"type,omitempty"`
+}
+
+func (c *ControlPlane) ClusterName() string {
+	return c.Name
+}
+
+func (c *ControlPlane) NamespaceName() string {
+	return c.Namespace
 }
