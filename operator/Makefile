@@ -48,12 +48,13 @@ apply: ## Deploy the controller into your ~/.kube/config cluster
 	kubectl create ns $(KIT_NAMESPACE) || true
 	kubectl -n $(KIT_NAMESPACE) apply -f config/
 
-deploy: 
+deploy:
+	kubectl create ns $(KIT_NAMESPACE) || true
 	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/
     
 delete: ## Delete the controller from your ~/.kube/config cluster
 	kubectl delete -f config
-	kubectl -n $(KIT_NAMESPACE) delete ns $(KIT_NAMESPACE)
+	kubectl delete ns $(KIT_NAMESPACE)
 
 codegen: ## Generate code. Must be run if changes are made to ./pkg/apis/...
 	hack/codegen.sh

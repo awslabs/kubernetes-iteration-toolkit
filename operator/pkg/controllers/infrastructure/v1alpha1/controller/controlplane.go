@@ -18,9 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	// "github.com/awslabs/kubernetes-iteration-toolkit/pkg/apis/infrastructure/v1alpha1"
-	// "github.com/awslabs/kubernetes-iteration-toolkit/pkg/awsprovider"
-	// "github.com/awslabs/kubernetes-iteration-toolkit/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"

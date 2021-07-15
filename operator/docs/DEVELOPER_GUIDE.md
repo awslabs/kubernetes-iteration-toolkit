@@ -7,7 +7,7 @@ If you are trying out KIT or developing KIT follow these instructions to get sta
  - [Ko version](https://github.com/google/ko#install) (v0.8.2 or higher)
  - [ECR repository](https://docs.aws.amazon.com/AmazonECR/latest/userguide/repository-create.html)
 
-## Build
+## Build and Deploy
 
 ### Create an ECR image repo
 
@@ -22,7 +22,7 @@ aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS 
 
 ## Deploy
 
-Ko will build the Docker image and push the image to the container repo created in ECR in the last step. Once the image is published, Ko will `kubectl apply` KIT YAML in `config` directory. This will install KIT to the cluster listed in `kubectl config current-context`
+Makefile call `Ko` and `Ko` will build the Docker image and push the image to the container repo created in ECR in the last step. Once the image is published, Ko will `kubectl apply` KIT YAML(s) in `config` directory. This will install KIT operator and the required configs to the cluster listed in `kubectl config current-context`
 
 ```bash
 make deploy CONTAINER_IMAGE_REGISTRY=$CONTAINER_IMAGE_REGISTRY
@@ -32,5 +32,5 @@ make deploy CONTAINER_IMAGE_REGISTRY=$CONTAINER_IMAGE_REGISTRY
 To delete KIT from Kubernetes cluster
 
 ```bash
-delete
+make delete
 ```
