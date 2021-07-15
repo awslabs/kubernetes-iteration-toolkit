@@ -3,6 +3,7 @@ module github.com/awslabs/kit/operator
 go 1.16
 
 require (
+	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0 // indirect
 	github.com/aws/aws-sdk-go v1.38.62
 	github.com/awslabs/karpenter v0.2.8
 	github.com/pkg/errors v0.9.1

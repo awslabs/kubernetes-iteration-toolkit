@@ -17,11 +17,12 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/errors"
+	"github.com/awslabs/kit/operator/pkg/status"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -41,69 +42,70 @@ type GenericController struct {
 func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	// 1. Read Spec
 	resource := c.For()
-	if err := c.Get(ctx, req.NamespacedName, resource); err != nil {
+	var err error
+	if err = c.Get(ctx, req.NamespacedName, resource); err != nil {
 		if errors.KubeObjNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, err
+		return *status.Failed, err
 	}
 	// 2. Copy object for merge patch base
 	persisted := resource.DeepCopyObject()
-	// 3. reconcile else finalize if object is deleted
-	result, err := c.reconcile(ctx, resource)
-	if err != nil {
-		resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
-		if errors.SafeToIgnore(err) {
-			return result, nil
-		}
-		zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
-		return reconcile.Result{Requeue: true}, err
+	// 3. Reconcile else finalize if object is deleted
+	result, reconcileErr := c.reconcile(ctx, resource, persisted)
+	// 4. Update Status using a merge patch, we want to set status even when reconcile errored
+	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil && !errors.KubeObjNotFound(err) {
+		return *status.Failed, fmt.Errorf("status patch for %s, %w,", req.NamespacedName, err)
 	}
-	resource.StatusConditions().MarkTrue(v1alpha1.Active)
-	// 4. Update Status using a merge patch
-	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to persist changes to %s, %w", req.NamespacedName, err)
+	if reconcileErr != nil {
+		zap.S().Errorf("Error reconciling the resource %v", err)
+		return *status.Failed, reconcileErr
 	}
 	return result, nil
 }
 
-func (c *GenericController) reconcile(ctx context.Context, resource Object) (reconcile.Result, error) {
+func (c *GenericController) reconcile(ctx context.Context, resource Object, persisted runtime.Object) (reconcile.Result, error) {
+	var result *reconcile.Result
+	var err error
+	existingFinalizers := resource.GetFinalizers()
 	if resource.GetDeletionTimestamp() == nil {
 		// Add finalizer for this controller if not exists
-		if err := c.addFinalizerIfNotExists(ctx, resource); err != nil {
-			return reconcile.Result{Requeue: true}, err
-		}
-		result, err := c.Controller.Reconcile(ctx, resource)
+		c.addFinalizer(ctx, resource)
+		result, err = c.Controller.Reconcile(ctx, resource)
 		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("reconciling resource, %w", err)
+			resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
+			zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
+			return *status.Failed, fmt.Errorf("reconciling resource, %w", err)
 		}
-		return result, nil
+		resource.StatusConditions().MarkTrue(v1alpha1.Active)
+	} else {
+		if result, err = c.Controller.Finalize(ctx, resource); err != nil {
+			return *status.Failed, fmt.Errorf("finalizing resource controller %v, %w", c.Controller.Name(), err)
+		}
+		c.removeFinalizer(ctx, resource)
+		zap.S().Infof("[%s] Successfully deleted", resource.GetName())
 	}
-	result, err := c.Controller.Finalize(ctx, resource)
-	if err != nil {
-		return result, fmt.Errorf("finalizing resource controller name %v, %w", c.Controller.Name(), err)
+	// If the finalizers have changed merge patch the object
+	if len(existingFinalizers) != len(resource.GetFinalizers()) {
+		if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
+			return *status.Failed, fmt.Errorf("patch object %s, %w", resource.GetName(), err)
+		}
 	}
-	if err := c.removeFinalizer(ctx, resource); err != nil {
-		return reconcile.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("removing finalizers, %w", err)
-	}
-	return result, nil
+	return *result, nil
 }
 
-func (c *GenericController) addFinalizerIfNotExists(ctx context.Context, resource Object) error {
+func (c *GenericController) addFinalizer(ctx context.Context, resource Object) {
 	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
 	for _, finalizer := range resource.GetFinalizers() {
 		if finalizer == finalizerStr {
-			return nil
+			return
 		}
 	}
 	finalizers := append(resource.GetFinalizers(), finalizerStr)
-	if err := c.patchFinalizersToResource(ctx, resource, finalizers); err != nil {
-		return err
-	}
-	return nil
+	resource.SetFinalizers(finalizers)
 }
 
-func (c *GenericController) removeFinalizer(ctx context.Context, resource Object) error {
+func (c *GenericController) removeFinalizer(ctx context.Context, resource Object) {
 	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
 	remainingFinalizers := []string{}
 	for _, finalizer := range resource.GetFinalizers() {
@@ -113,19 +115,6 @@ func (c *GenericController) removeFinalizer(ctx context.Context, resource Object
 		remainingFinalizers = append(remainingFinalizers, finalizer)
 	}
 	if len(remainingFinalizers) < len(resource.GetFinalizers()) {
-		if err := c.patchFinalizersToResource(ctx, resource, remainingFinalizers); err != nil {
-			return err
-		}
-		zap.S().Infof("Successfully deleted finalizer %s for cluster name %s", finalizerStr, resource.GetName())
+		resource.SetFinalizers(remainingFinalizers)
 	}
-	return nil
-}
-
-func (c *GenericController) patchFinalizersToResource(ctx context.Context, resource Object, finalizers []string) error {
-	persisted := resource.DeepCopyObject()
-	resource.SetFinalizers(finalizers)
-	if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
-		return fmt.Errorf("merging changes to kube object, %w", err)
-	}
-	return nil
 }
