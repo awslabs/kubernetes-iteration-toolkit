@@ -56,6 +56,7 @@ type ResourceManager interface {
 // object
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
+	setDefaults(controlPlane)
 	// TODO create karpenter provisioner spec for creating new nodes.
 	// deploy etcd to the management cluster
 	if err := c.etcdprovider.deploy(ctx, controlPlane); err != nil {
@@ -67,4 +68,9 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 
 func (c *controlPlane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
 	return status.Terminated, nil
+}
+
+// TODO move this to default checks this is for the time being
+func setDefaults(controlPlane *v1alpha1.ControlPlane) {
+	controlPlane.Spec.Etcd.Component = &v1alpha1.Component{Replicas: 3}
 }

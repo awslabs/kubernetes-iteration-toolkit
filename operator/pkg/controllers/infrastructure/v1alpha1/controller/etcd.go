@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/errors"
@@ -41,6 +42,14 @@ const (
 
 type etcdProvider struct {
 	kubeClient client.Client
+}
+
+type CertConfig struct {
+	*certutil.Config
+	name   string
+	isCA   bool
+	caCert *x509.Certificate
+	caKey  crypto.Signer
 }
 
 func newETCDProvider(kubeclient client.Client) *etcdProvider {
@@ -64,27 +73,28 @@ func (e *etcdProvider) deploy(ctx context.Context, controlPlane *v1alpha1.Contro
 
 func (e *etcdProvider) createETCDCerts(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	// get CA key and cert
-	caCert, caKey, err := e.rootCertificateAuthority(ctx, controlPlane)
+	caCert, caKey, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, etcdRootCACertConfig(controlPlane))
 	if err != nil {
 		return fmt.Errorf("creating root CA for cluster %v, %w", controlPlane.ClusterName(), err)
 	}
-	// 	TODO generate etcd server, peer, healthcheck and etcdAPIClient certs
-	_ = caCert
-	_ = caKey
+	// 	generate etcd server, peer, healthcheck and etcdAPIClient certs
+	for _, certConfig := range certListFor(controlPlane, caCert, caKey) {
+		if _, _, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, certConfig); err != nil {
+			return fmt.Errorf("creating certs and key name %s, %w,", certConfig.name, err)
+		}
+	}
 	return nil
 }
 
 // rootCertificateAuthority checks with management server for a root CA secret, if it exists return the cert and key, else
 // it will generate a new root ca and store as a secret in management server
-func (e *etcdProvider) rootCertificateAuthority(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (*x509.Certificate, crypto.Signer, error) {
+func (e *etcdProvider) createCertAndKeyIfNotFound(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
 	var cert *x509.Certificate
 	var key crypto.Signer
-	objName := etcdCASecretNameFor(controlPlane.ClusterName())
-	secret, err := e.getSecret(ctx, namespacedName(controlPlane.NamespaceName(), objName))
+	secret, err := e.getSecret(ctx, controlPlane.NamespaceName(), certConfig.name)
 	if err != nil {
 		if errors.KubeObjNotFound(err) {
-			// create a root CA
-			cert, key, err = e.createRootCertificateAuthority(ctx, controlPlane)
+			cert, key, err = e.generateCertAndKey(ctx, controlPlane, certConfig)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -103,18 +113,16 @@ func (e *etcdProvider) rootCertificateAuthority(ctx context.Context, controlPlan
 	return certs[0], parsedKey.(crypto.Signer), err
 }
 
-func (e *etcdProvider) getSecret(ctx context.Context, name types.NamespacedName) (*v1.Secret, error) {
+func (e *etcdProvider) getSecret(ctx context.Context, namespace, objName string) (*v1.Secret, error) {
 	result := &v1.Secret{}
-	if err := e.kubeClient.Get(ctx, name, result); err != nil {
-		return nil, fmt.Errorf("getting secret %v, %w", name, err)
+	if err := e.kubeClient.Get(ctx, namespacedName(namespace, objName), result); err != nil {
+		return nil, fmt.Errorf("getting secret %v, %w", namespacedName(namespace, objName), err)
 	}
 	return result, nil
 }
 
-func (e *etcdProvider) createRootCertificateAuthority(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (*x509.Certificate, crypto.Signer, error) {
-	// create a root ca for ETCD
-	certConfig := &certutil.Config{CommonName: etcdRootCACommonName}
-	cert, key, err := pkiutil.KeyAndCert(certConfig, nil, nil, true)
+func (e *etcdProvider) generateCertAndKey(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+	cert, key, err := pkiutil.KeyAndCert(certConfig.Config, certConfig.caCert, certConfig.caKey, certConfig.isCA)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating certificate authority, %w,", err)
 	}
@@ -126,18 +134,18 @@ func (e *etcdProvider) createRootCertificateAuthority(ctx context.Context, contr
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(key.(*rsa.PrivateKey)),
 	})
-	if err := e.createSecret(ctx, certBytes, keyBytes, controlPlane); err != nil {
+	if err := e.createSecret(ctx, certBytes, keyBytes, controlPlane, certConfig); err != nil {
 		return nil, nil, fmt.Errorf("creating root ca secret, %w", err)
 	}
-	zap.S().Infof("[%s] successfully created root ca %s", controlPlane.ClusterName(), etcdRootCACommonName)
+	zap.S().Infof("[%s] successfully created cert and key %s", controlPlane.ClusterName(), certConfig.name)
 	return cert, key, nil
 }
 
 // createSecret will store root CA and key as the kubernetes secret
-func (e *etcdProvider) createSecret(ctx context.Context, cert, key []byte, controlPlane *v1alpha1.ControlPlane) error {
+func (e *etcdProvider) createSecret(ctx context.Context, cert, key []byte, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) error {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      etcdCASecretNameFor(controlPlane.ClusterName()),
+			Name:      certConfig.name,
 			Namespace: controlPlane.NamespaceName(),
 			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion: controlPlane.APIVersion,
@@ -194,7 +202,8 @@ func (e *etcdProvider) createService(ctx context.Context, controlPlane *v1alpha1
 				Port: 2379,
 				Name: etcdClientPortNameFor(controlPlane.ClusterName()),
 			}},
-			Selector: etcdLabelFor(controlPlane.ClusterName()),
+			ClusterIP: "None",
+			Selector:  etcdLabelFor(controlPlane.ClusterName()),
 		},
 	}
 	if err := e.kubeClient.Create(ctx, svc); err != nil {
@@ -229,6 +238,14 @@ func etcdCASecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd-ca", clusterName)
 }
 
+func etcdServerSecretNameFor(clusterName string) string {
+	return fmt.Sprintf("%s-etcd-server", clusterName)
+}
+
+func etcdPeerSecretNameFor(clusterName string) string {
+	return fmt.Sprintf("%s-etcd-peer", clusterName)
+}
+
 func etcdLabelFor(clusterName string) map[string]string {
 	return map[string]string{
 		"app": etcdServiceNameFor(clusterName),
@@ -238,3 +255,102 @@ func etcdLabelFor(clusterName string) map[string]string {
 func namespacedName(namespace, obj string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: obj}
 }
+
+func certListFor(controlPlane *v1alpha1.ControlPlane, caCert *x509.Certificate, caKey crypto.Signer) []*CertConfig {
+	return []*CertConfig{
+		etcdServerCertConfig(controlPlane, caCert, caKey),
+		etcdPeerCertConfig(controlPlane, caCert, caKey),
+	}
+}
+
+func etcdRootCACertConfig(controlPlane *v1alpha1.ControlPlane) *CertConfig {
+	return &CertConfig{
+		isCA: true,
+		name: etcdCASecretNameFor(controlPlane.ClusterName()),
+		Config: &certutil.Config{
+			CommonName: etcdRootCACommonName,
+		},
+	}
+}
+
+/*
+DNSNames contains the following entries-
+"localhost",
+<svcname>.<namespace>.svc.cluster.local
+<podname>
+<podname>.<svcname>.<namespace>.svc.cluster.local
+The last two entries are added for every pod in the cluster
+*/
+func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane, caCert *x509.Certificate, caKey crypto.Signer) *CertConfig {
+	config := &CertConfig{
+		caCert: caCert,
+		caKey:  caKey,
+		name:   etcdServerSecretNameFor(controlPlane.ClusterName()),
+		Config: &certutil.Config{
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			CommonName:   "etcd",
+			Organization: []string{"kubernetes"},
+			AltNames: certutil.AltNames{
+				DNSNames: append(etcdPodAndHostnames(controlPlane),
+					etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
+					"localhost"),
+				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
+			},
+		},
+	}
+	zap.S().Infof("Server cert DNSNames are %+v", config.Config.AltNames.DNSNames)
+	return config
+}
+
+/*
+DNSNames contains the following entries-
+"localhost",
+<svcname>.<namespace>.svc.cluster.local
+<podname>
+<podname>.<svcname>.<namespace>.svc.cluster.local
+The last two entries are added for every pod in the cluster
+*/
+func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane, caCert *x509.Certificate, caKey crypto.Signer) *CertConfig {
+	config := &CertConfig{
+		caCert: caCert,
+		caKey:  caKey,
+		name:   etcdPeerSecretNameFor(controlPlane.ClusterName()),
+		Config: &certutil.Config{
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			CommonName:   "etcd",
+			Organization: []string{"kubernetes"},
+			AltNames: certutil.AltNames{
+				DNSNames: append(etcdPodAndHostnames(controlPlane),
+					etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
+					"localhost"),
+				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
+			},
+		},
+	}
+	zap.S().Infof("Peer cert DNSNames are %+v", config.Config.AltNames.DNSNames)
+	return config
+}
+
+// Service name if <clustername>-etcd.<namespace>.svc.cluster.local
+func etcdSvcFQDN(clusterName, namespace string) string {
+	return fmt.Sprintf("%s.%s.svc.cluster.local", etcdServiceNameFor(clusterName), namespace)
+}
+
+// For a given cluster name example, podnames are <clusternme>-etcd-[0-n-1], and
+// hostnames are <podname>.<svcname>.kit.svc.cluster.local
+func etcdPodAndHostnames(controlPlane *v1alpha1.ControlPlane) []string {
+	result := []string{}
+	for i := 0; i < controlPlane.Spec.Etcd.Replicas; i++ {
+		podname := fmt.Sprintf("%s-etcd-%d", controlPlane.ClusterName(), i)
+		result = append(result, podname, fmt.Sprintf("%s.%s", podname, etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace)))
+	}
+	return result
+}
+
+// func etcdHealthCheckCertConfig() *certutil.Config {
+// 	return &certutil.Config{}
+// }
+
+// func etcdAPIClientCertConfig() *certutil.Config {
+// 	return &certutil.Config{}
+// }
