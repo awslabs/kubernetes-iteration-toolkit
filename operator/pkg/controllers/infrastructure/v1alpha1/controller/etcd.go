@@ -71,101 +71,6 @@ func (e *etcdProvider) deploy(ctx context.Context, controlPlane *v1alpha1.Contro
 	return nil
 }
 
-func (e *etcdProvider) createETCDCerts(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	// get CA key and cert
-	caCert, caKey, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, etcdRootCACertConfig(controlPlane))
-	if err != nil {
-		return fmt.Errorf("creating root CA for cluster %v, %w", controlPlane.ClusterName(), err)
-	}
-	// generate etcd server, peer, healthcheck and etcdAPIClient certs
-	for _, certConfig := range certListFor(controlPlane, caCert, caKey) {
-		if _, _, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, certConfig); err != nil {
-			return fmt.Errorf("creating certs and key name %s, %w,", certConfig.name, err)
-		}
-	}
-	return nil
-}
-
-// rootCertificateAuthority checks with management server for a root CA secret, if it exists return the cert and key, else
-// it will generate a new root ca and store as a secret in management server
-func (e *etcdProvider) createCertAndKeyIfNotFound(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
-	var cert *x509.Certificate
-	var key crypto.Signer
-	secret, err := e.getSecret(ctx, controlPlane.NamespaceName(), certConfig.name)
-	if err != nil {
-		if errors.KubeObjNotFound(err) {
-			cert, key, err = e.generateCertAndKey(ctx, controlPlane, certConfig)
-			if err != nil {
-				return nil, nil, err
-			}
-			return cert, key, err
-		}
-		return nil, nil, err
-	}
-	certs, err := certutil.ParseCertsPEM(secret.Data["tls.crt"])
-	if err != nil {
-		return nil, nil, err
-	}
-	parsedKey, err := keyutil.ParsePrivateKeyPEM(secret.Data["tls.key"])
-	if err != nil {
-		return nil, nil, err
-	}
-	return certs[0], parsedKey.(crypto.Signer), err
-}
-
-func (e *etcdProvider) getSecret(ctx context.Context, namespace, objName string) (*v1.Secret, error) {
-	result := &v1.Secret{}
-	if err := e.kubeClient.Get(ctx, namespacedName(namespace, objName), result); err != nil {
-		return nil, fmt.Errorf("getting secret %v, %w", namespacedName(namespace, objName), err)
-	}
-	return result, nil
-}
-
-func (e *etcdProvider) generateCertAndKey(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
-	cert, key, err := pkiutil.KeyAndCert(certConfig.Config, certConfig.caCert, certConfig.caKey, certConfig.isCA)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating certificate authority, %w,", err)
-	}
-	certBytes := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.Raw,
-	})
-	keyBytes := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key.(*rsa.PrivateKey)),
-	})
-	if err := e.createSecret(ctx, certBytes, keyBytes, controlPlane, certConfig); err != nil {
-		return nil, nil, fmt.Errorf("creating root ca secret, %w", err)
-	}
-	zap.S().Infof("[%s] successfully created cert and key %s", controlPlane.ClusterName(), certConfig.name)
-	return cert, key, nil
-}
-
-// createSecret will store root CA and key as the kubernetes secret
-func (e *etcdProvider) createSecret(ctx context.Context, cert, key []byte, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) error {
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      certConfig.name,
-			Namespace: controlPlane.NamespaceName(),
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: controlPlane.APIVersion,
-				Name:       controlPlane.Name,
-				Kind:       controlPlane.Kind,
-				UID:        controlPlane.UID,
-			}},
-		},
-		Type: v1.SecretTypeTLS,
-		Data: map[string][]byte{
-			"tls.crt": cert,
-			"tls.key": key,
-		},
-	}
-	if err := e.kubeClient.Create(ctx, secret); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (e *etcdProvider) createETCDService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (string, error) {
 	objName := etcdServiceNameFor(controlPlane.ClusterName())
 	service, err := e.getService(ctx, namespacedName(controlPlane.NamespaceName(), objName))
@@ -220,6 +125,101 @@ func (e *etcdProvider) getService(ctx context.Context, name types.NamespacedName
 		return nil, fmt.Errorf("getting service %v, %w", name, err)
 	}
 	return result, nil
+}
+
+func (e *etcdProvider) createETCDCerts(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	// get CA key and cert
+	caCert, caKey, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, etcdRootCACertConfig(controlPlane))
+	if err != nil {
+		return fmt.Errorf("creating root CA for cluster %v, %w", controlPlane.ClusterName(), err)
+	}
+	// generate etcd server, peer, healthcheck and etcdAPIClient certs
+	for _, certConfig := range certListFor(controlPlane, caCert, caKey) {
+		if _, _, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, certConfig); err != nil {
+			return fmt.Errorf("creating certs and key name %s, %w,", certConfig.name, err)
+		}
+	}
+	return nil
+}
+
+// createCertAndKeyIfNotFound checks with management server for a root CA secret, if it exists return the cert and key, else
+// it will generate a new root ca and store as a secret in management server
+func (e *etcdProvider) createCertAndKeyIfNotFound(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+	var cert *x509.Certificate
+	var key crypto.Signer
+	secret, err := e.getSecret(ctx, controlPlane.NamespaceName(), certConfig.name)
+	if err != nil {
+		if errors.KubeObjNotFound(err) {
+			cert, key, err = e.createCertAndKeySecret(ctx, controlPlane, certConfig)
+			if err != nil {
+				return nil, nil, err
+			}
+			return cert, key, err
+		}
+		return nil, nil, err
+	}
+	certs, err := certutil.ParseCertsPEM(secret.Data["tls.crt"])
+	if err != nil {
+		return nil, nil, err
+	}
+	parsedKey, err := keyutil.ParsePrivateKeyPEM(secret.Data["tls.key"])
+	if err != nil {
+		return nil, nil, err
+	}
+	return certs[0], parsedKey.(crypto.Signer), err
+}
+
+func (e *etcdProvider) getSecret(ctx context.Context, namespace, objName string) (*v1.Secret, error) {
+	result := &v1.Secret{}
+	if err := e.kubeClient.Get(ctx, namespacedName(namespace, objName), result); err != nil {
+		return nil, fmt.Errorf("getting secret %v, %w", namespacedName(namespace, objName), err)
+	}
+	return result, nil
+}
+
+func (e *etcdProvider) createCertAndKeySecret(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+	cert, key, err := pkiutil.KeyAndCert(certConfig.Config, certConfig.caCert, certConfig.caKey, certConfig.isCA)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating certificate authority, %w,", err)
+	}
+	certBytes := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	})
+	keyBytes := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key.(*rsa.PrivateKey)),
+	})
+	if err := e.createSecret(ctx, certBytes, keyBytes, controlPlane, certConfig); err != nil {
+		return nil, nil, fmt.Errorf("creating root ca secret, %w", err)
+	}
+	zap.S().Infof("[%s] successfully created cert and key %s", controlPlane.ClusterName(), certConfig.name)
+	return cert, key, nil
+}
+
+// createSecret will store root CA and key as the kubernetes secret
+func (e *etcdProvider) createSecret(ctx context.Context, cert, key []byte, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) error {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      certConfig.name,
+			Namespace: controlPlane.NamespaceName(),
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: controlPlane.APIVersion,
+				Name:       controlPlane.Name,
+				Kind:       controlPlane.Kind,
+				UID:        controlPlane.UID,
+			}},
+		},
+		Type: v1.SecretTypeTLS,
+		Data: map[string][]byte{
+			"tls.crt": cert,
+			"tls.key": key,
+		},
+	}
+	if err := e.kubeClient.Create(ctx, secret); err != nil {
+		return err
+	}
+	return nil
 }
 
 func etcdServerPortNameFor(clusterName string) string {
