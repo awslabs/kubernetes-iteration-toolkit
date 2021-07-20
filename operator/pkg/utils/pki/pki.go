@@ -66,11 +66,7 @@ func signedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certificat
 		return nil, errors.New("commonName is missing")
 	}
 	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
-	// if isCA {
-	// 	keyUsage |= x509.KeyUsageCertSign
-	// }
 	removeDuplicateAltNames(&cfg.AltNames)
-
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,

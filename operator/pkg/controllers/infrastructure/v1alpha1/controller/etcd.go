@@ -77,7 +77,7 @@ func (e *etcdProvider) createETCDCerts(ctx context.Context, controlPlane *v1alph
 	if err != nil {
 		return fmt.Errorf("creating root CA for cluster %v, %w", controlPlane.ClusterName(), err)
 	}
-	// 	generate etcd server, peer, healthcheck and etcdAPIClient certs
+	// generate etcd server, peer, healthcheck and etcdAPIClient certs
 	for _, certConfig := range certListFor(controlPlane, caCert, caKey) {
 		if _, _, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, certConfig); err != nil {
 			return fmt.Errorf("creating certs and key name %s, %w,", certConfig.name, err)
@@ -346,11 +346,3 @@ func etcdPodAndHostnames(controlPlane *v1alpha1.ControlPlane) []string {
 	}
 	return result
 }
-
-// func etcdHealthCheckCertConfig() *certutil.Config {
-// 	return &certutil.Config{}
-// }
-
-// func etcdAPIClientCertConfig() *certutil.Config {
-// 	return &certutil.Config{}
-// }

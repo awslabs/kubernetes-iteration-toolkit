@@ -15,13 +15,7 @@ limitations under the License.
 package errors
 
 import (
-	"errors"
-
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
-)
-
-var (
-	WaitingForSubResources = errors.New("waiting for subresource to be ready")
 )
 
 func KubeObjNotFound(err error) bool {

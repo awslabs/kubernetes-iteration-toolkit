@@ -15,5 +15,5 @@ package project
 var (
 	// Version is the karpenter app version injected during compilation
 	// when using the Makefile
-	Version = "dev-build"
+	Version = "dev"
 )
