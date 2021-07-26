@@ -17,6 +17,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/errors"
@@ -42,9 +43,8 @@ type GenericController struct {
 func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	// 1. Read Spec
 	resource := c.For()
-	var err error
-	if err = c.Get(ctx, req.NamespacedName, resource); err != nil {
-		if errors.KubeObjNotFound(err) {
+	if err := c.Get(ctx, req.NamespacedName, resource); err != nil {
+		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return *status.Failed, err
@@ -54,11 +54,10 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	// 3. Reconcile else finalize if object is deleted
 	result, reconcileErr := c.reconcile(ctx, resource, persisted)
 	// 4. Update Status using a merge patch, we want to set status even when reconcile errored
-	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil && !errors.KubeObjNotFound(err) {
+	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil && !errors.IsNotFound(err) {
 		return *status.Failed, fmt.Errorf("status patch for %s, %w,", req.NamespacedName, err)
 	}
 	if reconcileErr != nil {
-		zap.S().Errorf("Error reconciling the resource %v", err)
 		return *status.Failed, reconcileErr
 	}
 	return result, nil
@@ -74,7 +73,6 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 		result, err = c.Controller.Reconcile(ctx, resource)
 		if err != nil {
 			resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
-			zap.S().Errorf("Failed to reconcile kind %s, %v", resource.GetObjectKind().GroupVersionKind().Kind, err)
 			return *status.Failed, fmt.Errorf("reconciling resource, %w", err)
 		}
 		resource.StatusConditions().MarkTrue(v1alpha1.Active)
@@ -86,7 +84,9 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 		zap.S().Infof("[%s] Successfully deleted", resource.GetName())
 	}
 	// If the finalizers have changed merge patch the object
-	if len(existingFinalizers) != len(resource.GetFinalizers()) {
+	if !reflect.DeepEqual(existingFinalizers, resource.GetFinalizers()) {
+		zap.S().Infof("Patching resource for finalizers %v", resource.GetName())
+
 		if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
 			return *status.Failed, fmt.Errorf("patch object %s, %w", resource.GetName(), err)
 		}

@@ -75,7 +75,7 @@ func (e *etcdProvider) createETCDService(ctx context.Context, controlPlane *v1al
 	objName := etcdServiceNameFor(controlPlane.ClusterName())
 	service, err := e.getService(ctx, namespacedName(controlPlane.NamespaceName(), objName))
 	if err != nil {
-		if errors.KubeObjNotFound(err) {
+		if errors.IsNotFound(err) {
 			if err := e.createService(ctx, controlPlane); err != nil {
 				return "", fmt.Errorf("creating etcd service object for cluster %v, %w", controlPlane.ClusterName(), err)
 			}
@@ -114,7 +114,7 @@ func (e *etcdProvider) createService(ctx context.Context, controlPlane *v1alpha1
 	if err := e.kubeClient.Create(ctx, svc); err != nil {
 		return err
 	}
-	zap.S().Infof("[%s] successfully created service %s", controlPlane.ClusterName(),
+	zap.S().Infof("[%s] created service %s", controlPlane.ClusterName(),
 		etcdServiceNameFor(controlPlane.ClusterName()))
 	return nil
 }
@@ -149,7 +149,7 @@ func (e *etcdProvider) createCertAndKeyIfNotFound(ctx context.Context, controlPl
 	var key crypto.Signer
 	secret, err := e.getSecret(ctx, controlPlane.NamespaceName(), certConfig.name)
 	if err != nil {
-		if errors.KubeObjNotFound(err) {
+		if errors.IsNotFound(err) {
 			cert, key, err = e.createCertAndKeySecret(ctx, controlPlane, certConfig)
 			if err != nil {
 				return nil, nil, err
@@ -193,7 +193,7 @@ func (e *etcdProvider) createCertAndKeySecret(ctx context.Context, controlPlane 
 	if err := e.createSecret(ctx, certBytes, keyBytes, controlPlane, certConfig); err != nil {
 		return nil, nil, fmt.Errorf("creating root ca secret, %w", err)
 	}
-	zap.S().Infof("[%s] successfully created cert and key %s", controlPlane.ClusterName(), certConfig.name)
+	zap.S().Infof("[%s] created cert and key %s", controlPlane.ClusterName(), certConfig.name)
 	return cert, key, nil
 }
 

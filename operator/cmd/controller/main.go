@@ -55,11 +55,11 @@ func main() {
 		LeaderElectionNamespace: "kit",
 	})
 
-	session := awsprovider.NewSession()
-	err := manager.RegisterWebhooks().RegisterControllers(
-		infra.NewControlPlaneController(awsprovider.EC2Client(session),
-			manager.GetClient()),
-	).Start(controllerruntime.SetupSignalHandler())
+	err := manager.RegisterControllers(
+		infra.NewControlPlaneController(
+			awsprovider.EC2Client(awsprovider.NewSession()),
+			manager.GetClient(),
+		)).Start(controllerruntime.SetupSignalHandler())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start manager, %v", err))
 	}

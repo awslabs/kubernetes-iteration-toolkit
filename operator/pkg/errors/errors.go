@@ -18,6 +18,6 @@ import (
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-func KubeObjNotFound(err error) bool {
+func IsNotFound(err error) bool {
 	return kubeerrors.IsNotFound(err)
 }

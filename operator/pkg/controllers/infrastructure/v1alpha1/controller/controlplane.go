@@ -33,8 +33,8 @@ type controlPlane struct {
 }
 
 // NewControlPlaneController returns a controller for managing VPCs in AWS
-func NewControlPlaneController(ec2api *awsprovider.EC2, restIface client.Client) *controlPlane {
-	return &controlPlane{ec2api: ec2api, Client: restIface, etcdprovider: newETCDProvider(restIface)}
+func NewControlPlaneController(ec2api *awsprovider.EC2, kubeClient client.Client) *controlPlane {
+	return &controlPlane{ec2api: ec2api, Client: kubeClient, etcdprovider: newETCDProvider(kubeClient)}
 }
 
 // Name returns the name of the controller
