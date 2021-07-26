@@ -298,7 +298,6 @@ func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane, caCert *x509.Cert
 			},
 		},
 	}
-	zap.S().Infof("Server cert DNSNames are %+v", config.Config.AltNames.DNSNames)
 	return config
 }
 
@@ -327,7 +326,6 @@ func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane, caCert *x509.Certif
 			},
 		},
 	}
-	zap.S().Infof("Peer cert DNSNames are %+v", config.Config.AltNames.DNSNames)
 	return config
 }
 
