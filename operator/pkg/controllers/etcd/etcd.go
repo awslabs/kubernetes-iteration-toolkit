@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package etcd
 
 import (
 	"context"
@@ -40,7 +40,7 @@ const (
 	etcdRootCACommonName = "etcd/ca"
 )
 
-type etcdProvider struct {
+type Provider struct {
 	kubeClient client.Client
 }
 
@@ -52,11 +52,11 @@ type CertConfig struct {
 	caKey  crypto.Signer
 }
 
-func newETCDProvider(kubeclient client.Client) *etcdProvider {
-	return &etcdProvider{kubeClient: kubeclient}
+func New(kubeclient client.Client) *Provider {
+	return &Provider{kubeClient: kubeclient}
 }
 
-func (e *etcdProvider) deploy(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (e *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	// generate etcd service object
 	etcdServiceName, err := e.createETCDService(ctx, controlPlane)
 	if err != nil {
@@ -71,7 +71,7 @@ func (e *etcdProvider) deploy(ctx context.Context, controlPlane *v1alpha1.Contro
 	return nil
 }
 
-func (e *etcdProvider) createETCDService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (string, error) {
+func (e *Provider) createETCDService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (string, error) {
 	objName := etcdServiceNameFor(controlPlane.ClusterName())
 	service, err := e.getService(ctx, namespacedName(controlPlane.NamespaceName(), objName))
 	if err != nil {
@@ -86,7 +86,7 @@ func (e *etcdProvider) createETCDService(ctx context.Context, controlPlane *v1al
 	return service.Name, nil
 }
 
-func (e *etcdProvider) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (e *Provider) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
@@ -112,14 +112,14 @@ func (e *etcdProvider) createService(ctx context.Context, controlPlane *v1alpha1
 		},
 	}
 	if err := e.kubeClient.Create(ctx, svc); err != nil {
-		return err
+		return fmt.Errorf("creating service %s/%s, %w", svc.Namespace, svc.Name, err)
 	}
 	zap.S().Infof("[%s] created service %s", controlPlane.ClusterName(),
 		etcdServiceNameFor(controlPlane.ClusterName()))
 	return nil
 }
 
-func (e *etcdProvider) getService(ctx context.Context, name types.NamespacedName) (*v1.Service, error) {
+func (e *Provider) getService(ctx context.Context, name types.NamespacedName) (*v1.Service, error) {
 	result := &v1.Service{}
 	if err := e.kubeClient.Get(ctx, name, result); err != nil {
 		return nil, fmt.Errorf("getting service %v, %w", name, err)
@@ -127,7 +127,7 @@ func (e *etcdProvider) getService(ctx context.Context, name types.NamespacedName
 	return result, nil
 }
 
-func (e *etcdProvider) createETCDCerts(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (e *Provider) createETCDCerts(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	// get CA key and cert
 	caCert, caKey, err := e.createCertAndKeyIfNotFound(ctx, controlPlane, etcdRootCACertConfig(controlPlane))
 	if err != nil {
@@ -144,7 +144,7 @@ func (e *etcdProvider) createETCDCerts(ctx context.Context, controlPlane *v1alph
 
 // createCertAndKeyIfNotFound checks with management server for a root CA secret, if it exists return the cert and key, else
 // it will generate a new root ca and store as a secret in management server
-func (e *etcdProvider) createCertAndKeyIfNotFound(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+func (e *Provider) createCertAndKeyIfNotFound(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
 	var cert *x509.Certificate
 	var key crypto.Signer
 	secret, err := e.getSecret(ctx, controlPlane.NamespaceName(), certConfig.name)
@@ -169,7 +169,7 @@ func (e *etcdProvider) createCertAndKeyIfNotFound(ctx context.Context, controlPl
 	return certs[0], parsedKey.(crypto.Signer), err
 }
 
-func (e *etcdProvider) getSecret(ctx context.Context, namespace, objName string) (*v1.Secret, error) {
+func (e *Provider) getSecret(ctx context.Context, namespace, objName string) (*v1.Secret, error) {
 	result := &v1.Secret{}
 	if err := e.kubeClient.Get(ctx, namespacedName(namespace, objName), result); err != nil {
 		return nil, fmt.Errorf("getting secret %v, %w", namespacedName(namespace, objName), err)
@@ -177,7 +177,7 @@ func (e *etcdProvider) getSecret(ctx context.Context, namespace, objName string)
 	return result, nil
 }
 
-func (e *etcdProvider) createCertAndKeySecret(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
+func (e *Provider) createCertAndKeySecret(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) (*x509.Certificate, crypto.Signer, error) {
 	cert, key, err := pkiutil.KeyAndCert(certConfig.Config, certConfig.caCert, certConfig.caKey, certConfig.isCA)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating certificate authority, %w,", err)
@@ -198,7 +198,7 @@ func (e *etcdProvider) createCertAndKeySecret(ctx context.Context, controlPlane 
 }
 
 // createSecret will store root CA and key as the kubernetes secret
-func (e *etcdProvider) createSecret(ctx context.Context, cert, key []byte, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) error {
+func (e *Provider) createSecret(ctx context.Context, cert, key []byte, controlPlane *v1alpha1.ControlPlane, certConfig *CertConfig) error {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      certConfig.name,
@@ -217,7 +217,7 @@ func (e *etcdProvider) createSecret(ctx context.Context, cert, key []byte, contr
 		},
 	}
 	if err := e.kubeClient.Create(ctx, secret); err != nil {
-		return err
+		return fmt.Errorf("creating secret %s/%s, %w", secret.Namespace, secret.Name, err)
 	}
 	return nil
 }

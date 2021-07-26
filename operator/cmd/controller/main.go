@@ -7,7 +7,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
-	infra "github.com/awslabs/kit/operator/pkg/controllers/infrastructure/v1alpha1/controller"
+	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
 
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"go.uber.org/zap/zapcore"
@@ -56,7 +56,7 @@ func main() {
 	})
 
 	err := manager.RegisterControllers(
-		infra.NewControlPlaneController(
+		controlplane.NewController(
 			awsprovider.EC2Client(awsprovider.NewSession()),
 			manager.GetClient(),
 		)).Start(controllerruntime.SetupSignalHandler())

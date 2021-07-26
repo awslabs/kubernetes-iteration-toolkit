@@ -25,6 +25,7 @@ aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS 
 Makefile call `Ko` and `Ko` will build the Docker image and push the image to the container repo created in ECR in the last step. Once the image is published, Ko will `kubectl apply` KIT YAML(s) in `config` directory. This will install KIT operator and the required configs to the cluster listed in `kubectl config current-context`
 
 ```bash
+kubectl create namespace kit
 make deploy CONTAINER_IMAGE_REGISTRY=$CONTAINER_IMAGE_REGISTRY
 ```
 
@@ -33,4 +34,5 @@ To delete KIT from Kubernetes cluster
 
 ```bash
 make delete
+kubectl delete namespace kit
 ```

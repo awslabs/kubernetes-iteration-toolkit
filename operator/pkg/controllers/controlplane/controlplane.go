@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package controlplane
 
 import (
 	"context"
@@ -21,6 +21,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
+	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/status"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -29,12 +30,12 @@ import (
 type controlPlane struct {
 	ec2api *awsprovider.EC2
 	client.Client
-	etcdprovider *etcdProvider
+	Provider *etcd.Provider
 }
 
-// NewControlPlaneController returns a controller for managing VPCs in AWS
-func NewControlPlaneController(ec2api *awsprovider.EC2, kubeClient client.Client) *controlPlane {
-	return &controlPlane{ec2api: ec2api, Client: kubeClient, etcdprovider: newETCDProvider(kubeClient)}
+// NewController returns a controller for managing VPCs in AWS
+func NewController(ec2api *awsprovider.EC2, kubeClient client.Client) *controlPlane {
+	return &controlPlane{ec2api: ec2api, Client: kubeClient, Provider: etcd.New(kubeClient)}
 }
 
 // Name returns the name of the controller
@@ -47,10 +48,6 @@ func (c *controlPlane) For() controllers.Object {
 	return &v1alpha1.ControlPlane{}
 }
 
-type ResourceManager interface {
-	Create(context.Context, *v1alpha1.ControlPlane) error
-}
-
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
@@ -59,7 +56,7 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	setDefaults(controlPlane)
 	// TODO create karpenter provisioner spec for creating new nodes.
 	// deploy etcd to the management cluster
-	if err := c.etcdprovider.deploy(ctx, controlPlane); err != nil {
+	if err := c.Provider.Reconcile(ctx, controlPlane); err != nil {
 		return nil, fmt.Errorf("deploying etcd for clustername %v, %w", controlPlane.Name, err)
 	}
 	// TODO deploy master to management cluster
