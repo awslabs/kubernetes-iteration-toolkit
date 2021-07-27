@@ -24,6 +24,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/status"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -67,9 +68,11 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 	var result *reconcile.Result
 	var err error
 	existingFinalizers := resource.GetFinalizers()
+	existingFinalizerSet := sets.NewString(existingFinalizers...)
+	finalizerStr := sets.NewString(fmt.Sprintf(FinalizerForAWSResources, c.Name()))
 	if resource.GetDeletionTimestamp() == nil {
-		// Add finalizer for this controller if not exists
-		c.addFinalizer(ctx, resource)
+		// Add finalizer for this controller
+		resource.SetFinalizers(existingFinalizerSet.Union(finalizerStr).UnsortedList())
 		result, err = c.Controller.Reconcile(ctx, resource)
 		if err != nil {
 			resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
@@ -80,41 +83,15 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 		if result, err = c.Controller.Finalize(ctx, resource); err != nil {
 			return *status.Failed, fmt.Errorf("finalizing resource controller %v, %w", c.Controller.Name(), err)
 		}
-		c.removeFinalizer(ctx, resource)
+		// Remove finalizer for this controller
+		resource.SetFinalizers(existingFinalizerSet.Difference(finalizerStr).UnsortedList())
 		zap.S().Infof("[%s] Successfully deleted", resource.GetName())
 	}
 	// If the finalizers have changed merge patch the object
 	if !reflect.DeepEqual(existingFinalizers, resource.GetFinalizers()) {
-		zap.S().Infof("Patching resource for finalizers %v", resource.GetName())
-
 		if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
 			return *status.Failed, fmt.Errorf("patch object %s, %w", resource.GetName(), err)
 		}
 	}
 	return *result, nil
-}
-
-func (c *GenericController) addFinalizer(ctx context.Context, resource Object) {
-	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
-	for _, finalizer := range resource.GetFinalizers() {
-		if finalizer == finalizerStr {
-			return
-		}
-	}
-	finalizers := append(resource.GetFinalizers(), finalizerStr)
-	resource.SetFinalizers(finalizers)
-}
-
-func (c *GenericController) removeFinalizer(ctx context.Context, resource Object) {
-	finalizerStr := fmt.Sprintf(FinalizerForAWSResources, c.Name())
-	remainingFinalizers := []string{}
-	for _, finalizer := range resource.GetFinalizers() {
-		if finalizer == finalizerStr {
-			continue
-		}
-		remainingFinalizers = append(remainingFinalizers, finalizer)
-	}
-	if len(remainingFinalizers) < len(resource.GetFinalizers()) {
-		resource.SetFinalizers(remainingFinalizers)
-	}
 }

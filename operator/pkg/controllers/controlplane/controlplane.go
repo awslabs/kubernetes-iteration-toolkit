@@ -28,14 +28,13 @@ import (
 )
 
 type controlPlane struct {
-	ec2api *awsprovider.EC2
-	client.Client
+	ec2api   *awsprovider.EC2
 	Provider *etcd.Provider
 }
 
 // NewController returns a controller for managing VPCs in AWS
 func NewController(ec2api *awsprovider.EC2, kubeClient client.Client) *controlPlane {
-	return &controlPlane{ec2api: ec2api, Client: kubeClient, Provider: etcd.New(kubeClient)}
+	return &controlPlane{ec2api: ec2api, Provider: etcd.New(kubeClient)}
 }
 
 // Name returns the name of the controller
@@ -53,6 +52,7 @@ func (c *controlPlane) For() controllers.Object {
 // object
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
+	// TODO move this to webhook defaulting
 	setDefaults(controlPlane)
 	// TODO create karpenter provisioner spec for creating new nodes.
 	// deploy etcd to the management cluster
