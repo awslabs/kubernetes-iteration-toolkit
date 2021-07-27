@@ -44,7 +44,7 @@ licenses: ## Verifies dependency licenses and requires GITHUB_TOKEN to be set
 	go build $(GOFLAGS) -o bin/operator cmd/controller/main.go
 	golicense hack/license-config.hcl bin/operator
 
-deploy: ## Deploy the controller into your ~/.kube/config cluster
+apply: ## Apply the controller into your ~/.kube/config cluster
 	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/
     
 delete: ## Delete the controller from your ~/.kube/config cluster
