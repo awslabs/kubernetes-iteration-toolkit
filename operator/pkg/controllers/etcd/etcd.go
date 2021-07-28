@@ -54,7 +54,7 @@ func New(kubeclient client.Client) *Provider {
 
 func (e *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	// generate etcd service object
-	etcdServiceName, err := e.createETCDService(ctx, controlPlane)
+	err := e.createETCDService(ctx, controlPlane)
 	if err != nil {
 		return err
 	}
@@ -63,16 +63,14 @@ func (e *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.Control
 		return err
 	}
 	// TODO generate etcd stateful set
-	_ = etcdServiceName
 	return nil
 }
 
-func (e *Provider) createETCDService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (string, error) {
-	objName := etcdServiceNameFor(controlPlane.ClusterName())
+func (e *Provider) createETCDService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	if err := e.createService(ctx, controlPlane); err != nil {
-		return "", fmt.Errorf("creating etcd service object for cluster %v, %w", controlPlane.ClusterName(), err)
+		return fmt.Errorf("creating etcd service object for cluster %v, %w", controlPlane.ClusterName(), err)
 	}
-	return objName, nil
+	return nil
 }
 
 func (e *Provider) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
