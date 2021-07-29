@@ -132,7 +132,7 @@ func signedCert(cfg *certutil.Config, key crypto.Signer, caCertBytes, caKeyBytes
 		return nil, errors.New("commonName is missing")
 	}
 	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
-	removeDuplicateAltNames(&cfg.AltNames)
+	cfg.AltNames = removeDuplicateAltNames(&cfg.AltNames)
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -156,9 +156,9 @@ func signedCert(cfg *certutil.Config, key crypto.Signer, caCertBytes, caKeyBytes
 }
 
 // removeDuplicateAltNames removes duplicate items in altNames.
-func removeDuplicateAltNames(altNames *certutil.AltNames) {
+func removeDuplicateAltNames(altNames *certutil.AltNames) certutil.AltNames {
 	if altNames == nil {
-		return
+		return certutil.AltNames{}
 	}
 	if altNames.DNSNames != nil {
 		altNames.DNSNames = sets.NewString(altNames.DNSNames...).List()
@@ -172,6 +172,7 @@ func removeDuplicateAltNames(altNames *certutil.AltNames) {
 		}
 	}
 	altNames.IPs = ips
+	return *altNames
 }
 
 // newSelfSignedCACert creates a certificate authority
