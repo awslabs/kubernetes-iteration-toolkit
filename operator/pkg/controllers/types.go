@@ -33,11 +33,11 @@ type Controller interface {
 	// Reconcile hands a hydrated kubernetes resource to the controller for
 	// reconciliation. Any changes made to the resource's status are persisted
 	// after Reconcile returns, even if it returns an error.
-	Reconcile(context.Context, Object) (reconcile.Result, error)
+	Reconcile(context.Context, Object) (*reconcile.Result, error)
 	// Reconcile hands a hydrated kubernetes resource to the controller for
 	// cleanup. Any changes made to the resource's status are persisted after
 	// Finalize returns, even if it returns an error.
-	Finalize(context.Context, Object) (reconcile.Result, error)
+	Finalize(context.Context, Object) (*reconcile.Result, error)
 	// For returns a default instantiation of the resource and is injected by
 	// data from the API Server at the start of the reconciliation loop.
 	For() Object

@@ -24,8 +24,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/karpenter/pkg/utils/log"
-	"github.com/awslabs/karpenter/pkg/utils/project"
+)
+
+const (
+	userAgent = "kubernetes-iteration-toolkit/operator"
 )
 
 func NewSession() *session.Session {
@@ -41,7 +43,9 @@ func withRegion(sess *session.Session) *session.Session {
 	var err error
 	if region == "" {
 		region, err = ec2metadata.New(sess).Region()
-		log.PanicIfError(err, "failed to call the metadata server's region API")
+		if err != nil {
+			panic(fmt.Sprintf("Failed to call the metadata server's region API, %v", err))
+		}
 	}
 	sess.Config.Region = aws.String(region)
 	return sess
@@ -49,7 +53,6 @@ func withRegion(sess *session.Session) *session.Session {
 
 // withUserAgent adds a kit specific user-agent string to AWS session
 func withUserAgent(sess *session.Session) *session.Session {
-	userAgent := fmt.Sprintf("kit.sh-%s", project.Version)
 	sess.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler(userAgent))
 	return sess
 }
