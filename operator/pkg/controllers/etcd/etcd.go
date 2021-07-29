@@ -21,7 +21,7 @@ import (
 	"net"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
-	pkiutil "github.com/awslabs/kit/operator/pkg/utils/pki"
+	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
 
 	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
