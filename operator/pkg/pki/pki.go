@@ -51,7 +51,7 @@ func RootCA(config *CertConfig) (certBytes, keyBytes []byte, err error) {
 	// verify the existing certs if valid use
 	cert, key, err := validCerts(config.ExistingCert, config.ExistingKey)
 	if err == nil {
-		zap.S().Infof("Reusing existing certs for %s", config.CommonName)
+		zap.S().Debugf("Reusing existing root CA certs for %s", config.CommonName)
 	} else {
 		// create private key, defaults to x509.RSA
 		if key, err = rsa.GenerateKey(cryptorand.Reader, rsaKeySize); err != nil {
@@ -105,7 +105,7 @@ func privateKeyAndCertificate(config *CertConfig, caCertBytes, caKeyBytes []byte
 	// verify the existing certs if valid use
 	cert, key, err := validCerts(config.ExistingCert, config.ExistingKey)
 	if err == nil {
-		zap.S().Infof("Reusing existing certs for %s", config.CommonName)
+		zap.S().Debugf("Reusing existing certs for %s", config.CommonName)
 		return cert, key, nil
 	}
 	// create private key, defaults to x509.RSA

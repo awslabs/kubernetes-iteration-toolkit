@@ -146,9 +146,9 @@ func (in *ControlPlaneStatus) DeepCopy() *ControlPlaneStatus {
 func (in *ETCDSpec) DeepCopyInto(out *ETCDSpec) {
 	*out = *in
 	out.Instances = in.Instances
-	if in.Component != nil {
-		in, out := &in.Component, &out.Component
-		*out = new(Component)
+	if in.Spec != nil {
+		in, out := &in.Spec, &out.Spec
+		*out = new(v1.PodSpec)
 		(*in).DeepCopyInto(*out)
 	}
 }
