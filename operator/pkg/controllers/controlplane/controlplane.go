@@ -27,10 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	defaultKubernetesVersion = "1.19"
-)
-
 type controlPlane struct {
 	ec2api       *awsprovider.EC2
 	etcdProvider *etcd.Provider
@@ -56,10 +52,6 @@ func (c *controlPlane) For() controllers.Object {
 // object
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (result *reconcile.Result, err error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
-	// var err error
-	if controlPlane.Spec, err = controlPlane.Spec.WithStaticDefaults(c.DefaultStaticSpecFor(controlPlane)); err != nil {
-		return nil, err
-	}
 	// TODO create karpenter provisioner spec for creating new nodes.
 	// deploy etcd to the management cluster
 	if err := c.etcdProvider.Reconcile(ctx, controlPlane); err != nil {
@@ -72,15 +64,3 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 func (c *controlPlane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
 	return status.Terminated, nil
 }
-<<<<<<< HEAD
-=======
-
-func (c *controlPlane) DefaultStaticSpecFor(controlPlane *v1alpha1.ControlPlane) func() *v1alpha1.ControlPlaneSpec {
-	return func() *v1alpha1.ControlPlaneSpec {
-		return &v1alpha1.ControlPlaneSpec{
-			KubernetesVersion: defaultKubernetesVersion,
-			Etcd:              *c.etcdProvider.DefaultStaticSpecFor(controlPlane)(),
-		}
-	}
-}
->>>>>>> 87c9f17 (Update CRD Spec for etcd, adds etcd statefulset spec)
