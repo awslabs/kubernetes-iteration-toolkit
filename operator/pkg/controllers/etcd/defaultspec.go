@@ -28,129 +28,125 @@ const (
 	defaultEtcdImage    = "public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.14-eks-1-18-1"
 )
 
-func (e *Provider) DefaultStaticSpecFor(controlPlane *v1alpha1.ControlPlane) func() *v1alpha1.ETCDSpec {
-	return func() *v1alpha1.ETCDSpec {
-		return &v1alpha1.ETCDSpec{
-			Spec: &v1.PodSpec{
-				TerminationGracePeriodSeconds: aws.Int64(1),
-				HostNetwork:                   true,
-				DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
-				Containers: []v1.Container{{
-					Name:  "etcd",
-					Image: defaultEtcdImage,
-					Ports: []v1.ContainerPort{{
-						ContainerPort: 2379,
-						Name:          "etcd",
-					}, {
-						ContainerPort: 2380,
-						Name:          "etcd-peer",
-					}},
-					VolumeMounts: []v1.VolumeMount{{
-						Name:      "etcd-data",
-						MountPath: "/var/lib/etcd",
-					}, {
-						Name:      "etcd-ca",
-						MountPath: "/etc/kubernetes/pki",
-					}, {
-						Name:      "etcd-peer-certs",
-						MountPath: "/etc/kubernetes/pki/etcd/peer",
-					}, {
-						Name:      "etcd-server-certs",
-						MountPath: "/etc/kubernetes/pki/etcd/server",
-					}},
-					Command: []string{"etcd"},
-					Args: []string{
-						"--cert-file=/etc/kubernetes/pki/etcd/server/server.crt",
-						"--initial-cluster=" + initialClusterFlag(controlPlane),
-						"--data-dir=/var/lib/etcd",
-						"--initial-cluster-state=new",
-						"--initial-cluster-token=etcd-cluster-1",
-						"--key-file=/etc/kubernetes/pki/etcd/server/server.key",
-						"--advertise-client-urls=" + advertizeClusterURL(controlPlane),
-						"--initial-advertise-peer-urls=" + advertizePeerURL(controlPlane),
-						"--listen-client-urls=https://$(NODE_IP):2379,https://127.0.0.1:2379",
-						"--listen-metrics-urls=http://127.0.0.1:2381",
-						"--listen-peer-urls=https://$(NODE_IP):2380",
-						"--name=$(NODE_ID)",
-						"--peer-cert-file=/etc/kubernetes/pki/etcd/peer/peer.crt",
-						"--peer-client-cert-auth=true",
-						"--peer-key-file=/etc/kubernetes/pki/etcd/peer/peer.key",
-						"--peer-trusted-ca-file=/etc/kubernetes/pki/ca.crt",
-						"--snapshot-count=10000",
-						"--trusted-ca-file=/etc/kubernetes/pki/ca.crt",
-						"--logger=zap",
-					},
-					Env: []v1.EnvVar{{
-						Name: "NODE_IP",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								FieldPath: "status.podIP",
-							},
-						},
-					}, {
-						Name: "NODE_ID",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								FieldPath: "metadata.name",
-							},
-						},
-					}},
-				}},
-				Volumes: []v1.Volume{{
-					Name: "etcd-data",
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{
-							Path: "/var/lib/etcd",
-						},
-					},
-				}, {
-					Name: "etcd-ca",
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName:  caSecretName(controlPlane),
-							DefaultMode: aws.Int32(0400),
-							Items: []v1.KeyToPath{{
-								Key:  "tls.crt",
-								Path: "ca.crt",
-							}, {
-								Key:  "tls.key",
-								Path: "ca.key",
-							}},
-						},
-					},
-				}, {
-					Name: "etcd-peer-certs",
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName:  caPeerName(controlPlane),
-							DefaultMode: aws.Int32(0400),
-							Items: []v1.KeyToPath{{
-								Key:  "tls.crt",
-								Path: "peer.crt",
-							}, {
-								Key:  "tls.key",
-								Path: "peer.key",
-							}},
-						},
-					},
-				}, {
-					Name: "etcd-server-certs",
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName:  caServerName(controlPlane),
-							DefaultMode: aws.Int32(0400),
-							Items: []v1.KeyToPath{{
-								Key:  "tls.crt",
-								Path: "server.crt",
-							}, {
-								Key:  "tls.key",
-								Path: "server.key",
-							}},
-						},
-					},
-				}},
+func PodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
+	return &v1.PodSpec{
+		TerminationGracePeriodSeconds: aws.Int64(1),
+		HostNetwork:                   true,
+		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
+		Containers: []v1.Container{{
+			Name:  "etcd",
+			Image: defaultEtcdImage,
+			Ports: []v1.ContainerPort{{
+				ContainerPort: 2379,
+				Name:          "etcd",
+			}, {
+				ContainerPort: 2380,
+				Name:          "etcd-peer",
+			}},
+			VolumeMounts: []v1.VolumeMount{{
+				Name:      "etcd-data",
+				MountPath: "/var/lib/etcd",
+			}, {
+				Name:      "etcd-ca",
+				MountPath: "/etc/kubernetes/pki",
+			}, {
+				Name:      "etcd-peer-certs",
+				MountPath: "/etc/kubernetes/pki/etcd/peer",
+			}, {
+				Name:      "etcd-server-certs",
+				MountPath: "/etc/kubernetes/pki/etcd/server",
+			}},
+			Command: []string{"etcd"},
+			Args: []string{
+				"--cert-file=/etc/kubernetes/pki/etcd/server/server.crt",
+				"--initial-cluster=" + initialClusterFlag(controlPlane),
+				"--data-dir=/var/lib/etcd",
+				"--initial-cluster-state=new",
+				"--initial-cluster-token=etcd-cluster-1",
+				"--key-file=/etc/kubernetes/pki/etcd/server/server.key",
+				"--advertise-client-urls=" + advertizeClusterURL(controlPlane),
+				"--initial-advertise-peer-urls=" + advertizePeerURL(controlPlane),
+				"--listen-client-urls=https://$(NODE_IP):2379,https://127.0.0.1:2379",
+				"--listen-metrics-urls=http://127.0.0.1:2381",
+				"--listen-peer-urls=https://$(NODE_IP):2380",
+				"--name=$(NODE_ID)",
+				"--peer-cert-file=/etc/kubernetes/pki/etcd/peer/peer.crt",
+				"--peer-client-cert-auth=true",
+				"--peer-key-file=/etc/kubernetes/pki/etcd/peer/peer.key",
+				"--peer-trusted-ca-file=/etc/kubernetes/pki/ca.crt",
+				"--snapshot-count=10000",
+				"--trusted-ca-file=/etc/kubernetes/pki/ca.crt",
+				"--logger=zap",
 			},
-		}
+			Env: []v1.EnvVar{{
+				Name: "NODE_IP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "status.podIP",
+					},
+				},
+			}, {
+				Name: "NODE_ID",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.name",
+					},
+				},
+			}},
+		}},
+		Volumes: []v1.Volume{{
+			Name: "etcd-data",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/var/lib/etcd",
+				},
+			},
+		}, {
+			Name: "etcd-ca",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName:  caSecretName(controlPlane),
+					DefaultMode: aws.Int32(0400),
+					Items: []v1.KeyToPath{{
+						Key:  "tls.crt",
+						Path: "ca.crt",
+					}, {
+						Key:  "tls.key",
+						Path: "ca.key",
+					}},
+				},
+			},
+		}, {
+			Name: "etcd-peer-certs",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName:  caPeerName(controlPlane),
+					DefaultMode: aws.Int32(0400),
+					Items: []v1.KeyToPath{{
+						Key:  "tls.crt",
+						Path: "peer.crt",
+					}, {
+						Key:  "tls.key",
+						Path: "peer.key",
+					}},
+				},
+			},
+		}, {
+			Name: "etcd-server-certs",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName:  caServerName(controlPlane),
+					DefaultMode: aws.Int32(0400),
+					Items: []v1.KeyToPath{{
+						Key:  "tls.crt",
+						Path: "server.crt",
+					}, {
+						Key:  "tls.key",
+						Path: "server.key",
+					}},
+				},
+			},
+		}},
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
+	"github.com/awslabs/kit/operator/pkg/utils/patch"
 
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
@@ -180,6 +181,13 @@ func (e *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1
 		},
 	}
 	result, err := controllerutil.CreateOrPatch(ctx, e.kubeClient, statefulSet, func() (err error) {
+		// Generate the default pod spec for the given control plane, if user has
+		// provided custom config for the etcd pod spec, patch this user
+		// provided config to the default spec
+		etcdSpec, err := patch.PodSpec(PodSpecFor(controlPlane), controlPlane.Spec.Etcd.Spec)
+		if err != nil {
+			return fmt.Errorf("failed to patch pod spec, %w", err)
+		}
 		statefulSet.Spec = appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: etcdLabelFor(controlPlane.ClusterName()),
@@ -190,7 +198,7 @@ func (e *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: etcdLabelFor(controlPlane.ClusterName()),
 				},
-				Spec: *controlPlane.Spec.Etcd.Spec,
+				Spec: etcdSpec,
 			},
 		}
 		return nil
