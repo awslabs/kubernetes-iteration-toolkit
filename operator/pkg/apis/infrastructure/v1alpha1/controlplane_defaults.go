@@ -16,6 +16,8 @@ package v1alpha1
 
 import (
 	"context"
+
+	"github.com/awslabs/kit/operator/pkg/apis/config"
 )
 
 // SetDefaults for the ControlPlane, this gets called by the kit-webhook pod
@@ -27,4 +29,8 @@ func (c *ControlPlane) SetDefaults(ctx context.Context) {
 }
 
 // SetDefaults for the ControlPlaneSpec, cascading to all subspecs
-func (s *ControlPlaneSpec) SetDefaults(ctx context.Context) {}
+func (s *ControlPlaneSpec) SetDefaults(ctx context.Context) {
+	if s.KubernetesVersion == "" {
+		s.KubernetesVersion = config.DefaultKubernetesVersion
+	}
+}

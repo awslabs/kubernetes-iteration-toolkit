@@ -30,8 +30,6 @@ spec:
                   properties:
                     ami:
                       type: string
-                    replicas:
-                      type: integer
                     spec:
                       properties:
                         activeDeadlineSeconds:
