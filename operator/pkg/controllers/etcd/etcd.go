@@ -24,6 +24,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
 	"github.com/awslabs/kit/operator/pkg/utils/patch"
+	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 
 	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,35 +44,27 @@ type Provider struct {
 	kubeClient client.Client
 }
 
-type certRequest struct {
-	*pkiutil.CertConfig
-	Name   string
-	IsCA   bool
-	caCert []byte
-	caKey  []byte
-}
-
 func New(kubeclient client.Client) *Provider {
 	return &Provider{kubeClient: kubeclient}
 }
 
-func (e *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
+func (p *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
 	// generate etcd service object
-	if err := e.createService(ctx, controlPlane); err != nil {
+	if err := p.createService(ctx, controlPlane); err != nil {
 		return err
 	}
 	// Create ETCD certs and keys, store them as secret in the management server
-	if err := e.createETCDCerts(ctx, controlPlane); err != nil {
+	if err := p.createETCDSecrets(ctx, controlPlane); err != nil {
 		return err
 	}
 	// create etcd stateful set
-	if err := e.createStatefulset(ctx, controlPlane); err != nil {
+	if err := p.createStatefulset(ctx, controlPlane); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (e *Provider) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (p *Provider) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
@@ -85,7 +78,7 @@ func (e *Provider) createService(ctx context.Context, controlPlane *v1alpha1.Con
 			}},
 		},
 	}
-	result, err := controllerutil.CreateOrPatch(ctx, e.kubeClient, svc, func() error {
+	result, err := controllerutil.CreateOrPatch(ctx, p.kubeClient, svc, func() error {
 		// We can't update the Spec field completely as the existing svc object
 		// has some defaults set by API server like `Spec.Type: ClusterIP`. If
 		// we update Spec field, we will need to set these defaults as well
@@ -115,59 +108,17 @@ func (e *Provider) createService(ctx context.Context, controlPlane *v1alpha1.Con
 	return nil
 }
 
-func (e *Provider) createETCDCerts(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	// create the ETCD ROOT CA certs and key
-	caCert, caKey, err := e.createSecret(ctx, controlPlane, etcdRootCACertConfig(controlPlane))
-	if err != nil {
-		return fmt.Errorf("creating root CA for name %v, %w", controlPlane.ClusterName(), err)
-	}
-	// create etcd server, peer, healthcheck and etcdAPIClient certs and key
-	for _, certConfig := range certListFor(controlPlane, caCert, caKey) {
-		if _, _, err := e.createSecret(ctx, controlPlane, certConfig); err != nil {
-			return fmt.Errorf("creating certs and key name %s, %w,", certConfig.Name, err)
-		}
+func (p *Provider) createETCDSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	// create the root CA, certs and key for etcd
+	if err := secrets.WithRootCAName(p.kubeClient,
+		etcdCASecretNameFor(controlPlane.ClusterName()),
+		etcdRootCACommonName).CreateSecrets(ctx, controlPlane, certListFor(controlPlane)...); err != nil {
+		return err
 	}
 	return nil
 }
 
-// createSecret will store root CA and key as the kubernetes secret
-func (e *Provider) createSecret(ctx context.Context, controlPlane *v1alpha1.ControlPlane, req *certRequest) (cert, key []byte, err error) {
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      req.Name,
-			Namespace: controlPlane.NamespaceName(),
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: controlPlane.APIVersion,
-				Name:       controlPlane.Name,
-				Kind:       controlPlane.Kind,
-				UID:        controlPlane.UID,
-			}},
-		},
-		Data: map[string][]byte{},
-	}
-	result, err := controllerutil.CreateOrPatch(ctx, e.kubeClient, secret, func() (err error) {
-		secret.Type = v1.SecretTypeTLS
-		req.ExistingCert = secret.Data["tls.crt"]
-		req.ExistingKey = secret.Data["tls.key"]
-		// create certificate and key if the existing is nil or invalid
-		if req.IsCA {
-			cert, key, err = pkiutil.RootCA(req.CertConfig)
-		} else {
-			cert, key, err = pkiutil.GenerateCertAndKey(req.CertConfig, req.caCert, req.caKey)
-		}
-		secret.Data["tls.crt"] = cert
-		secret.Data["tls.key"] = key
-		return
-	})
-	if err == nil {
-		if result != controllerutil.OperationResultNone {
-			zap.S().Infof("[%s] secret %s %s", controlPlane.ClusterName(), secret.Name, result)
-		}
-	}
-	return
-}
-
-func (e *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (p *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
@@ -180,7 +131,7 @@ func (e *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1
 			}},
 		},
 	}
-	result, err := controllerutil.CreateOrPatch(ctx, e.kubeClient, statefulSet, func() (err error) {
+	result, err := controllerutil.CreateOrPatch(ctx, p.kubeClient, statefulSet, func() (err error) {
 		// Generate the default pod spec for the given control plane, if user has
 		// provided custom config for the etcd pod spec, patch this user
 		// provided config to the default spec
@@ -240,22 +191,10 @@ func etcdLabelFor(clusterName string) map[string]string {
 	}
 }
 
-func certListFor(controlPlane *v1alpha1.ControlPlane, caCert, caKey []byte) []*certRequest {
-	return []*certRequest{
-		etcdServerCertConfig(controlPlane, caCert, caKey),
-		etcdPeerCertConfig(controlPlane, caCert, caKey),
-	}
-}
-
-func etcdRootCACertConfig(controlPlane *v1alpha1.ControlPlane) *certRequest {
-	return &certRequest{
-		IsCA: true,
-		Name: etcdCASecretNameFor(controlPlane.ClusterName()),
-		CertConfig: &pkiutil.CertConfig{
-			Config: &certutil.Config{
-				CommonName: etcdRootCACommonName,
-			},
-		},
+func certListFor(controlPlane *v1alpha1.ControlPlane) []*secrets.Request {
+	return []*secrets.Request{
+		etcdServerCertConfig(controlPlane),
+		etcdPeerCertConfig(controlPlane),
 	}
 }
 
@@ -267,11 +206,9 @@ DNSNames contains the following entries-
 <podname>.<svcname>.<namespace>.svc.cluster.local
 The last two entries are added for every pod in the cluster
 */
-func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane, caCert, caKey []byte) *certRequest {
-	return &certRequest{
-		Name:   etcdServerSecretNameFor(controlPlane.ClusterName()),
-		caCert: caCert,
-		caKey:  caKey,
+func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
+	return &secrets.Request{
+		Name: etcdServerSecretNameFor(controlPlane.ClusterName()),
 		CertConfig: &pkiutil.CertConfig{
 			Config: &certutil.Config{
 				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
@@ -296,11 +233,9 @@ DNSNames contains the following entries-
 <podname>.<svcname>.<namespace>.svc.cluster.local
 The last two entries are added for every pod in the cluster
 */
-func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane, caCert, caKey []byte) *certRequest {
-	return &certRequest{
-		Name:   etcdPeerSecretNameFor(controlPlane.ClusterName()),
-		caCert: caCert,
-		caKey:  caKey,
+func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
+	return &secrets.Request{
+		Name: etcdPeerSecretNameFor(controlPlane.ClusterName()),
 		CertConfig: &pkiutil.CertConfig{
 			Config: &certutil.Config{
 				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
