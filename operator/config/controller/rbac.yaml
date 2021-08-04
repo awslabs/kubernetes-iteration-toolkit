@@ -69,6 +69,7 @@ rules:
   - get
   - create
   - update
+  - patch
   - list
   - watch
 - apiGroups:

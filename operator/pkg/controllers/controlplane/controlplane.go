@@ -23,7 +23,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
-	"github.com/awslabs/kit/operator/pkg/status"
+	"github.com/awslabs/kit/operator/pkg/result"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -55,7 +55,7 @@ func (c *controlPlane) For() controllers.Object {
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
-func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (result *reconcile.Result, err error) {
+func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	// TODO create karpenter provisioner spec for creating new nodes.
 	// deploy etcd to the management cluster
@@ -65,9 +65,9 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	if err := c.masterController.Reconcile(ctx, controlPlane); err != nil {
 		return nil, fmt.Errorf("reconciling master for cluster %v, %w", controlPlane.ClusterName(), err)
 	}
-	return status.Created, nil
+	return result.Created, nil
 }
 
 func (c *controlPlane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
-	return status.Terminated, nil
+	return result.Terminated, nil
 }

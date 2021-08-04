@@ -21,7 +21,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/errors"
-	"github.com/awslabs/kit/operator/pkg/status"
+	"github.com/awslabs/kit/operator/pkg/result"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,24 +48,27 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		return *status.Failed, err
+		return *result.Failed, err
 	}
 	// 2. Copy object for merge patch base
 	persisted := resource.DeepCopyObject()
 	// 3. Reconcile else finalize if object is deleted
-	result, reconcileErr := c.reconcile(ctx, resource, persisted)
+	reconcileResult, reconcileErr := c.reconcile(ctx, resource, persisted)
 	// 4. Update Status using a merge patch, we want to set status even when reconcile errored
 	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil && !errors.IsNotFound(err) {
-		return *status.Failed, fmt.Errorf("status patch for %s, %w,", req.NamespacedName, err)
+		return *result.Failed, fmt.Errorf("status patch for %s, %w,", req.NamespacedName, err)
 	}
 	if reconcileErr != nil {
-		return *status.Failed, reconcileErr
+		if errors.IsWaitingForSubResource(reconcileErr) {
+			return *result.Waiting, nil
+		}
+		return *result.Failed, reconcileErr
 	}
-	return result, nil
+	return reconcileResult, nil
 }
 
 func (c *GenericController) reconcile(ctx context.Context, resource Object, persisted runtime.Object) (reconcile.Result, error) {
-	var result *reconcile.Result
+	var reconcileResult *reconcile.Result
 	var err error
 	existingFinalizers := resource.GetFinalizers()
 	existingFinalizerSet := sets.NewString(existingFinalizers...)
@@ -73,15 +76,15 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 	if resource.GetDeletionTimestamp() == nil {
 		// Add finalizer for this controller
 		resource.SetFinalizers(existingFinalizerSet.Union(finalizerStr).UnsortedList())
-		result, err = c.Controller.Reconcile(ctx, resource)
+		reconcileResult, err = c.Controller.Reconcile(ctx, resource)
 		if err != nil {
 			resource.StatusConditions().MarkFalse(v1alpha1.Active, "", err.Error())
-			return *status.Failed, fmt.Errorf("reconciling resource, %w", err)
+			return *result.Failed, fmt.Errorf("reconciling resource, %w", err)
 		}
 		resource.StatusConditions().MarkTrue(v1alpha1.Active)
 	} else {
-		if result, err = c.Controller.Finalize(ctx, resource); err != nil {
-			return *status.Failed, fmt.Errorf("finalizing resource controller %v, %w", c.Controller.Name(), err)
+		if reconcileResult, err = c.Controller.Finalize(ctx, resource); err != nil {
+			return *result.Failed, fmt.Errorf("finalizing resource controller %v, %w", c.Controller.Name(), err)
 		}
 		// Remove finalizer for this controller
 		resource.SetFinalizers(existingFinalizerSet.Difference(finalizerStr).UnsortedList())
@@ -90,8 +93,8 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 	// If the finalizers have changed merge patch the object
 	if !reflect.DeepEqual(existingFinalizers, resource.GetFinalizers()) {
 		if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
-			return *status.Failed, fmt.Errorf("patch object %s, %w", resource.GetName(), err)
+			return *result.Failed, fmt.Errorf("patch object %s, %w", resource.GetName(), err)
 		}
 	}
-	return *result, nil
+	return *reconcileResult, nil
 }
