@@ -29,16 +29,16 @@ import (
 )
 
 type controlPlane struct {
-	ec2api         *awsprovider.EC2
-	etcdProvider   *etcd.Provider
-	masterProvider *master.Provider
+	ec2api           *awsprovider.EC2
+	etcdController   *etcd.Controller
+	masterController *master.Controller
 }
 
 // NewController returns a controller for managing VPCs in AWS
 func NewController(ec2api *awsprovider.EC2, kubeClient client.Client) *controlPlane {
 	return &controlPlane{ec2api: ec2api,
-		etcdProvider:   etcd.New(kubeClient),
-		masterProvider: master.New(kubeClient),
+		etcdController:   etcd.New(kubeClient),
+		masterController: master.New(kubeClient),
 	}
 }
 
@@ -59,10 +59,10 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	controlPlane := object.(*v1alpha1.ControlPlane)
 	// TODO create karpenter provisioner spec for creating new nodes.
 	// deploy etcd to the management cluster
-	if err := c.etcdProvider.Reconcile(ctx, controlPlane); err != nil {
+	if err := c.etcdController.Reconcile(ctx, controlPlane); err != nil {
 		return nil, fmt.Errorf("reconciling etcd for cluster %v, %w", controlPlane.ClusterName(), err)
 	}
-	if err := c.masterProvider.Reconcile(ctx, controlPlane); err != nil {
+	if err := c.masterController.Reconcile(ctx, controlPlane); err != nil {
 		return nil, fmt.Errorf("reconciling master for cluster %v, %w", controlPlane.ClusterName(), err)
 	}
 	return status.Created, nil

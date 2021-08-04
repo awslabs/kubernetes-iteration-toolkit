@@ -34,18 +34,19 @@ const (
 	frontProxyCACommonName = "front-proxy-ca"
 )
 
-type Provider struct {
-	kubeClient client.Client
+type Controller struct {
+	kubeClient      client.Client
+	secretsProvider *secrets.Provider
 }
 
-func New(kubeclient client.Client) *Provider {
-	return &Provider{kubeClient: kubeclient}
+func New(kubeclient client.Client) *Controller {
+	return &Controller{kubeClient: kubeclient, secretsProvider: secrets.New(kubeclient)}
 }
 
-func (p *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
+func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
 
-	// TODO Create a service for master NLB
-	if err := p.createMasterSecrets(ctx, controlPlane); err != nil {
+	// TODO Create a service for master
+	if err := c.createSecrets(ctx, controlPlane); err != nil {
 		return err
 	}
 	// TODO Create and apply objects for kube apiserver, KCM and scheduler
@@ -54,17 +55,15 @@ func (p *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.Control
 
 // createMasterSecrets creates the kubernetes secrets containing all the certs
 // and key required to run master API server
-func (p *Provider) createMasterSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) createSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	// create the root CA, certs and key for API server and kubelet client
-	if err := secrets.WithRootCAName(p.kubeClient,
-		masterCASecretNameFor(controlPlane.ClusterName()), masterCACommonName).
-		CreateSecrets(ctx, controlPlane, certListFor(controlPlane)...); err != nil {
+	if err := c.secretsProvider.WithRootCAName(masterCASecretNameFor(controlPlane.ClusterName()),
+		masterCACommonName).CreateSecrets(ctx, controlPlane, certListFor(controlPlane)...); err != nil {
 		return err
 	}
 	// create the root CA, certs and key for front proxy client
-	if err := secrets.WithRootCAName(p.kubeClient,
-		kubeFrontProxyCASecretNameFor(controlPlane.ClusterName()), frontProxyCACommonName).
-		CreateSecrets(ctx, controlPlane, kubeFrontProxyClient(controlPlane)); err != nil {
+	if err := c.secretsProvider.WithRootCAName(kubeFrontProxyCASecretNameFor(controlPlane.ClusterName()),
+		frontProxyCACommonName).CreateSecrets(ctx, controlPlane, kubeFrontProxyClient(controlPlane)); err != nil {
 		return err
 	}
 	return nil

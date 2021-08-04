@@ -40,31 +40,32 @@ const (
 	etcdRootCACommonName = "etcd/ca"
 )
 
-type Provider struct {
-	kubeClient client.Client
+type Controller struct {
+	kubeClient      client.Client
+	secretsProvider *secrets.Provider
 }
 
-func New(kubeclient client.Client) *Provider {
-	return &Provider{kubeClient: kubeclient}
+func New(kubeclient client.Client) *Controller {
+	return &Controller{kubeClient: kubeclient, secretsProvider: secrets.New(kubeclient)}
 }
 
-func (p *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
+func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
 	// generate etcd service object
-	if err := p.createService(ctx, controlPlane); err != nil {
+	if err := c.createService(ctx, controlPlane); err != nil {
 		return err
 	}
 	// Create ETCD certs and keys, store them as secret in the management server
-	if err := p.createETCDSecrets(ctx, controlPlane); err != nil {
+	if err := c.createSecrets(ctx, controlPlane); err != nil {
 		return err
 	}
 	// create etcd stateful set
-	if err := p.createStatefulset(ctx, controlPlane); err != nil {
+	if err := c.createStatefulset(ctx, controlPlane); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *Provider) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
@@ -78,7 +79,7 @@ func (p *Provider) createService(ctx context.Context, controlPlane *v1alpha1.Con
 			}},
 		},
 	}
-	result, err := controllerutil.CreateOrPatch(ctx, p.kubeClient, svc, func() error {
+	result, err := controllerutil.CreateOrPatch(ctx, c.kubeClient, svc, func() error {
 		// We can't update the Spec field completely as the existing svc object
 		// has some defaults set by API server like `Spec.Type: ClusterIP`. If
 		// we update Spec field, we will need to set these defaults as well
@@ -108,17 +109,16 @@ func (p *Provider) createService(ctx context.Context, controlPlane *v1alpha1.Con
 	return nil
 }
 
-func (p *Provider) createETCDSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) createSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	// create the root CA, certs and key for etcd
-	if err := secrets.WithRootCAName(p.kubeClient,
-		etcdCASecretNameFor(controlPlane.ClusterName()),
+	if err := c.secretsProvider.WithRootCAName(etcdCASecretNameFor(controlPlane.ClusterName()),
 		etcdRootCACommonName).CreateSecrets(ctx, controlPlane, certListFor(controlPlane)...); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) createStatefulset(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
@@ -131,7 +131,7 @@ func (p *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1
 			}},
 		},
 	}
-	result, err := controllerutil.CreateOrPatch(ctx, p.kubeClient, statefulSet, func() (err error) {
+	result, err := controllerutil.CreateOrPatch(ctx, c.kubeClient, statefulSet, func() (err error) {
 		// Generate the default pod spec for the given control plane, if user has
 		// provided custom config for the etcd pod spec, patch this user
 		// provided config to the default spec
