@@ -59,8 +59,8 @@ type MasterSpec struct {
 
 // ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
 type ETCDSpec struct {
-	Instances  `json:",inline"`
-	*Component `json:",inline"`
+	Instances `json:",inline"`
+	Spec      *v1.PodSpec `json:"spec,omitempty"`
 }
 
 // Component provides a generic way to pass in args and images to master and etcd

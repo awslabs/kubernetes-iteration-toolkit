@@ -46,9 +46,13 @@ licenses: ## Verifies dependency licenses and requires GITHUB_TOKEN to be set
 
 apply: ## Apply the controller into your ~/.kube/config cluster
 	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/
+	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/controller
+	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/webhook
     
 delete: ## Delete the controller from your ~/.kube/config cluster
 	kubectl delete -f config
+	kubectl delete -f config/webhook
+	kubectl delete -f config/controller
 
 codegen: ## Generate code. Must be run if changes are made to ./pkg/apis/...
 	hack/codegen.sh

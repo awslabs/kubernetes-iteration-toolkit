@@ -20,10 +20,13 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
+	"github.com/awslabs/kit/operator/pkg/utils/patch"
 
 	"go.uber.org/zap"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -52,23 +55,18 @@ func New(kubeclient client.Client) *Provider {
 	return &Provider{kubeClient: kubeclient}
 }
 
-func (e *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (e *Provider) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
 	// generate etcd service object
-	err := e.createETCDService(ctx, controlPlane)
-	if err != nil {
+	if err := e.createService(ctx, controlPlane); err != nil {
 		return err
 	}
 	// Create ETCD certs and keys, store them as secret in the management server
 	if err := e.createETCDCerts(ctx, controlPlane); err != nil {
 		return err
 	}
-	// TODO generate etcd stateful set
-	return nil
-}
-
-func (e *Provider) createETCDService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	if err := e.createService(ctx, controlPlane); err != nil {
-		return fmt.Errorf("creating etcd service object for cluster %v, %w", controlPlane.ClusterName(), err)
+	// create etcd stateful set
+	if err := e.createStatefulset(ctx, controlPlane); err != nil {
+		return err
 	}
 	return nil
 }
@@ -167,6 +165,49 @@ func (e *Provider) createSecret(ctx context.Context, controlPlane *v1alpha1.Cont
 		}
 	}
 	return
+}
+
+func (e *Provider) createStatefulset(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	statefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
+			Namespace: controlPlane.NamespaceName(),
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: controlPlane.APIVersion,
+				Name:       controlPlane.Name,
+				Kind:       controlPlane.Kind,
+				UID:        controlPlane.UID,
+			}},
+		},
+	}
+	result, err := controllerutil.CreateOrPatch(ctx, e.kubeClient, statefulSet, func() (err error) {
+		// Generate the default pod spec for the given control plane, if user has
+		// provided custom config for the etcd pod spec, patch this user
+		// provided config to the default spec
+		etcdSpec, err := patch.PodSpec(PodSpecFor(controlPlane), controlPlane.Spec.Etcd.Spec)
+		if err != nil {
+			return fmt.Errorf("failed to patch pod spec, %w", err)
+		}
+		statefulSet.Spec = appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: etcdLabelFor(controlPlane.ClusterName()),
+			},
+			ServiceName: etcdServiceNameFor(controlPlane.ClusterName()),
+			Replicas:    aws.Int32(defaultEtcdReplicas),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: etcdLabelFor(controlPlane.ClusterName()),
+				},
+				Spec: etcdSpec,
+			},
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	zap.S().Infof("[%s] statefulset %s %s", controlPlane.ClusterName(), statefulSet.Name, result)
+	return nil
 }
 
 func etcdServerPortNameFor(clusterName string) string {
@@ -285,7 +326,7 @@ func etcdSvcFQDN(clusterName, namespace string) string {
 // hostnames are <podname>.<svcname>.kit.svc.cluster.local
 func etcdPodAndHostnames(controlPlane *v1alpha1.ControlPlane) []string {
 	result := []string{}
-	for i := 0; i < controlPlane.Spec.Etcd.Replicas; i++ {
+	for i := 0; i < defaultEtcdReplicas; i++ {
 		podname := fmt.Sprintf("%s-etcd-%d", controlPlane.ClusterName(), i)
 		result = append(result, podname, fmt.Sprintf("%s.%s", podname, etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace)))
 	}

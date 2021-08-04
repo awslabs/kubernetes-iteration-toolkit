@@ -22,6 +22,7 @@ package v1alpha1
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"knative.dev/pkg/apis"
+	"knative.dev/pkg/webhook/resourcesemantics"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
@@ -37,6 +38,10 @@ var (
 
 	// AddToScheme is required by pkg/client/...
 	AddToScheme = SchemeBuilder.AddToScheme
+
+	Resources = map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
+		SchemeGroupVersion.WithKind("ControlPlane"): &ControlPlane{},
+	}
 )
 
 const (
