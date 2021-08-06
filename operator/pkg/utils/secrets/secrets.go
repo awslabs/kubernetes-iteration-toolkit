@@ -42,10 +42,22 @@ type CA struct {
 }
 
 type Request struct {
-	*pkiutil.CertConfig
-	Name string
-	IsCA bool
+	*certutil.Config
+	Name      string
+	Namespace string
+	CACert    []byte
+	CAKey     []byte
 }
+
+type CertAndKey struct {
+	Cert []byte
+	Key  []byte
+}
+
+const (
+	SecretCertName = "tls.crt"
+	SecretKeyName  = "tls.key"
+)
 
 func New(kubeClient client.Client) *Provider {
 	return &Provider{kubeClient: kubeClient}
@@ -58,6 +70,61 @@ func (p *Provider) WithRootCAName(secretName, commonName string) *CA {
 	return &CA{Provider: Provider{p.kubeClient}, caName: secretName, caCommonName: commonName}
 }
 
+func RootCA(name, namespace, commonName string) (*v1.Secret, error) {
+	cert, key, err := pkiutil.RootCA(&certutil.Config{CommonName: commonName})
+	if err != nil {
+		return nil, err
+	}
+	return secretObjWithCerts(name, namespace, cert, key), nil
+}
+
+func IsValid(secret *v1.Secret) error {
+	// TODO
+	return nil
+}
+
+func CreateWithCerts(config *Request, caSecret *v1.Secret) (*v1.Secret, error) {
+	if caSecret == nil {
+		return RootCA(config.Name, config.Namespace, config.CommonName)
+	}
+	cert, key, err := pkiutil.GenerateCertAndKey(config.Config, config.CACert, config.CAKey)
+	if err != nil {
+		return nil, err
+	}
+	return secretObjWithCerts(config.Name, config.Namespace, cert, key), nil
+}
+
+func CreateWithConfig(configName, namespace string, config []byte) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configName,
+			Namespace: namespace,
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"config": config,
+		},
+	}
+}
+
+func Parse(secret *v1.Secret) (cert, key []byte) {
+	return secret.Data[SecretCertName], secret.Data[SecretKeyName]
+}
+
+func secretObjWithCerts(secretName, namespace string, cert, key []byte) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		Type: v1.SecretTypeTLS,
+		Data: map[string][]byte{
+			SecretCertName: cert,
+			SecretKeyName:  key,
+		},
+	}
+}
+
 // CreateSecrets loops through all the requests and creates the secrets objects for these requests
 // If a root CA is not present, it will create a root CA
 func (c *CA) CreateSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane, req ...*Request) error {
@@ -68,7 +135,7 @@ func (c *CA) CreateSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPl
 				return fmt.Errorf("creating root CA %v for %v, %w", c.caName, c.caCommonName, err)
 			}
 		}
-		if _, _, err := c.create(ctx, controlPlane, r); err != nil {
+		if _, _, err := c.Create(ctx, controlPlane, r); err != nil {
 			return fmt.Errorf("creating secret %v for %v, %w", r.Name, r.CommonName, err)
 		}
 	}
@@ -77,13 +144,11 @@ func (c *CA) CreateSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPl
 
 // generateCA creates a new CA if there is no secret found in the cluster with caSecretName
 func (c *CA) generateCA(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
-	c.caCert, c.caKey, err = c.create(ctx, controlPlane, &Request{
+	c.caCert, c.caKey, err = c.Create(ctx, controlPlane, &Request{
 		IsCA: true,
 		Name: c.caName,
-		CertConfig: &pkiutil.CertConfig{
-			Config: &certutil.Config{
-				CommonName: c.caCommonName,
-			},
+		Config: &certutil.Config{
+			CommonName: c.caCommonName,
 		},
 	})
 	return
@@ -92,7 +157,7 @@ func (c *CA) generateCA(ctx context.Context, controlPlane *v1alpha1.ControlPlane
 // create creates a v1.Secret object that contains the cert and key and is
 // stored in Kubernetes cluster. If the secret object is found in the cluster,
 // it reuses the existing the existing cert and key if it is valid.
-func (c *CA) create(ctx context.Context, controlPlane *v1alpha1.ControlPlane, req *Request) (cert, key []byte, err error) {
+func (c *CA) Create(ctx context.Context, controlPlane *v1alpha1.ControlPlane, req *Request) (cert, key []byte, err error) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name,

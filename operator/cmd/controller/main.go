@@ -8,10 +8,10 @@ import (
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
+	"github.com/awslabs/kit/operator/pkg/utils/runtime"
 
 	"github.com/awslabs/karpenter/pkg/utils/log"
 	"go.uber.org/zap/zapcore"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	controllerruntimezap "sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	scheme  = runtime.NewScheme()
+	scheme  = runtime.Scheme()
 	options = Options{}
 )
 
