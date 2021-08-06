@@ -21,12 +21,17 @@ import (
 	"net"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/errors"
+	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 
-	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
+	"go.uber.org/zap"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	certutil "k8s.io/client-go/util/cert"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -44,9 +49,12 @@ func New(kubeclient client.Client) *Controller {
 }
 
 func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
-
-	// TODO Create a service for master
-	if err := c.createSecrets(ctx, controlPlane); err != nil {
+	// Create a service for master this will create an endpoint for the cluster
+	controlPlaneHostname, err := c.getControlPlaneHostname(ctx, controlPlane)
+	if err != nil {
+		return err
+	}
+	if err := c.createSecrets(ctx, controlPlaneHostname, controlPlane); err != nil {
 		return err
 	}
 	// TODO Create and apply objects for kube apiserver, KCM and scheduler
@@ -55,10 +63,10 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 
 // createMasterSecrets creates the kubernetes secrets containing all the certs
 // and key required to run master API server
-func (c *Controller) createSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) createSecrets(ctx context.Context, hostname string, controlPlane *v1alpha1.ControlPlane) error {
 	// create the root CA, certs and key for API server and kubelet client
 	if err := c.secretsProvider.WithRootCAName(masterCASecretNameFor(controlPlane.ClusterName()),
-		masterCACommonName).CreateSecrets(ctx, controlPlane, certListFor(controlPlane)...); err != nil {
+		masterCACommonName).CreateSecrets(ctx, controlPlane, certListFor(hostname, controlPlane)...); err != nil {
 		return err
 	}
 	// create the root CA, certs and key for front proxy client
@@ -69,14 +77,67 @@ func (c *Controller) createSecrets(ctx context.Context, controlPlane *v1alpha1.C
 	return nil
 }
 
-func certListFor(controlPlane *v1alpha1.ControlPlane) []*secrets.Request {
+func (c *Controller) getControlPlaneHostname(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (string, error) {
+	hostname, err := c.createService(ctx, controlPlane)
+	if err != nil {
+		return "", err
+	}
+	if hostname == "" {
+		return "", fmt.Errorf("waiting for control plane hostname, %w", errors.WaitingForSubResources)
+	}
+	return hostname, nil
+}
+
+func (c *Controller) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (string, error) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceNameFor(controlPlane.ClusterName()),
+			Namespace: controlPlane.NamespaceName(),
+			Annotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-scheme":                  "internet-facing",
+				"service.beta.kubernetes.io/aws-load-balancer-type":                    "nlb-ip",
+				"service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "stickiness.enabled=true,stickiness.type=source_ip",
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: controlPlane.APIVersion,
+				Name:       controlPlane.Name,
+				Kind:       controlPlane.Kind,
+				UID:        controlPlane.UID,
+			}},
+		},
+	}
+	hostname := ""
+	result, err := controllerutil.CreateOrPatch(ctx, c.kubeClient, svc, func() error {
+		svc.Spec.Selector = labelsFor(controlPlane.ClusterName())
+		svc.Spec.Ports = []v1.ServicePort{{
+			Port:       443,
+			Name:       apiserverPortName(controlPlane.ClusterName()),
+			TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 443},
+			Protocol:   "TCP",
+		}}
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		if len(svc.Status.LoadBalancer.Ingress) > 0 {
+			hostname = svc.Status.LoadBalancer.Ingress[0].Hostname
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("creating service %s/%s, %w", svc.Namespace, svc.Name, err)
+	}
+	if result != controllerutil.OperationResultNone {
+		zap.S().Infof("[%s] service %s %s", controlPlane.ClusterName(), svc.Name, result)
+	}
+	return hostname, nil
+}
+
+func certListFor(hostname string, controlPlane *v1alpha1.ControlPlane) []*secrets.Request {
 	return []*secrets.Request{
-		kubeAPIServerCertConfig(controlPlane),
+		kubeAPIServerCertConfig(hostname, controlPlane),
 		kubeletClientCertConfig(controlPlane),
 	}
 }
 
-func kubeAPIServerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
+func kubeAPIServerCertConfig(hostname string, controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 	return &secrets.Request{
 		Name: kubeAPIServerSecretNameFor(controlPlane.ClusterName()),
 		CertConfig: &pkiutil.CertConfig{
@@ -84,13 +145,8 @@ func kubeAPIServerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Reque
 				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 				CommonName: "kube-apiserver",
 				AltNames: certutil.AltNames{
-					DNSNames: append([]string{
-						// TODO add master loadbalancer DNS name here
-						"localhost"},
-						"kubernetes",
-						"kubernetes.default",
-						"kubernetes.default.svc",
-						"kubernetes.default.svc.cluster.local"),
+					DNSNames: []string{hostname, "localhost", "kubernetes", "kubernetes.default",
+						"kubernetes.default.svc", "kubernetes.default.svc.cluster.local"},
 					IPs: []net.IP{net.IPv4(127, 0, 0, 1), apiServerVirtualIP()},
 				},
 			},
@@ -148,4 +204,18 @@ func kubeFrontProxyClientSecretNameFor(clusterName string) string {
 
 func kubeFrontProxyCASecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-front-proxy-ca", clusterName)
+}
+
+func serviceNameFor(clusterName string) string {
+	return fmt.Sprintf("%s-controlplane-endpoint", clusterName)
+}
+
+func labelsFor(clusterName string) map[string]string {
+	return map[string]string{
+		"app": serviceNameFor(clusterName),
+	}
+}
+
+func apiserverPortName(clusterName string) string {
+	return fmt.Sprintf("%s-port", serviceNameFor(clusterName))
 }
