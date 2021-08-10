@@ -32,22 +32,29 @@ type CertificatesProvider struct {
 	kubeClient *kubeprovider.Client
 }
 
-// CertTree contains root CA as a the key and all the certificates signed by
-// this root CA are added as the value for this map
+// CertTree contains root CA as the key and all the certificates signed by
+// this root CA (leafs) are added as the value for this map
 type CertTree map[*secrets.Request][]*secrets.Request
 
 func New(kubeClient *kubeprovider.Client) *CertificatesProvider {
 	return &CertificatesProvider{kubeClient: kubeClient}
 }
 
+// ReconcileFor reconciles all certs/key requested as part of the certsTreeMap.
+// All the cert/key pairs are stored as a secret object. It will first read the
+// existing secret, if not found will create one.
 func (c *CertificatesProvider) ReconcileFor(ctx context.Context, certsTreeMap CertTree, controlPlane *v1alpha1.ControlPlane) error {
 	for rootCA, leafCerts := range certsTreeMap {
+		// Get the existing CA from API server in the form of a Kube secret object,
+		// if not found or invalid generate a new one
 		caSecret, err := c.GetOrGenerateSecret(ctx, rootCA, nil)
 		if err != nil {
 			return fmt.Errorf("creating root CA %v, %w", rootCA.Name, err)
 		}
 		secretObjs := []*v1.Secret{caSecret}
 		for _, leafCert := range leafCerts {
+			// Get the existing cert and key from API server, if not found or
+			// invalid generate a new one
 			secretObj, err := c.GetOrGenerateSecret(ctx, leafCert, caSecret)
 			if err != nil {
 				return fmt.Errorf("creating secret objects %v, %w", secretObj.Name, err)
@@ -64,10 +71,11 @@ func (c *CertificatesProvider) ReconcileFor(ctx context.Context, certsTreeMap Ce
 	return nil
 }
 
-// getSecretObj will check with API server for this object.
-// Calls getSecretFromServer to get from API server and validate
+// GetOrGenerateSecret will check with API server for this object.
+// Calls GetSecretFromServer to get from API server and validate
 // If the object is not found, it will create and return a new secret object.
-func (c *CertificatesProvider) GetOrGenerateSecret(ctx context.Context, request *secrets.Request, caSecret *v1.Secret) (*v1.Secret, error) {
+func (c *CertificatesProvider) GetOrGenerateSecret(ctx context.Context,
+	request *secrets.Request, caSecret *v1.Secret) (*v1.Secret, error) {
 	// get secret from api server
 	secret, err := c.GetSecretFromServer(ctx, object.NamespacedName(request.Name, request.Namespace))
 	if err != nil && errors.IsNotFound(err) {
@@ -81,7 +89,7 @@ func (c *CertificatesProvider) GetOrGenerateSecret(ctx context.Context, request 
 	return secret, err
 }
 
-// getSecretFromServer will get the secret from API server and validate
+// GetSecretFromServer will get the secret from API server and validate
 func (c *CertificatesProvider) GetSecretFromServer(ctx context.Context, nn types.NamespacedName) (*v1.Secret, error) {
 	// get secret from api server
 	secretObj := &v1.Secret{}

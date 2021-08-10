@@ -40,12 +40,6 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceNameFor(controlPlane.ClusterName()),
 			Namespace: controlPlane.NamespaceName(),
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: controlPlane.APIVersion,
-				Name:       controlPlane.Name,
-				Kind:       controlPlane.Kind,
-				UID:        controlPlane.UID,
-			}},
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{

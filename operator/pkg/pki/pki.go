@@ -50,7 +50,6 @@ func RootCA(config *certutil.Config) (certBytes, keyBytes []byte, err error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create self-signed CA certificate, %w", err)
 	}
-	// }
 	certBytes, keyBytes = encode(cert, key)
 	return
 }
