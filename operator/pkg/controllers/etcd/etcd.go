@@ -20,20 +20,15 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
-	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
-	"github.com/awslabs/kit/operator/pkg/utils/patch"
+	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/common"
+	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 
 	"go.uber.org/zap"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/types"
 	certutil "k8s.io/client-go/util/cert"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -41,143 +36,46 @@ const (
 )
 
 type Controller struct {
-	kubeClient      client.Client
-	secretsProvider *secrets.Provider
+	kubeClient   *kubeprovider.Client
+	certificates *common.CertificatesProvider
 }
 
-func New(kubeclient client.Client) *Controller {
-	return &Controller{kubeClient: kubeclient, secretsProvider: secrets.New(kubeclient)}
+type reconciler func(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error)
+
+func New(kubeclient *kubeprovider.Client) *Controller {
+	return &Controller{kubeClient: kubeclient, certificates: common.New(kubeclient)}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
-	// generate etcd service object
-	if err := c.createService(ctx, controlPlane); err != nil {
-		return err
+	for _, reconcile := range []reconciler{
+		c.reconcileService,
+		c.reconcileSecrets,
+		c.reconcileStatefulSet,
+	} {
+		if err := reconcile(ctx, controlPlane); err != nil {
+			return err
+		}
 	}
-	// Create ETCD certs and keys, store them as secret in the management server
-	if err := c.createSecrets(ctx, controlPlane); err != nil {
-		return err
-	}
-	// create etcd stateful set
-	if err := c.createStatefulset(ctx, controlPlane); err != nil {
-		return err
-	}
+	zap.S().Infof("[%v] etcd reconciled", controlPlane.ClusterName())
 	return nil
 }
 
-func (c *Controller) createService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
-			Namespace: controlPlane.NamespaceName(),
-			Labels:    etcdLabelFor(controlPlane.ClusterName()),
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: controlPlane.APIVersion,
-				Name:       controlPlane.Name,
-				Kind:       controlPlane.Kind,
-				UID:        controlPlane.UID,
-			}},
-		},
-	}
-	result, err := controllerutil.CreateOrPatch(ctx, c.kubeClient, svc, func() error {
-		// We can't update the Spec field completely as the existing svc object
-		// has some defaults set by API server like `Spec.Type: ClusterIP`. If
-		// we update Spec field, we will need to set these defaults as well
-		// because CreateOrPatch does a reflect.DeepEqual for the existing spec
-		// and with our change, calls Patch if they are not equal.
-		svc.Spec.Selector = etcdLabelFor(controlPlane.ClusterName())
-		svc.Spec.Ports = []v1.ServicePort{{
-			Port:       2380,
-			Name:       etcdServerPortNameFor(controlPlane.ClusterName()),
-			TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2380},
-			Protocol:   "TCP",
-		}, {
-			Port:       2379,
-			Name:       etcdClientPortNameFor(controlPlane.ClusterName()),
-			TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2379},
-			Protocol:   "TCP",
-		}}
-		svc.Spec.ClusterIP = "None"
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("creating service %s/%s, %w", svc.Namespace, svc.Name, err)
-	}
-	if result != controllerutil.OperationResultNone {
-		zap.S().Infof("[%s] service %s %s", controlPlane.ClusterName(), svc.Name, result)
-	}
-	return nil
-}
-
-func (c *Controller) createSecrets(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) reconcileSecrets(ctx context.Context, cp *v1alpha1.ControlPlane) error {
 	// create the root CA, certs and key for etcd
-	if err := c.secretsProvider.WithRootCAName(etcdCASecretNameFor(controlPlane.ClusterName()),
-		etcdRootCACommonName).CreateSecrets(ctx, controlPlane, certListFor(controlPlane)...); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Controller) createStatefulset(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	statefulSet := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      etcdServiceNameFor(controlPlane.ClusterName()),
-			Namespace: controlPlane.NamespaceName(),
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: controlPlane.APIVersion,
-				Name:       controlPlane.Name,
-				Kind:       controlPlane.Kind,
-				UID:        controlPlane.UID,
-			}},
+	secretTreeMap := common.CertTree{
+		rootCACertConfig(object.NamespacedName(caSecretNameFor(cp.ClusterName()), cp.NamespaceName())): {
+			etcdServerCertConfig(cp),
+			etcdPeerCertConfig(cp),
 		},
 	}
-	result, err := controllerutil.CreateOrPatch(ctx, c.kubeClient, statefulSet, func() (err error) {
-		// Generate the default pod spec for the given control plane, if user has
-		// provided custom config for the etcd pod spec, patch this user
-		// provided config to the default spec
-		etcdSpec, err := patch.PodSpec(PodSpecFor(controlPlane), controlPlane.Spec.Etcd.Spec)
-		if err != nil {
-			return fmt.Errorf("failed to patch pod spec, %w", err)
-		}
-		statefulSet.Spec = appsv1.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: etcdLabelFor(controlPlane.ClusterName()),
-			},
-			ServiceName: etcdServiceNameFor(controlPlane.ClusterName()),
-			Replicas:    aws.Int32(defaultEtcdReplicas),
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: etcdLabelFor(controlPlane.ClusterName()),
-				},
-				Spec: etcdSpec,
-			},
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	zap.S().Infof("[%s] statefulset %s %s", controlPlane.ClusterName(), statefulSet.Name, result)
-	return nil
+	return c.certificates.ReconcileFor(ctx, secretTreeMap, cp)
 }
 
-func etcdServerPortNameFor(clusterName string) string {
-	return fmt.Sprintf("etcd-server-ssl-%s", clusterName)
-}
-
-func etcdClientPortNameFor(clusterName string) string {
-	return fmt.Sprintf("etcd-client-ssl-%s", clusterName)
-}
-
-func etcdServiceNameFor(clusterName string) string {
-	return fmt.Sprintf("%s-etcd", clusterName)
-}
-
-func etcdCASecretNameFor(clusterName string) string {
+func caSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd-ca", clusterName)
 }
 
-func etcdServerSecretNameFor(clusterName string) string {
+func serverSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd-server", clusterName)
 }
 
@@ -185,16 +83,13 @@ func etcdPeerSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd-peer", clusterName)
 }
 
-func etcdLabelFor(clusterName string) map[string]string {
-	return map[string]string{
-		"app": etcdServiceNameFor(clusterName),
-	}
-}
-
-func certListFor(controlPlane *v1alpha1.ControlPlane) []*secrets.Request {
-	return []*secrets.Request{
-		etcdServerCertConfig(controlPlane),
-		etcdPeerCertConfig(controlPlane),
+func rootCACertConfig(nn types.NamespacedName) *secrets.Request {
+	return &secrets.Request{
+		Name:      nn.Name,
+		Namespace: nn.Namespace,
+		Config: &certutil.Config{
+			CommonName: etcdRootCACommonName,
+		},
 	}
 }
 
@@ -208,18 +103,17 @@ The last two entries are added for every pod in the cluster
 */
 func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 	return &secrets.Request{
-		Name: etcdServerSecretNameFor(controlPlane.ClusterName()),
-		CertConfig: &pkiutil.CertConfig{
-			Config: &certutil.Config{
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-				CommonName:   "etcd",
-				Organization: []string{"kubernetes"},
-				AltNames: certutil.AltNames{
-					DNSNames: append(etcdPodAndHostnames(controlPlane),
-						etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
-						"localhost"),
-					IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
-				},
+		Name:      serverSecretNameFor(controlPlane.ClusterName()),
+		Namespace: controlPlane.NamespaceName(),
+		Config: &certutil.Config{
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			CommonName:   "etcd",
+			Organization: []string{"kubernetes"},
+			AltNames: certutil.AltNames{
+				DNSNames: append(etcdPodAndHostnames(controlPlane),
+					etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
+					"localhost"),
+				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
 			},
 		},
 	}
@@ -235,18 +129,17 @@ The last two entries are added for every pod in the cluster
 */
 func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 	return &secrets.Request{
-		Name: etcdPeerSecretNameFor(controlPlane.ClusterName()),
-		CertConfig: &pkiutil.CertConfig{
-			Config: &certutil.Config{
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-				CommonName:   "etcd",
-				Organization: []string{"kubernetes"},
-				AltNames: certutil.AltNames{
-					DNSNames: append(etcdPodAndHostnames(controlPlane),
-						etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
-						"localhost"),
-					IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
-				},
+		Name:      etcdPeerSecretNameFor(controlPlane.ClusterName()),
+		Namespace: controlPlane.NamespaceName(),
+		Config: &certutil.Config{
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			CommonName:   "etcd",
+			Organization: []string{"kubernetes"},
+			AltNames: certutil.AltNames{
+				DNSNames: append(etcdPodAndHostnames(controlPlane),
+					etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
+					"localhost"),
+				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
 			},
 		},
 	}
@@ -254,7 +147,7 @@ func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 
 // Service name if <clustername>-etcd.<namespace>.svc.cluster.local
 func etcdSvcFQDN(clusterName, namespace string) string {
-	return fmt.Sprintf("%s.%s.svc.cluster.local", etcdServiceNameFor(clusterName), namespace)
+	return fmt.Sprintf("%s.%s.svc.cluster.local", serviceNameFor(clusterName), namespace)
 }
 
 // For a given cluster name example, podnames are <clusternme>-etcd-[0-n-1], and

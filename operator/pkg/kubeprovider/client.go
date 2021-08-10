@@ -1,12 +1,24 @@
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package kubeprovider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/awslabs/kit/operator/pkg/errors"
-	"github.com/awslabs/kit/operator/pkg/utils/secrets"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -18,33 +30,18 @@ func New(client client.Client) *Client {
 	return &Client{Client: client}
 }
 
-const (
-	tlsCertName = "tls.crt"
-	tlsKeyName  = "tls.key"
-)
-
-func (c *Client) CertKeyFromSecret(ctx context.Context, name, namespace string) (*secrets.CertAndKey, error) {
-	secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{
-		Name:      name,
-		Namespace: namespace},
-	}
-	if err := c.Get(ctx, client.ObjectKeyFromObject(secret), secret); err != nil {
-		return nil, err
-	}
-	return &secrets.CertAndKey{secret.Data[tlsCertName], secret.Data[tlsKeyName]}, nil
-}
-
-// func (c *Client) Get(ctx context.Context, obj client.Object) (client.Object, error) {
-// 	return nil, nil
-// }
-
 // Ensure creates if not exist, else will update the existing object
 func (c *Client) Ensure(ctx context.Context, desired client.Object) error {
-	if err := c.Get(ctx, client.ObjectKeyFromObject(desired), desired.DeepCopyObject().(client.Object)); err != nil {
+	existingObject := desired.DeepCopyObject().(client.Object)
+	if err := c.Get(ctx, client.ObjectKeyFromObject(desired), existingObject); err != nil {
 		if errors.IsNotFound(err) {
 			return c.Create(ctx, desired)
 		}
-		return err
+		return fmt.Errorf("getting object %v, name %v, %w",
+			desired.GetObjectKind().GroupVersionKind().GroupKind().String(), desired.GetName(), err)
 	}
-	return c.Update(ctx, desired)
+	if err := c.Patch(ctx, existingObject, client.StrategicMergeFrom(desired)); err != nil {
+		return fmt.Errorf("failed to patch, %v, %w", desired.GetName(), err)
+	}
+	return nil
 }

@@ -28,7 +28,7 @@ const (
 	defaultEtcdImage    = "public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.14-eks-1-18-1"
 )
 
-func PodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
+func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 	return &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,

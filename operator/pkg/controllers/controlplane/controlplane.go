@@ -23,6 +23,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
+	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/result"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -37,8 +38,8 @@ type controlPlane struct {
 // NewController returns a controller for managing VPCs in AWS
 func NewController(ec2api *awsprovider.EC2, kubeClient client.Client) *controlPlane {
 	return &controlPlane{ec2api: ec2api,
-		etcdController:   etcd.New(kubeClient),
-		masterController: master.New(kubeClient),
+		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
+		masterController: master.New(kubeprovider.New(kubeClient)),
 	}
 }
 
