@@ -62,8 +62,9 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 
 func (c *Controller) reconcileSecrets(ctx context.Context, cp *v1alpha1.ControlPlane) error {
 	// create the root CA, certs and key for etcd
+	rootCA := rootCACertConfig(object.NamespacedName(caSecretNameFor(cp.ClusterName()), cp.NamespaceName()))
 	secretTreeMap := common.CertTree{
-		rootCACertConfig(object.NamespacedName(caSecretNameFor(cp.ClusterName()), cp.NamespaceName())): {
+		rootCA: {
 			etcdServerCertConfig(cp),
 			etcdPeerCertConfig(cp),
 		},

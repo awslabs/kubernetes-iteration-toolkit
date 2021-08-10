@@ -38,20 +38,9 @@ const (
 	CertificateValidity = time.Hour * 24 * 365
 )
 
-// type CertConfig struct {
-// 	*certutil.Config
-// 	ExistingCert []byte
-// 	ExistingKey  []byte
-// }
-
 // RootCA for a given config will check existing certs if they are valid, else
 // will generate new root CA for the certutil.Config provided
 func RootCA(config *certutil.Config) (certBytes, keyBytes []byte, err error) {
-	// verify the existing certs if valid use
-	// cert, key, err := parseCerts(config.ExistingCert, config.ExistingKey)
-	// if err == nil {
-	// 	zap.S().Debugf("Reusing existing root CA certs for %s", config.CommonName)
-	// } else {
 	// create private key, defaults to x509.RSA
 	key, err := rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 	if err != nil {
@@ -110,31 +99,8 @@ func encode(cert *x509.Certificate, key crypto.Signer) (certBytes, keyBytes []by
 	return
 }
 
-// func privateKeyAndCertificate(config *CertConfig, caCertBytes, caKeyBytes []byte) (*x509.Certificate, crypto.Signer, error) {
-// 	// // verify the existing certs if valid use
-// 	// cert, key, err := validCerts(config.ExistingCert, config.ExistingKey)
-// 	// if err == nil {
-// 	// 	zap.S().Debugf("Reusing existing certs for %s", config.CommonName)
-// 	// 	return cert, key, nil
-// 	// }
-// 	// create private key, defaults to x509.RSA
-// 	key, err := rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
-// 	if err != nil {
-// 		return nil, nil, fmt.Errorf("unable to create private key while generating CA certificate, %w", err)
-// 	}
-// 	cert, err := signedCert(config.Config, key, caCertBytes, caKeyBytes)
-// 	if err != nil {
-// 		return nil, nil, fmt.Errorf("creating signed cert, %w", err)
-// 	}
-// 	return cert, key, nil
-// }
-
 // signedCert creates a signed certificate using the given CA certificate and key
 func signedCert(cfg *certutil.Config, key, caKey crypto.Signer, caCert *x509.Certificate) (*x509.Certificate, error) {
-	// caCert, caKey, err := parseCerts(caCertBytes, caKeyBytes)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("root CA is invalid, %w", err)
-	// }
 	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		return nil, err

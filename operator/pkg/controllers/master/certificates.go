@@ -43,12 +43,14 @@ func (c *Controller) reconcileCertificates(ctx context.Context, cp *v1alpha1.Con
 	if err != nil {
 		return err
 	}
+	controlPlaneCA := rootCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.NamespaceName()))
+	frontProxyCA := frontProxyCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.NamespaceName()))
 	certsTreeMap := common.CertTree{
-		rootCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.NamespaceName())): {
+		controlPlaneCA: {
 			kubeAPIServerCertConfig(endpoint, nn),
 			kubeletClientCertConfig(nn),
 		},
-		frontProxyCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.NamespaceName())): {
+		frontProxyCA: {
 			kubeFrontProxyClient(nn),
 		},
 	}
