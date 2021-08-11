@@ -38,7 +38,7 @@ func (c *Controller) reconcileKubeConfigs(ctx context.Context, controlPlane *v1a
 		kubeSchedulerCertConfig(controlPlane.ClusterName()),
 		kubeControllerManagerCertConfig(controlPlane.ClusterName()),
 	} {
-		if err := c.reconcileConfigFor(ctx, request, controlPlane); err != nil {
+		if err := c.reconcileConfigFor(ctx, controlPlane, request); err != nil {
 			return err
 		}
 	}
@@ -46,9 +46,9 @@ func (c *Controller) reconcileKubeConfigs(ctx context.Context, controlPlane *v1a
 	return nil
 }
 
-func (c *Controller) reconcileConfigFor(ctx context.Context, request *secrets.Request, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) reconcileConfigFor(ctx context.Context, controlPlane *v1alpha1.ControlPlane, request *secrets.Request) error {
 	clusterName := controlPlane.ClusterName()
-	namespace := controlPlane.NamespaceName()
+	namespace := controlPlane.Namespace
 	endpoint, err := c.getClusterEndpoint(ctx, object.NamespacedName(clusterName, namespace))
 	if err != nil {
 		return err

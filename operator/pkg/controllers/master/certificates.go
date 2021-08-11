@@ -21,7 +21,7 @@ import (
 	"net"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/utils/common"
+	"github.com/awslabs/kit/operator/pkg/utils/certificates"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 
@@ -38,14 +38,14 @@ const (
 // reconcileCertificates creates the kubernetes secrets containing all the certs
 // and key required to run master API server
 func (c *Controller) reconcileCertificates(ctx context.Context, cp *v1alpha1.ControlPlane) error {
-	nn := object.NamespacedName(cp.ClusterName(), cp.NamespaceName())
+	nn := object.NamespacedName(cp.ClusterName(), cp.Namespace)
 	endpoint, err := c.getClusterEndpoint(ctx, nn)
 	if err != nil {
 		return err
 	}
-	controlPlaneCA := rootCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.NamespaceName()))
-	frontProxyCA := frontProxyCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.NamespaceName()))
-	certsTreeMap := common.CertTree{
+	controlPlaneCA := rootCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.Namespace))
+	frontProxyCA := frontProxyCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.Namespace))
+	certsTreeMap := certificates.CertTree{
 		controlPlaneCA: {
 			kubeAPIServerCertConfig(endpoint, nn),
 			kubeletClientCertConfig(nn),
@@ -54,7 +54,7 @@ func (c *Controller) reconcileCertificates(ctx context.Context, cp *v1alpha1.Con
 			kubeFrontProxyClient(nn),
 		},
 	}
-	return c.certificates.ReconcileFor(ctx, certsTreeMap, cp)
+	return c.certificates.ReconcileFor(ctx, cp, certsTreeMap)
 }
 
 func rootCACertConfig(nn types.NamespacedName) *secrets.Request {

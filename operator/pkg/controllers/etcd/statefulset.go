@@ -39,7 +39,7 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 	return c.kubeClient.Ensure(ctx, object.WithOwner(controlPlane, &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceNameFor(controlPlane.ClusterName()),
-			Namespace: controlPlane.NamespaceName(),
+			Namespace: controlPlane.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{

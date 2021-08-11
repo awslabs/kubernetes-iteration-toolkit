@@ -19,17 +19,17 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	"github.com/awslabs/kit/operator/pkg/utils/common"
+	"github.com/awslabs/kit/operator/pkg/utils/certificates"
 	"go.uber.org/zap"
 )
 
 type Controller struct {
 	kubeClient   *kubeprovider.Client
-	certificates *common.CertificatesProvider
+	certificates *certificates.Provider
 }
 
 func New(kubeclient *kubeprovider.Client) *Controller {
-	return &Controller{kubeClient: kubeclient, certificates: common.New(kubeclient)}
+	return &Controller{kubeClient: kubeclient, certificates: certificates.Reconciler(kubeclient)}
 }
 
 type reconciler func(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error)

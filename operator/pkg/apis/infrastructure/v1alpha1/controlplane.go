@@ -82,7 +82,3 @@ type Instances struct {
 func (c *ControlPlane) ClusterName() string {
 	return c.Name
 }
-
-func (c *ControlPlane) NamespaceName() string {
-	return c.Namespace
-}

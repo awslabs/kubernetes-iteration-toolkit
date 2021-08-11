@@ -22,7 +22,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	"github.com/awslabs/kit/operator/pkg/utils/common"
+	"github.com/awslabs/kit/operator/pkg/utils/certificates"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 
@@ -37,13 +37,13 @@ const (
 
 type Controller struct {
 	kubeClient   *kubeprovider.Client
-	certificates *common.CertificatesProvider
+	certificates *certificates.Provider
 }
 
 type reconciler func(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error)
 
 func New(kubeclient *kubeprovider.Client) *Controller {
-	return &Controller{kubeClient: kubeclient, certificates: common.New(kubeclient)}
+	return &Controller{kubeClient: kubeclient, certificates: certificates.Reconciler(kubeclient)}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
@@ -62,14 +62,14 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 
 func (c *Controller) reconcileSecrets(ctx context.Context, cp *v1alpha1.ControlPlane) error {
 	// create the root CA, certs and key for etcd
-	rootCA := rootCACertConfig(object.NamespacedName(caSecretNameFor(cp.ClusterName()), cp.NamespaceName()))
-	secretTreeMap := common.CertTree{
+	rootCA := rootCACertConfig(object.NamespacedName(caSecretNameFor(cp.ClusterName()), cp.Namespace))
+	secretTreeMap := certificates.CertTree{
 		rootCA: {
 			etcdServerCertConfig(cp),
 			etcdPeerCertConfig(cp),
 		},
 	}
-	return c.certificates.ReconcileFor(ctx, secretTreeMap, cp)
+	return c.certificates.ReconcileFor(ctx, cp, secretTreeMap)
 }
 
 func caSecretNameFor(clusterName string) string {
@@ -105,7 +105,7 @@ The last two entries are added for every pod in the cluster
 func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 	return &secrets.Request{
 		Name:      serverSecretNameFor(controlPlane.ClusterName()),
-		Namespace: controlPlane.NamespaceName(),
+		Namespace: controlPlane.Namespace,
 		Config: &certutil.Config{
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 			CommonName:   "etcd",
@@ -131,7 +131,7 @@ The last two entries are added for every pod in the cluster
 func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 	return &secrets.Request{
 		Name:      etcdPeerSecretNameFor(controlPlane.ClusterName()),
-		Namespace: controlPlane.NamespaceName(),
+		Namespace: controlPlane.Namespace,
 		Config: &certutil.Config{
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 			CommonName:   "etcd",

@@ -30,7 +30,7 @@ func (c *Controller) reconcileService(ctx context.Context, controlPlane *v1alpha
 	return c.kubeClient.Ensure(ctx, object.WithOwner(controlPlane, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceNameFor(controlPlane.ClusterName()),
-			Namespace: controlPlane.NamespaceName(),
+			Namespace: controlPlane.Namespace,
 			Labels:    labelFor(controlPlane.ClusterName()),
 		},
 		Spec: v1.ServiceSpec{

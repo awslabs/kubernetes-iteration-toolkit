@@ -27,7 +27,7 @@ type Client struct {
 }
 
 func New(client client.Client) *Client {
-	return &Client{Client: client}
+	return &Client{client}
 }
 
 // Ensure creates if not exist, else will update the existing object

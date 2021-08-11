@@ -31,7 +31,7 @@ func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.Control
 	return c.kubeClient.Ensure(ctx, object.WithOwner(cp, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceNameFor(cp.ClusterName()),
-			Namespace: cp.NamespaceName(),
+			Namespace: cp.Namespace,
 			Annotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-scheme":                  "internet-facing",
 				"service.beta.kubernetes.io/aws-load-balancer-type":                    "nlb-ip",
