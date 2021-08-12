@@ -1,0 +1,73 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: clusterloader2
+spec:
+  description: "clusterloader2 task to run various types of cl2 tests on a given cluster."
+  params:
+  - name: giturl
+    description: "git url to clone the package"
+    default: https://github.com/kubernetes/perf-tests.git
+  - name: nodes-per-namespace
+    description: "nodes per namespace to get created for load test "
+  - name: cl2-load-test-throughput
+    description: " throughput used for mutate operations"
+  - name: pods-per-node
+    description: "pod density"
+  - name: nodes
+    description: "number of dataplane nodes to run the load test against"
+  workspaces:
+  - name: source
+  - name: config
+  - name: secrets
+    mountPath: /root/.aws
+  steps:
+  - name: git-clone      
+    image: docker.io/library/golang:latest
+    workingDir: $(workspaces.source.path)
+    command: ["/bin/bash"]
+    args: ["-c", "git clone $(params.giturl)"]
+  - name: prepare-loadtest
+    image: amazon/aws-cli
+    workingDir: $(workspaces.source.path)
+    script: |
+      cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
+      NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
+      CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
+      CL2_USE_HOST_NETWORK_PODS: false
+      PODS_PER_NODE: $(params.pods-per-node)
+      SMALL_STATEFUL_SETS_PER_NAMESPACE: 0
+      MEDIUM_STATEFUL_SETS_PER_NAMESPACE: 0
+      CL2_ENABLE_PVS: false
+      PROMETHEUS_SCRAPE_KUBE_PROXY: false
+      ENABLE_SYSTEM_POD_METRICS: false
+      NODE_MODE: master 
+      EOL
+      RESULT_DIR=$(workspaces.source.path)/results
+      mkdir -p ${RESULT_DIR} 
+      mkdir -p /root/.kube/
+      cp $(workspaces.config.path)/kubeconfig /root/.kube/config
+      # TODO: Move to a separate task and chain it to this task through pipeline if we need more checks than just this before kicking off test.
+      #kubectl commands are purely for knowing state of cluster before kicking off the test.
+      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      kubectl version
+      kubectl config current-context
+      kubectl get nodes --kubeconfig=$(workspaces.config.path)/kubeconfig
+      kubectl get ns
+      # end
+  - name: run-loadtest
+    image: 197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:76e3fd7
+    command: ["./clusterloader"]
+    args: 
+    - --kubeconfig=$(workspaces.config.path)/kubeconfig
+    - --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
+    - --testoverrides=$(workspaces.source.path)/overrides.yaml
+    - --nodes=$(params.nodes) 
+    - --provider=eks 
+    - --report-dir=$(workspaces.source.path)/results
+    - --alsologtostderr
+    env:
+    - name: ENABLE_EXEC_SERVICE
+      value: "false"
