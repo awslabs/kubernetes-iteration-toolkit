@@ -2,17 +2,15 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: clusterloader2
+  name: pod-density
 spec:
-  description: "clusterloader2 task to run various types of cl2 tests on a given cluster."
+  description: "clusterloader2 pod density task to run various types of cl2 tests on a given cluster."
   params:
   - name: giturl
     description: "git url to clone the package"
     default: https://github.com/kubernetes/perf-tests.git
   - name: nodes-per-namespace
     description: "nodes per namespace to get created for load test "
-  - name: cl2-load-test-throughput
-    description: " throughput used for mutate operations"
   - name: pods-per-node
     description: "pod density"
   - name: nodes
@@ -34,15 +32,7 @@ spec:
     script: |
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
-      CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
       PODS_PER_NODE: $(params.pods-per-node)
-      CL2_USE_HOST_NETWORK_PODS: false
-      # we are not testing statefulsets at this point
-      SMALL_STATEFUL_SETS_PER_NAMESPACE: 0
-      MEDIUM_STATEFUL_SETS_PER_NAMESPACE: 0
-      # we are not testing PVS at this point
-      CL2_ENABLE_PVS: false
-      PROMETHEUS_SCRAPE_KUBE_PROXY: false
       ENABLE_SYSTEM_POD_METRICS: false
       NODE_MODE: master 
       EOL
@@ -66,7 +56,7 @@ spec:
     command: ["./clusterloader"]
     args: 
     - --kubeconfig=$(workspaces.config.path)/kubeconfig
-    - --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
+    - --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/density/config.yaml
     - --testoverrides=$(workspaces.source.path)/overrides.yaml
     - --nodes=$(params.nodes) 
     - --provider=eks 
