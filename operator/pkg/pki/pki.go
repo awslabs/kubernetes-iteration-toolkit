@@ -28,7 +28,6 @@ import (
 	"net"
 	"time"
 
-	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/sets"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
@@ -39,27 +38,17 @@ const (
 	CertificateValidity = time.Hour * 24 * 365
 )
 
-type CertConfig struct {
-	*certutil.Config
-	ExistingCert []byte
-	ExistingKey  []byte
-}
-
 // RootCA for a given config will check existing certs if they are valid, else
 // will generate new root CA for the certutil.Config provided
-func RootCA(config *CertConfig) (certBytes, keyBytes []byte, err error) {
-	// verify the existing certs if valid use
-	cert, key, err := validCerts(config.ExistingCert, config.ExistingKey)
-	if err == nil {
-		zap.S().Debugf("Reusing existing root CA certs for %s", config.CommonName)
-	} else {
-		// create private key, defaults to x509.RSA
-		if key, err = rsa.GenerateKey(cryptorand.Reader, rsaKeySize); err != nil {
-			return nil, nil, fmt.Errorf("unable to create private key while generating CA certificate, %w", err)
-		}
-		if cert, err = newSelfSignedCACert(config.CommonName, key); err != nil {
-			return nil, nil, fmt.Errorf("unable to create self-signed CA certificate, %w", err)
-		}
+func RootCA(config *certutil.Config) (certBytes, keyBytes []byte, err error) {
+	// create private key, defaults to x509.RSA
+	key, err := rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create private key while generating CA certificate, %w", err)
+	}
+	cert, err := newSelfSignedCACert(config.CommonName, key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create self-signed CA certificate, %w", err)
 	}
 	certBytes, keyBytes = encode(cert, key)
 	return
@@ -68,16 +57,24 @@ func RootCA(config *CertConfig) (certBytes, keyBytes []byte, err error) {
 // GenerateCertAndKey for a given config and valid CA, will check existing certs
 // if they are valid, else will generate new cert and key for the
 // certutil.Config provided
-func GenerateCertAndKey(config *CertConfig, caCertBytes, caKeyBytes []byte) (certBytes, keyBytes []byte, err error) {
-	cert, key, err := privateKeyAndCertificate(config, caCertBytes, caKeyBytes)
+func GenerateCertAndKey(config *certutil.Config, caCertBytes, caKeyBytes []byte) (certBytes, keyBytes []byte, err error) {
+	caCert, caKey, err := parseCerts(caCertBytes, caKeyBytes)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating certificate authority, %w,", err)
+		return nil, nil, fmt.Errorf("root CA is invalid, %w", err)
+	}
+	key, err := rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create private key while generating CA certificate, %w", err)
+	}
+	cert, err := signedCert(config, key, caKey, caCert)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating signed cert, %w", err)
 	}
 	certBytes, keyBytes = encode(cert, key)
 	return
 }
 
-func validCerts(certBytes, keyBytes []byte) (*x509.Certificate, crypto.Signer, error) {
+func parseCerts(certBytes, keyBytes []byte) (*x509.Certificate, crypto.Signer, error) {
 	cert, err := certutil.ParseCertsPEM(certBytes)
 	if err != nil {
 		return nil, nil, err
@@ -101,29 +98,8 @@ func encode(cert *x509.Certificate, key crypto.Signer) (certBytes, keyBytes []by
 	return
 }
 
-func privateKeyAndCertificate(config *CertConfig, caCertBytes, caKeyBytes []byte) (*x509.Certificate, crypto.Signer, error) {
-	// verify the existing certs if valid use
-	cert, key, err := validCerts(config.ExistingCert, config.ExistingKey)
-	if err == nil {
-		zap.S().Debugf("Reusing existing certs for %s", config.CommonName)
-		return cert, key, nil
-	}
-	// create private key, defaults to x509.RSA
-	if key, err = rsa.GenerateKey(cryptorand.Reader, rsaKeySize); err != nil {
-		return nil, nil, fmt.Errorf("unable to create private key while generating CA certificate, %w", err)
-	}
-	if cert, err = signedCert(config.Config, key, caCertBytes, caKeyBytes); err != nil {
-		return nil, nil, fmt.Errorf("creating signed cert, %w", err)
-	}
-	return cert, key, nil
-}
-
 // signedCert creates a signed certificate using the given CA certificate and key
-func signedCert(cfg *certutil.Config, key crypto.Signer, caCertBytes, caKeyBytes []byte) (*x509.Certificate, error) {
-	caCert, caKey, err := validCerts(caCertBytes, caKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("root CA is invalid, %w", err)
-	}
+func signedCert(cfg *certutil.Config, key, caKey crypto.Signer, caCert *x509.Certificate) (*x509.Certificate, error) {
 	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		return nil, err

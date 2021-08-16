@@ -28,7 +28,7 @@ const (
 	defaultEtcdImage    = "public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.14-eks-1-18-1"
 )
 
-func PodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
+func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 	return &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
@@ -153,7 +153,7 @@ func PodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 func initialClusterFlag(controlPlane *v1alpha1.ControlPlane) string {
 	nodes := make([]string, 0)
 	for i := 0; i < defaultEtcdReplicas; i++ {
-		nodes = append(nodes, fmt.Sprintf("%[1]s-etcd-%[2]d=https://%[1]s-etcd-%[2]d.%[1]s-etcd.%[3]s.svc.cluster.local:2380", controlPlane.ClusterName(), i, controlPlane.NamespaceName()))
+		nodes = append(nodes, fmt.Sprintf("%[1]s-etcd-%[2]d=https://%[1]s-etcd-%[2]d.%[1]s-etcd.%[3]s.svc.cluster.local:2380", controlPlane.ClusterName(), i, controlPlane.Namespace))
 	}
 	return strings.Join(nodes, ",")
 }
@@ -167,11 +167,11 @@ func advertizePeerURL(controlPlane *v1alpha1.ControlPlane) string {
 }
 
 func podFQDN(controlPlane *v1alpha1.ControlPlane) string {
-	return fmt.Sprintf("$(NODE_ID).%s-etcd.%s.svc.cluster.local", controlPlane.ClusterName(), controlPlane.NamespaceName())
+	return fmt.Sprintf("$(NODE_ID).%s-etcd.%s.svc.cluster.local", controlPlane.ClusterName(), controlPlane.Namespace)
 }
 
 func serviceFQDN(controlPlane *v1alpha1.ControlPlane) string {
-	return fmt.Sprintf("%s-etcd.%s.svc.cluster.local", controlPlane.ClusterName(), controlPlane.NamespaceName())
+	return fmt.Sprintf("%s-etcd.%s.svc.cluster.local", controlPlane.ClusterName(), controlPlane.Namespace)
 }
 
 func caSecretName(controlPlane *v1alpha1.ControlPlane) string {
