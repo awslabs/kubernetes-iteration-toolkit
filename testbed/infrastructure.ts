@@ -41,5 +41,10 @@ export class Infrastructure extends cdk.Construct {
             minSize: 5,
             maxSize: 20
         });
+
+        //service account used by tekton workflows.
+        const sa = this.cluster.addServiceAccount('test-executor', {
+            name: 'test-executor',
+        }).role.addManagedPolicy({managedPolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess'});
     }
 }

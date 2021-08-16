@@ -5,7 +5,6 @@ metadata:
   name: loadtest
 spec:
   workspaces:
-    - name: secrets
     - name: config
     - name: source
     - name: results
@@ -18,17 +17,13 @@ spec:
   - name: region
     description: The region where the cluster is in.
     default: "us-west-2"
-  - name: zones
-    description: The zones where the cluster is in.
-    default: "us-west-2a,us-west-2b,us-west-2c"
-  - name: nodegroup-name
-    default: "linux-nodes"
-    description: The name of the nodegroup of the cluster.
-  - name: node-type
-    default: "m5.xlarge"
-    description: The type of the EC2 instaces for the nodegroup of the cluster.
+  - name: instance-selector-vcpus
+    default: 2
+    description: The vcpus of the EC2 instaces for the nodegroup of the cluster.
+  - name: instance-selector-memory
+    default: 4
+    description: The memory of the EC2 instaces for the nodegroup of the cluster.
   - name: desired-nodes
-    default: "100"
     description: The desired number of nodes in the cluster.
   - name: min-nodes
     default: "1"
@@ -44,10 +39,10 @@ spec:
     default: "10"
   - name: nodes-per-namespace
     description:  "nodes per namespace to get created for load test "
-    default: "10"
+    default: "100"
   - name: cl2-load-test-throughput
-    description: " throughput used for mutate operations"
-    default: "10"
+    description: "throughput used for mutate operations"
+    default: "15"
   tasks:
   - name: create-eks-cluster
     taskRef:
@@ -59,12 +54,10 @@ spec:
         value: '$(params.eks-version)'
       - name: region
         value: '$(params.region)'
-      - name: zones
-        value: '$(params.zones)'
-      - name: nodegroup-name
-        value: '$(params.nodegroup-name)'
-      - name: node-type
-        value: '$(params.node-type)'
+      - name: instance-selector-vcpus
+        value: '$(params.instance-selector-vcpus)'
+      - name: instance-selector-memory
+        value: '$(params.instance-selector-memory)'      
       - name: desired-nodes
         value: '$(params.desired-nodes)'
       - name: min-nodes
@@ -72,14 +65,12 @@ spec:
       - name: max-nodes
         value: '$(params.max-nodes)'
     workspaces:
-      - name: secrets
-        workspace: secrets
       - name: config    
         workspace: config
-  - name: runloadtest
+  - name: generate
     runAfter: [create-eks-cluster]
     taskRef:
-      name: clusterloader2
+      name: load
     params:
       - name: giturl
         value: '$(params.giturl)'
@@ -92,14 +83,12 @@ spec:
     workspaces:
       - name: source
         workspace: source
-      - name: secrets
-        workspace: secrets
       - name: config    
         workspace: config
       - name: results
         workspace: results
-  - name: delete-eks-cluster
-    runAfter: [runloadtest]
+  - name: teardown
+    runAfter: [generate]
     taskRef:
       name: eks-cluster-teardown
     params:
@@ -107,6 +96,3 @@ spec:
         value: '$(params.cluster-name)'
       - name: region
         value: '$(params.region)'
-    workspaces:
-      - name: secrets
-        workspace: secrets
