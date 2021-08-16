@@ -1,0 +1,84 @@
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: eks-cl2-load-1k-pipeline-cron
+spec:
+  schedule: "0 8 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: eks-hello-cron
+            image: curlimages/curl
+            args: ["curl", "-X", "POST", "--data", "{}", "el-eks-cl2-load-1k-cron-listener.svc.cluster.local:8080"]
+          restartPolicy: Never
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: eks-cl2-load-1k-cron-binding
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: eks-cl2-load-1k-cron-listener
+spec:
+  serviceAccountName: tekton-triggers-example-sa
+  triggers:
+    - name: eks-cl2-load-1k-trig
+      bindings:
+      - ref: eks-cl2-load-1k-cron-binding
+      template:
+        ref: eks-cl2-load-1k-pipeline-template  
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: eks-cl2-load-1k-pipeline-template
+spec:
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: eks-cl2-load-1k-pipeline-template-
+    spec:
+      pipelineRef:
+        name: loadtest
+      workspaces:
+      - name: source
+        emptyDir: {}
+      - name: secrets
+        emptyDir: {}
+      - name: config
+        emptyDir: {}
+      - name: results
+        emptyDir: {}
+      params:
+      - name: cluster-name
+        value: "eks1k-$(context.pipelineRun.uid)"
+      - name: eks-version
+        value: "1.20"
+      - name: region
+        value: "us-west-2"
+      - name: zones
+        value: "us-west-2a,us-west-2b,us-west-2c"
+      - name: nodegroup-name
+        value: "linux-nodes"
+      - name: node-type
+        value: "m5.xlarge"
+      - name: desired-nodes
+        value: "1000"
+      - name: min-nodes
+        value: "1"
+      - name: max-nodes
+        value: "1000"
+      - name: giturl
+        value: https://github.com/kubernetes/perf-tests.git
+      - name: pods-per-node
+        default: "10"
+      - name: nodes-per-namespace
+        value: "10"
+      - name: cl2-load-test-throughput
+        value: "10"
