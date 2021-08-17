@@ -22,7 +22,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	"github.com/awslabs/kit/operator/pkg/utils/certificates"
+	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 
@@ -36,14 +36,14 @@ const (
 )
 
 type Controller struct {
-	kubeClient   *kubeprovider.Client
-	certificates *certificates.Provider
+	kubeClient *kubeprovider.Client
+	keypairs   *keypairs.Provider
 }
 
 type reconciler func(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error)
 
 func New(kubeclient *kubeprovider.Client) *Controller {
-	return &Controller{kubeClient: kubeclient, certificates: certificates.Reconciler(kubeclient)}
+	return &Controller{kubeClient: kubeclient, keypairs: keypairs.Reconciler(kubeclient)}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
@@ -62,17 +62,18 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 
 func (c *Controller) reconcileSecrets(ctx context.Context, cp *v1alpha1.ControlPlane) error {
 	// create the root CA, certs and key for etcd
-	rootCA := rootCACertConfig(object.NamespacedName(caSecretNameFor(cp.ClusterName()), cp.Namespace))
-	secretTreeMap := certificates.CertTree{
+	rootCA := rootCACertConfig(object.NamespacedName(CASecretNameFor(cp.ClusterName()), cp.Namespace))
+	secretTreeMap := keypairs.CertTree{
 		rootCA: {
 			etcdServerCertConfig(cp),
 			etcdPeerCertConfig(cp),
+			etcdAPIClientCertConfig(cp),
 		},
 	}
-	return c.certificates.ReconcileFor(ctx, cp, secretTreeMap)
+	return c.keypairs.ReconcileCertsFor(ctx, cp, secretTreeMap)
 }
 
-func caSecretNameFor(clusterName string) string {
+func CASecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd-ca", clusterName)
 }
 
@@ -84,10 +85,15 @@ func etcdPeerSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd-peer", clusterName)
 }
 
+func EtcdAPIClientSecretNameFor(clusterName string) string {
+	return fmt.Sprintf("%s-apiserver-etcd-client", clusterName)
+}
+
 func rootCACertConfig(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
 		Name:      nn.Name,
 		Namespace: nn.Namespace,
+		Type:      secrets.CA,
 		Config: &certutil.Config{
 			CommonName: etcdRootCACommonName,
 		},
@@ -106,13 +112,14 @@ func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request 
 	return &secrets.Request{
 		Name:      serverSecretNameFor(controlPlane.ClusterName()),
 		Namespace: controlPlane.Namespace,
+		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 			CommonName:   "etcd",
 			Organization: []string{"kubernetes"},
 			AltNames: certutil.AltNames{
 				DNSNames: append(etcdPodAndHostnames(controlPlane),
-					etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
+					SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
 					"localhost"),
 				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
 			},
@@ -132,13 +139,14 @@ func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 	return &secrets.Request{
 		Name:      etcdPeerSecretNameFor(controlPlane.ClusterName()),
 		Namespace: controlPlane.Namespace,
+		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 			CommonName:   "etcd",
 			Organization: []string{"kubernetes"},
 			AltNames: certutil.AltNames{
 				DNSNames: append(etcdPodAndHostnames(controlPlane),
-					etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
+					SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
 					"localhost"),
 				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
 			},
@@ -146,9 +154,22 @@ func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 	}
 }
 
+func etcdAPIClientCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
+	return &secrets.Request{
+		Name:      EtcdAPIClientSecretNameFor(controlPlane.ClusterName()),
+		Namespace: controlPlane.Namespace,
+		Type:      secrets.KeyWithSignedCert,
+		Config: &certutil.Config{
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			CommonName:   "kube-apiserver-etcd-client",
+			Organization: []string{"system:masters"},
+		},
+	}
+}
+
 // Service name if <clustername>-etcd.<namespace>.svc.cluster.local
-func etcdSvcFQDN(clusterName, namespace string) string {
-	return fmt.Sprintf("%s.%s.svc.cluster.local", serviceNameFor(clusterName), namespace)
+func SvcFQDN(clusterName, namespace string) string {
+	return fmt.Sprintf("%s.%s.svc.cluster.local", ServiceNameFor(clusterName), namespace)
 }
 
 // For a given cluster name example, podnames are <clusternme>-etcd-[0-n-1], and
@@ -157,7 +178,7 @@ func etcdPodAndHostnames(controlPlane *v1alpha1.ControlPlane) []string {
 	result := []string{}
 	for i := 0; i < defaultEtcdReplicas; i++ {
 		podname := fmt.Sprintf("%s-etcd-%d", controlPlane.ClusterName(), i)
-		result = append(result, podname, fmt.Sprintf("%s.%s", podname, etcdSvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace)))
+		result = append(result, podname, fmt.Sprintf("%s.%s", podname, SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace)))
 	}
 	return result
 }

@@ -28,7 +28,7 @@ import (
 )
 
 func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.ControlPlane) (err error) {
-	return c.kubeClient.Ensure(ctx, object.WithOwner(cp, &v1.Service{
+	return c.kubeClient.EnsureCreate(ctx, object.WithOwner(cp, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceNameFor(cp.ClusterName()),
 			Namespace: cp.Namespace,
@@ -53,7 +53,7 @@ func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.Control
 
 func (c *Controller) getClusterEndpoint(ctx context.Context, nn types.NamespacedName) (string, error) {
 	svc := &v1.Service{}
-	if err := c.kubeClient.Get(ctx, nn, svc); err != nil {
+	if err := c.kubeClient.Get(ctx, types.NamespacedName{nn.Namespace, serviceNameFor(nn.Name)}, svc); err != nil {
 		if errors.IsNotFound(err) {
 			return "", fmt.Errorf("getting control plane endpoint, %w", errors.WaitingForSubResources)
 		}

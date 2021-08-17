@@ -17,6 +17,7 @@ package patch
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -28,7 +29,7 @@ func PodSpec(defaultSpec, patch *v1.PodSpec) (v1.PodSpec, error) {
 		return *defaultSpec, nil
 	}
 	obj := v1.PodSpec{}
-	mergedPatch, err := mergePatch(defaultSpec, patch, obj)
+	mergedPatch, err := mergePatch(defaultSpec, mergeContainerArgs(defaultSpec, patch), obj)
 	if err != nil {
 		return v1.PodSpec{}, err
 	}
@@ -53,4 +54,33 @@ func mergePatch(defaultObj, patch, object interface{}) ([]byte, error) {
 		return nil, fmt.Errorf("json merge patch, %w", err)
 	}
 	return patchedBytes, nil
+}
+
+func mergeContainerArgs(defaultSpec, patch *v1.PodSpec) *v1.PodSpec {
+	merged := []string{}
+	for key, value := range UnionMapStrings(parseArgsFor(defaultSpec), parseArgsFor(patch)) {
+		merged = append(merged, strings.Join([]string{key, value}, "="))
+	}
+	patch.Containers[0].Args = merged
+	return patch
+}
+
+func parseArgsFor(podSpec *v1.PodSpec) map[string]string {
+	result := map[string]string{}
+	for _, arg := range podSpec.Containers[0].Args {
+		kv := strings.Split(arg, "=")
+		result[kv[0]] = result[kv[1]]
+	}
+	return result
+}
+
+func UnionMapStrings(dest, src map[string]string) map[string]string {
+	result := map[string]string{}
+	for key, value := range dest {
+		result[key] = value
+	}
+	for key, value := range src {
+		result[key] = value
+	}
+	return result
 }
