@@ -27,7 +27,7 @@ import (
 func (c *Controller) reconcileSAKeyPair(ctx context.Context, cp *v1alpha1.ControlPlane) error {
 	secret, err := c.keypairs.GetOrGenerateSecret(ctx, &secrets.Request{
 		Type:      secrets.KeyPair,
-		Name:      saKeyPairSecretNameFor(cp.ClusterName()),
+		Name:      SAKeyPairSecretNameFor(cp.ClusterName()),
 		Namespace: cp.Namespace,
 	})
 	if err != nil {
@@ -36,6 +36,6 @@ func (c *Controller) reconcileSAKeyPair(ctx context.Context, cp *v1alpha1.Contro
 	return c.kubeClient.EnsureCreate(ctx, object.WithOwner(cp, secret))
 }
 
-func saKeyPairSecretNameFor(clusterName string) string {
+func SAKeyPairSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-sa-keypair", clusterName)
 }

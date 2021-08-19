@@ -33,4 +33,7 @@ func (s *ControlPlaneSpec) SetDefaults(ctx context.Context) {
 	if s.KubernetesVersion == "" {
 		s.KubernetesVersion = config.DefaultKubernetesVersion
 	}
+	if s.Master.APIServer == nil {
+		s.Master.APIServer = &Component{}
+	}
 }

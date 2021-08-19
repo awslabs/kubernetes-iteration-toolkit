@@ -23,6 +23,9 @@ release: publish helm docs ## Run all steps in release workflow
 test: ## Run tests
 	ginkgo -r
 
+build:
+	go build $(GOFLAGS) -o bin/operator cmd/controller/main.go
+
 battletest: ## Run stronger tests
 	# Ensure all files have cyclo-complexity =< 10
 	gocyclo -over 11 ./pkg
@@ -41,7 +44,6 @@ verify: ## Verify code. Includes dependencies, linting, formatting, etc
 	golangci-lint run --timeout 5m
 
 licenses: ## Verifies dependency licenses and requires GITHUB_TOKEN to be set
-	go build $(GOFLAGS) -o bin/operator cmd/controller/main.go
 	golicense hack/license-config.hcl bin/operator
 
 apply: ## Apply the controller into your ~/.kube/config cluster
@@ -72,4 +74,4 @@ publish: ## Generate release manifests and publish a versioned container image.
 toolchain: ## Install developer toolchain
 	./hack/toolchain.sh
 
-.PHONY: help dev ci release test battletest verify codegen apply delete publish helm toolchain licenses deploy
+.PHONY: help dev ci release test battletest verify codegen apply delete publish helm toolchain licenses deploy build

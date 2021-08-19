@@ -23,6 +23,5 @@ jobs:
           go-version: 1.16
       - name: Build & Test
         run: |
-          go build -v ./cmd/controller
-          go test ./...
+          make build && make test
         working-directory: operator

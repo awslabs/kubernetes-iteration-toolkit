@@ -40,6 +40,9 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileCertificates,
 		c.reconcileKubeConfigs,
 		c.reconcileSAKeyPair,
+		c.reconcileApiServer,
+		c.reconcileKCM,
+		c.reconcileScheduler,
 	} {
 		if err := reconcile(ctx, controlPlane); err != nil {
 			return err

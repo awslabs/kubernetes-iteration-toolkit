@@ -22,6 +22,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -35,6 +36,21 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		NodeSelector:                  labelsFor(controlPlane.ClusterName()),
+		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
+			MaxSkew:           int32(1),
+			TopologyKey:       "topology.kubernetes.io/zone",
+			WhenUnsatisfiable: v1.DoNotSchedule,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: labelsFor(controlPlane.ClusterName()),
+			},
+		}, {
+			MaxSkew:           int32(1),
+			TopologyKey:       "kubernetes.io/hostname",
+			WhenUnsatisfiable: v1.DoNotSchedule,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: labelsFor(controlPlane.ClusterName()),
+			},
+		}},
 		Containers: []v1.Container{{
 			Name:  "etcd",
 			Image: defaultEtcdImage,

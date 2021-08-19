@@ -30,7 +30,7 @@ import (
 func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.ControlPlane) (err error) {
 	return c.kubeClient.EnsureCreate(ctx, object.WithOwner(cp, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceNameFor(cp.ClusterName()),
+			Name:      ServiceNameFor(cp.ClusterName()),
 			Namespace: cp.Namespace,
 			Annotations: map[string]string{
 				"service.beta.kubernetes.io/aws-load-balancer-scheme":                  "internet-facing",
@@ -53,7 +53,7 @@ func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.Control
 
 func (c *Controller) getClusterEndpoint(ctx context.Context, nn types.NamespacedName) (string, error) {
 	svc := &v1.Service{}
-	if err := c.kubeClient.Get(ctx, types.NamespacedName{nn.Namespace, serviceNameFor(nn.Name)}, svc); err != nil {
+	if err := c.kubeClient.Get(ctx, types.NamespacedName{nn.Namespace, ServiceNameFor(nn.Name)}, svc); err != nil {
 		if errors.IsNotFound(err) {
 			return "", fmt.Errorf("getting control plane endpoint, %w", errors.WaitingForSubResources)
 		}
@@ -66,15 +66,15 @@ func (c *Controller) getClusterEndpoint(ctx context.Context, nn types.Namespaced
 }
 
 func apiserverPortName(clusterName string) string {
-	return fmt.Sprintf("%s-port", serviceNameFor(clusterName))
+	return fmt.Sprintf("%s-port", ServiceNameFor(clusterName))
 }
 
-func serviceNameFor(clusterName string) string {
+func ServiceNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-controlplane-endpoint", clusterName)
 }
 
 func labelsFor(clusterName string) map[string]string {
 	return map[string]string{
-		"app": serviceNameFor(clusterName),
+		"app": ServiceNameFor(clusterName),
 	}
 }
