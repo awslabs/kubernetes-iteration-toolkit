@@ -23,9 +23,12 @@ spec:
   - name: nodegroup-name
     default: linux-nodes
     description: The name of the nodegroup of the cluster.
-  - name: node-type
-    default: m5.xlarge
-    description: The type of the EC2 instaces for the nodegroup of the cluster.
+  - name: instance-selector-vcpus
+    default: 2
+    description: The vcpus of the EC2 instaces for the nodegroup of the cluster.
+  - name: instance-selector-memory
+    default: 4
+    description: The memory of the EC2 instaces for the nodegroup of the cluster.
   - name: desired-nodes
     default: "10"
     description: The desired number of nodes in the cluster.
@@ -36,9 +39,6 @@ spec:
     default: "10"
     description: The maximum number of nodes in the cluster.
   workspaces:
-  - name: secrets
-    mountPath: /tekton/home/.aws
-    description: The secret with the AWS keys
   - name: config
     description: |
       A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
@@ -52,7 +52,8 @@ spec:
         --region $(params.region) \
         --zones $(params.zones) \
         --nodegroup-name $(params.nodegroup-name) \
-        --node-type $(params.node-type) \
+        --instance-selector-vcpus $(params.instance-selector-vcpus) \
+        --instance-selector-memory $(params.instance-selector-memory) \
         --nodes $(params.desired-nodes) \
         --nodes-min $(params.min-nodes) \
         --nodes-max $(params.max-nodes) \

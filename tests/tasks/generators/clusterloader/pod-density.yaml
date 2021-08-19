@@ -19,8 +19,6 @@ spec:
   - name: source
   - name: config
   - name: results
-  - name: secrets
-    mountPath: /root/.aws
   steps:
   - name: git-clone      
     image: alpine/git

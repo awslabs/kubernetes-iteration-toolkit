@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: clusterloader2
+  name: load
 spec:
   description: "clusterloader2 task to run various types of cl2 tests on a given cluster."
   params:
@@ -21,8 +21,6 @@ spec:
   - name: source
   - name: config
   - name: results
-  - name: secrets
-    mountPath: /root/.aws
   steps:
   - name: git-clone      
     image: alpine/git
