@@ -113,7 +113,8 @@ func kubeConfigFor(request *configRequest, clusterName string, userSecret *v1.Se
 			request.auth.Name: {
 				ClientKeyData:         key,
 				ClientCertificateData: cert,
-			}},
+			},
+		},
 		CurrentContext: contextName,
 	}
 }
@@ -135,7 +136,8 @@ func kubeAdminCertConfig(clusterName, endpoint string, caSecret *v1.Secret) *con
 				CommonName:   "kubernetes-admin",
 				Organization: []string{"system:masters"},
 			},
-		}}
+		},
+	}
 }
 
 func kubeSchedulerCertConfig(clusterName, endpoint string, caSecret *v1.Secret) *configRequest {
@@ -149,7 +151,8 @@ func kubeSchedulerCertConfig(clusterName, endpoint string, caSecret *v1.Secret) 
 				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 				CommonName: "system:kube-scheduler",
 			},
-		}}
+		},
+	}
 }
 
 func kubeControllerManagerCertConfig(clusterName, endpoint string, caSecret *v1.Secret) *configRequest {
@@ -163,7 +166,8 @@ func kubeControllerManagerCertConfig(clusterName, endpoint string, caSecret *v1.
 				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 				CommonName: "system:kube-controller-manager",
 			},
-		}}
+		},
+	}
 }
 
 func kubeSchedulerSecretNameFor(clusterName string) string {

@@ -58,7 +58,7 @@ func mergePatch(defaultObj, patch, object interface{}) ([]byte, error) {
 
 func mergeContainerArgs(defaultSpec, patch *v1.PodSpec) *v1.PodSpec {
 	merged := []string{}
-	for key, value := range UnionMapStrings(parseArgsFor(defaultSpec), parseArgsFor(patch)) {
+	for key, value := range UnionStringMaps(parseArgsFor(defaultSpec), parseArgsFor(patch)) {
 		merged = append(merged, strings.Join([]string{key, value}, "="))
 	}
 	patch.Containers[0].Args = merged
@@ -74,7 +74,7 @@ func parseArgsFor(podSpec *v1.PodSpec) map[string]string {
 	return result
 }
 
-func UnionMapStrings(dest, src map[string]string) map[string]string {
+func UnionStringMaps(dest, src map[string]string) map[string]string {
 	result := map[string]string{}
 	for key, value := range dest {
 		result[key] = value
