@@ -20,6 +20,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -33,6 +34,7 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
+		NodeSelector:                  labelsFor(controlPlane.ClusterName()),
 		Containers: []v1.Container{{
 			Name:  "etcd",
 			Image: defaultEtcdImage,
@@ -105,13 +107,13 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 			Name: "etcd-ca",
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
-					SecretName:  caSecretName(controlPlane),
+					SecretName:  CASecretNameFor(controlPlane.ClusterName()),
 					DefaultMode: aws.Int32(0400),
 					Items: []v1.KeyToPath{{
-						Key:  "tls.crt",
+						Key:  secrets.SecretPublicKey,
 						Path: "ca.crt",
 					}, {
-						Key:  "tls.key",
+						Key:  secrets.SecretPrivateKey,
 						Path: "ca.key",
 					}},
 				},
@@ -123,10 +125,10 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 					SecretName:  caPeerName(controlPlane),
 					DefaultMode: aws.Int32(0400),
 					Items: []v1.KeyToPath{{
-						Key:  "tls.crt",
+						Key:  secrets.SecretPublicKey,
 						Path: "peer.crt",
 					}, {
-						Key:  "tls.key",
+						Key:  secrets.SecretPrivateKey,
 						Path: "peer.key",
 					}},
 				},
@@ -138,10 +140,10 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 					SecretName:  caServerName(controlPlane),
 					DefaultMode: aws.Int32(0400),
 					Items: []v1.KeyToPath{{
-						Key:  "tls.crt",
+						Key:  secrets.SecretPublicKey,
 						Path: "server.crt",
 					}, {
-						Key:  "tls.key",
+						Key:  secrets.SecretPrivateKey,
 						Path: "server.key",
 					}},
 				},
@@ -172,10 +174,6 @@ func podFQDN(controlPlane *v1alpha1.ControlPlane) string {
 
 func serviceFQDN(controlPlane *v1alpha1.ControlPlane) string {
 	return fmt.Sprintf("%s-etcd.%s.svc.cluster.local", controlPlane.ClusterName(), controlPlane.Namespace)
-}
-
-func caSecretName(controlPlane *v1alpha1.ControlPlane) string {
-	return fmt.Sprintf("%s-etcd-ca", controlPlane.ClusterName())
 }
 
 func caServerName(controlPlane *v1alpha1.ControlPlane) string {

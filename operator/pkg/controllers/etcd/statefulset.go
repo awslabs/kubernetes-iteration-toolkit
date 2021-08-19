@@ -36,20 +36,20 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 	if err != nil {
 		return fmt.Errorf("failed to patch pod spec, %w", err)
 	}
-	return c.kubeClient.Ensure(ctx, object.WithOwner(controlPlane, &appsv1.StatefulSet{
+	return c.kubeClient.EnsurePatch(ctx, &appsv1.StatefulSet{}, object.WithOwner(controlPlane, &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceNameFor(controlPlane.ClusterName()),
+			Name:      ServiceNameFor(controlPlane.ClusterName()),
 			Namespace: controlPlane.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labelFor(controlPlane.ClusterName()),
+				MatchLabels: labelsFor(controlPlane.ClusterName()),
 			},
-			ServiceName: serviceNameFor(controlPlane.ClusterName()),
+			ServiceName: ServiceNameFor(controlPlane.ClusterName()),
 			Replicas:    aws.Int32(defaultEtcdReplicas),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labelFor(controlPlane.ClusterName()),
+					Labels: labelsFor(controlPlane.ClusterName()),
 				},
 				Spec: etcdSpec,
 			},

@@ -26,21 +26,41 @@ import (
 
 type Request struct {
 	*certutil.Config
+	CASecret  *v1.Secret
+	Type      RequestType
 	Name      string
 	Namespace string
 }
 
+type RequestType int
+
 const (
-	SecretCertName = "tls.crt"
-	SecretKeyName  = "tls.key"
+	CA RequestType = iota + 1
+	KeyPair
+	KeyWithSignedCert
 )
 
-func CreateWithCerts(config *Request, caSecret *v1.Secret) (*v1.Secret, error) {
-	cert, key, err := CreateCertAndKey(config, caSecret)
+const (
+	SecretPrivateKey = "private"
+	SecretPublicKey  = "public"
+	SecretConfigKey  = "config"
+)
+
+func (r *Request) Create() (secret *v1.Secret, err error) {
+	var private, public []byte
+	switch r.Type {
+	case CA:
+		private, public, err = pkiutil.RootCA(&certutil.Config{CommonName: r.CommonName})
+	case KeyPair:
+		private, public, err = pkiutil.GenerateKeyPair()
+	case KeyWithSignedCert:
+		caKey, caCert := Parse(r.CASecret)
+		private, public, err = pkiutil.GenerateSignedCertAndKey(r.Config, caCert, caKey)
+	}
 	if err != nil {
 		return nil, err
 	}
-	return secretObjWithCerts(object.NamespacedName(config.Name, config.Namespace), cert, key), nil
+	return secretObjWithKeyPair(object.NamespacedName(r.Name, r.Namespace), private, public), nil
 }
 
 func IsValid(secret *v1.Secret) error {
@@ -54,18 +74,6 @@ func IsValid(secret *v1.Secret) error {
 	return nil
 }
 
-func CreateCertAndKey(config *Request, caSecret *v1.Secret) (certBytes, keyBytes []byte, err error) {
-	if caSecret == nil {
-		return pkiutil.RootCA(&certutil.Config{CommonName: config.CommonName})
-	}
-	caCert, caKey := Parse(caSecret)
-	cert, key, err := pkiutil.GenerateCertAndKey(config.Config, caCert, caKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	return cert, key, nil
-}
-
 func CreateWithConfig(nn types.NamespacedName, config []byte) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -74,25 +82,25 @@ func CreateWithConfig(nn types.NamespacedName, config []byte) *v1.Secret {
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"config": config,
+			SecretConfigKey: config,
 		},
 	}
 }
 
-func Parse(secret *v1.Secret) (cert, key []byte) {
-	return secret.Data[SecretCertName], secret.Data[SecretKeyName]
+func Parse(secret *v1.Secret) (key, cert []byte) {
+	return secret.Data[SecretPrivateKey], secret.Data[SecretPublicKey]
 }
 
-func secretObjWithCerts(nn types.NamespacedName, cert, key []byte) *v1.Secret {
+func secretObjWithKeyPair(nn types.NamespacedName, private, public []byte) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      nn.Name,
 			Namespace: nn.Namespace,
 		},
-		Type: v1.SecretTypeTLS,
+		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			SecretCertName: cert,
-			SecretKeyName:  key,
+			SecretPrivateKey: private,
+			SecretPublicKey:  public,
 		},
 	}
 }

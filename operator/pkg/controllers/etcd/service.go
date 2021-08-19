@@ -27,15 +27,15 @@ import (
 )
 
 func (c *Controller) reconcileService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	return c.kubeClient.Ensure(ctx, object.WithOwner(controlPlane, &v1.Service{
+	return c.kubeClient.EnsureCreate(ctx, object.WithOwner(controlPlane, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceNameFor(controlPlane.ClusterName()),
+			Name:      ServiceNameFor(controlPlane.ClusterName()),
 			Namespace: controlPlane.Namespace,
-			Labels:    labelFor(controlPlane.ClusterName()),
+			Labels:    labelsFor(controlPlane.ClusterName()),
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP: v1.ClusterIPNone,
-			Selector:  labelFor(controlPlane.ClusterName()),
+			Selector:  labelsFor(controlPlane.ClusterName()),
 			Ports: []v1.ServicePort{{
 				Port:       2380,
 				Name:       serverPortNameFor(controlPlane.ClusterName()),
@@ -59,12 +59,12 @@ func clientPortNameFor(clusterName string) string {
 	return fmt.Sprintf("etcd-client-ssl-%s", clusterName)
 }
 
-func serviceNameFor(clusterName string) string {
+func ServiceNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd", clusterName)
 }
 
-func labelFor(clusterName string) map[string]string {
+func labelsFor(clusterName string) map[string]string {
 	return map[string]string{
-		"app": serviceNameFor(clusterName),
+		"app": ServiceNameFor(clusterName),
 	}
 }

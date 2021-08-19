@@ -19,17 +19,17 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	"github.com/awslabs/kit/operator/pkg/utils/certificates"
+	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"go.uber.org/zap"
 )
 
 type Controller struct {
-	kubeClient   *kubeprovider.Client
-	certificates *certificates.Provider
+	kubeClient *kubeprovider.Client
+	keypairs   *keypairs.Provider
 }
 
 func New(kubeclient *kubeprovider.Client) *Controller {
-	return &Controller{kubeClient: kubeclient, certificates: certificates.Reconciler(kubeclient)}
+	return &Controller{kubeClient: kubeclient, keypairs: keypairs.Reconciler(kubeclient)}
 }
 
 type reconciler func(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error)
@@ -39,6 +39,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileEndpoint,
 		c.reconcileCertificates,
 		c.reconcileKubeConfigs,
+		c.reconcileSAKeyPair,
 	} {
 		if err := reconcile(ctx, controlPlane); err != nil {
 			return err

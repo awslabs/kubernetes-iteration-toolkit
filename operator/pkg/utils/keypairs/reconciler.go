@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certificates
+package keypairs
 
 import (
 	"context"
@@ -43,44 +43,44 @@ func Reconciler(kubeClient *kubeprovider.Client) *Provider {
 // ReconcileFor reconciles all certs/key requested as part of the certsTreeMap.
 // All the cert/key pairs are stored as a secret object. It will first read the
 // existing secret, if not found will create one.
-func (c *Provider) ReconcileFor(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certsTreeMap CertTree) error {
+func (c *Provider) ReconcileCertsFor(ctx context.Context, controlPlane *v1alpha1.ControlPlane, certsTreeMap CertTree) error {
 	for rootCA, leafCerts := range certsTreeMap {
 		// Get the existing CA from API server in the form of a Kube secret object,
 		// if not found or invalid generate a new one
-		caSecret, err := c.GetOrGenerateSecret(ctx, rootCA, nil)
+		caSecret, err := c.GetOrGenerateSecret(ctx, rootCA)
 		if err != nil {
 			return fmt.Errorf("creating root CA %v, %w", rootCA.Name, err)
 		}
 		secretObjs := []*v1.Secret{caSecret}
 		for _, leafCert := range leafCerts {
+			leafCert.CASecret = caSecret
 			// Get the existing cert and key from API server, if not found or
 			// invalid generate a new one
-			secretObj, err := c.GetOrGenerateSecret(ctx, leafCert, caSecret)
+			secretObj, err := c.GetOrGenerateSecret(ctx, leafCert)
 			if err != nil {
-				return fmt.Errorf("creating secret objects %v, %w", secretObj.Name, err)
+				return fmt.Errorf("creating secret objects %v, %w", leafCert.Name, err)
 			}
 			secretObjs = append(secretObjs, secretObj)
 		}
 		for _, secret := range secretObjs {
-			if err = c.kubeClient.Ensure(ctx, object.WithOwner(controlPlane, secret)); err != nil {
+			if err = c.kubeClient.EnsureCreate(ctx, object.WithOwner(controlPlane, secret)); err != nil {
 				return fmt.Errorf("ensuring secret %v, %w", secret.Name, err)
 			}
 		}
 	}
-	zap.S().Debugf("[%v] Secrets reconciled", controlPlane.ClusterName())
+	zap.S().Debugf("[%v] Keypairs reconciled", controlPlane.ClusterName())
 	return nil
 }
 
 // GetOrGenerateSecret will check with API server for this object.
 // Calls GetSecretFromServer to get from API server and validate
 // If the object is not found, it will create and return a new secret object.
-func (c *Provider) GetOrGenerateSecret(ctx context.Context,
-	request *secrets.Request, caSecret *v1.Secret) (*v1.Secret, error) {
+func (c *Provider) GetOrGenerateSecret(ctx context.Context, request *secrets.Request) (*v1.Secret, error) {
 	// get secret from api server
 	secret, err := c.GetSecretFromServer(ctx, object.NamespacedName(request.Name, request.Namespace))
 	if err != nil && errors.IsNotFound(err) {
 		// if not found generate a new secret object
-		return secrets.CreateWithCerts(request, caSecret)
+		return request.Create()
 	}
 	// validate the secret object contains valid secret data
 	if err := secrets.IsValid(secret); err != nil {

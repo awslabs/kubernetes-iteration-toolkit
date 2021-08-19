@@ -21,7 +21,7 @@ import (
 	"net"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/utils/certificates"
+	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 
@@ -43,9 +43,9 @@ func (c *Controller) reconcileCertificates(ctx context.Context, cp *v1alpha1.Con
 	if err != nil {
 		return err
 	}
-	controlPlaneCA := rootCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.Namespace))
-	frontProxyCA := frontProxyCACertConfig(object.NamespacedName(rootCASecretNameFor(cp.ClusterName()), cp.Namespace))
-	certsTreeMap := certificates.CertTree{
+	controlPlaneCA := rootCACertConfig(object.NamespacedName(cp.ClusterName(), cp.Namespace))
+	frontProxyCA := frontProxyCACertConfig(object.NamespacedName(cp.ClusterName(), cp.Namespace))
+	certsTreeMap := keypairs.CertTree{
 		controlPlaneCA: {
 			kubeAPIServerCertConfig(endpoint, nn),
 			kubeletClientCertConfig(nn),
@@ -54,13 +54,14 @@ func (c *Controller) reconcileCertificates(ctx context.Context, cp *v1alpha1.Con
 			kubeFrontProxyClient(nn),
 		},
 	}
-	return c.certificates.ReconcileFor(ctx, cp, certsTreeMap)
+	return c.keypairs.ReconcileCertsFor(ctx, cp, certsTreeMap)
 }
 
 func rootCACertConfig(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
-		Name:      nn.Name,
+		Name:      rootCASecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
+		Type:      secrets.CA,
 		Config: &certutil.Config{
 			CommonName: rootCACommonName,
 		},
@@ -71,6 +72,7 @@ func kubeAPIServerCertConfig(hostname string, nn types.NamespacedName) *secrets.
 	return &secrets.Request{
 		Name:      kubeAPIServerSecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
+		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
 			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 			CommonName: "kube-apiserver",
@@ -88,6 +90,7 @@ func kubeletClientCertConfig(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
 		Name:      kubeletClientSecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
+		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			CommonName:   "kube-apiserver-kubelet-client",
@@ -98,8 +101,9 @@ func kubeletClientCertConfig(nn types.NamespacedName) *secrets.Request {
 
 func frontProxyCACertConfig(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
-		Name:      nn.Name,
+		Name:      frontProxyCASecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
+		Type:      secrets.CA,
 		Config: &certutil.Config{
 			CommonName: frontProxyCACommonName,
 		},
@@ -111,6 +115,7 @@ func kubeFrontProxyClient(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
 		Name:      kubeFrontProxyClientSecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
+		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
 			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			CommonName: "front-proxy-client",
@@ -132,6 +137,10 @@ func kubeletClientSecretNameFor(clusterName string) string {
 
 func rootCASecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-controlplane-ca", clusterName)
+}
+
+func frontProxyCASecretNameFor(clusterName string) string {
+	return fmt.Sprintf("%s-front-proxy-ca", clusterName)
 }
 
 // TODO get this from controlPlane object
