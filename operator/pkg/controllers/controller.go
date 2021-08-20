@@ -50,6 +50,11 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		}
 		return *results.Failed, err
 	}
+	/*
+		Need to set this for tests to pass, in testing the client.Client used
+		doesn't populate GVK due at a bug in client-go. We can remove this if check,
+		once this bug is fixed https://github.com/kubernetes/client-go/issues/1004
+	*/
 	if resource.GetObjectKind().GroupVersionKind().Empty() {
 		resource.GetObjectKind().SetGroupVersionKind(v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.ControlPlaneKind))
 	}
