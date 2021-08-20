@@ -19,7 +19,7 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/errors"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
