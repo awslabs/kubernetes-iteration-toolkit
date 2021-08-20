@@ -20,6 +20,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	ControlPlaneLabelKey = "kit.kubernetes.io/control-plane-name"
+	AppNameLabelKey      = "kit.kubernetes.io/app"
+)
+
 func WithOwner(owner, obj client.Object) client.Object {
 	obj.SetOwnerReferences([]metav1.OwnerReference{{
 		APIVersion: owner.GetObjectKind().GroupVersionKind().Version,

@@ -71,7 +71,7 @@ var _ = Describe("ControlPlane", func() {
 		}}
 	})
 	AfterEach(func() {
-		ExpectCleanedUP(kubeClient)
+		ExpectCleanedUp(kubeClient)
 	})
 	Context("Reconcilation", func() {
 		Context("Objects", func() {

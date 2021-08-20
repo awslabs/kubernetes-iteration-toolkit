@@ -22,9 +22,8 @@ jobs:
           go-version: 1.16
       - name: Build & Test
         run: |
-          make toolchain
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
-          make build && make test
+          make toolchain build test
         working-directory: operator
       - uses: docker/login-action@v1
         with:

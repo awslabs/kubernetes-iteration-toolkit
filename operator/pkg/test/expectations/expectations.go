@@ -71,7 +71,7 @@ func ExpectStatefulSetExists(c client.Client, name string, namespace string) *ap
 	return set
 }
 
-func ExpectCleanedUP(c client.Client) {
+func ExpectCleanedUp(c client.Client) {
 	ctx := context.Background()
 	controlPlanes := v1alpha1.ControlPlaneList{}
 	Expect(c.List(ctx, &controlPlanes)).To(Succeed())

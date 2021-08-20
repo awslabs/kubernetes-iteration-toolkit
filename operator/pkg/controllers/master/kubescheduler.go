@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -62,10 +61,10 @@ func SchedulerDeploymentName(clusterName string) string {
 }
 
 func schedulerLabels(clustername string) map[string]string {
-	return patch.UnionStringMaps(labelsFor(clustername), schedulerComponent)
+	return map[string]string{
+		object.AppNameLabelKey: SchedulerDeploymentName(clustername),
+	}
 }
-
-var schedulerComponent = map[string]string{"component": "kube-scheduler"}
 
 func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

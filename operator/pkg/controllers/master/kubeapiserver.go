@@ -29,14 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO move to master.go
-func nodeSelector(clusterName string) map[string]string {
-	return map[string]string{
-		"node":        "control-plane",
-		"clustername": clusterName,
-	}
-}
-
 const (
 	apiserverImage        = "public.ecr.aws/eks-distro/kubernetes/kube-apiserver:v1.20.7-eks-1-20-4"
 	serviceClusterIPRange = "10.96.0.0/12"
@@ -76,10 +68,10 @@ func APIServerDeploymentName(clusterName string) string {
 }
 
 func apiServerLabels(clustername string) map[string]string {
-	return patch.UnionStringMaps(labelsFor(clustername), apiserverComponent)
+	return map[string]string{
+		object.AppNameLabelKey: APIServerDeploymentName(clustername),
+	}
 }
-
-var apiserverComponent = map[string]string{"component": "apiserver"}
 
 func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

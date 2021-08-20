@@ -62,10 +62,8 @@ func KCMDeploymentName(clusterName string) string {
 }
 
 func kcmLabels(clustername string) map[string]string {
-	return patch.UnionStringMaps(labelsFor(clustername), kcmComponent)
+	return patch.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "kube-controller-manager"})
 }
-
-var kcmComponent = map[string]string{"component": "kube-controller-manager"}
 
 func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

@@ -88,8 +88,7 @@ func etcdServerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request 
 			Organization: []string{"kubernetes"},
 			AltNames: certutil.AltNames{
 				DNSNames: append(etcdPodAndHostnames(controlPlane),
-					SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
-					"localhost"),
+					SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace), "localhost"),
 				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
 			},
 		},
@@ -115,8 +114,7 @@ func etcdPeerCertConfig(controlPlane *v1alpha1.ControlPlane) *secrets.Request {
 			Organization: []string{"kubernetes"},
 			AltNames: certutil.AltNames{
 				DNSNames: append(etcdPodAndHostnames(controlPlane),
-					SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace),
-					"localhost"),
+					SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace), "localhost"),
 				IPs: []net.IP{net.IPv4(127, 0, 0, 1)},
 			},
 		},
