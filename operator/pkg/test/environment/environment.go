@@ -19,9 +19,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/awslabs/kit/operator/pkg/controllers"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
@@ -44,12 +42,12 @@ func (e *Environment) Start(scheme *apiruntime.Scheme) (err error) {
 	if _, err = e.Environment.Start(); err != nil {
 		return fmt.Errorf("starting environment, %w", err)
 	}
-	manager := controllers.NewManagerOrDie(e.Config, controllerruntime.Options{Scheme: scheme})
-	go func() {
-		err = manager.Start(controllerruntime.SetupSignalHandler())
-	}()
-	<-manager.Elected()
-	e.Client = &FakeKubeClient{manager.GetClient()}
+
+	e.Client, err = client.New(e.Config, client.Options{Scheme: scheme})
+	if err != nil {
+		return fmt.Errorf("creating client, %w", err)
+	}
+	e.Client = &FakeKubeClient{e.Client}
 	return
 }
 

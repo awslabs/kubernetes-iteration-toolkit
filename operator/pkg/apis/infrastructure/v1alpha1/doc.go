@@ -30,6 +30,7 @@ var (
 	// APIVersion is the current API version used to register these objects
 	APIVersion = "v1alpha1"
 
+	ControlPlaneKind = "ControlPlane"
 	// SchemeGroupVersion is group version used to register these objects
 	SchemeGroupVersion = schema.GroupVersion{Group: "kit.k8s.amazonaws.com", Version: APIVersion}
 
@@ -40,7 +41,7 @@ var (
 	AddToScheme = SchemeBuilder.AddToScheme
 
 	Resources = map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
-		SchemeGroupVersion.WithKind("ControlPlane"): &ControlPlane{},
+		SchemeGroupVersion.WithKind(ControlPlaneKind): &ControlPlane{},
 	}
 )
 

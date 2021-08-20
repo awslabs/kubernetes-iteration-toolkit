@@ -62,7 +62,7 @@ var _ = AfterSuite(func() {
 	Expect(env.Stop()).To(Succeed(), "Failed to stop environment")
 })
 
-var _ = Describe("Allocation", func() {
+var _ = Describe("ControlPlane", func() {
 	var controlPlane *v1alpha1.ControlPlane
 	BeforeEach(func() {
 		controlPlane = &v1alpha1.ControlPlane{ObjectMeta: metav1.ObjectMeta{

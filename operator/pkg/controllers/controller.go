@@ -50,6 +50,9 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		}
 		return *results.Failed, err
 	}
+	if resource.GetObjectKind().GroupVersionKind().Empty() {
+		resource.GetObjectKind().SetGroupVersionKind(v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.ControlPlaneKind))
+	}
 	// 2. Copy object for merge patch base
 	persisted := resource.DeepCopyObject()
 	// 3. Reconcile else finalize if object is deleted
