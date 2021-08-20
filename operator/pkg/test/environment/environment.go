@@ -47,7 +47,6 @@ func (e *Environment) Start(scheme *apiruntime.Scheme) (err error) {
 	if err != nil {
 		return fmt.Errorf("creating client, %w", err)
 	}
-	e.Client = &FakeKubeClient{e.Client}
 	return
 }
 

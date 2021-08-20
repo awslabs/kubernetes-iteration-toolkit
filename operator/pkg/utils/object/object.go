@@ -15,14 +15,15 @@ limitations under the License.
 package object
 
 import (
+	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	ControlPlaneLabelKey = "kit.kubernetes.io/control-plane-name"
-	AppNameLabelKey      = "kit.kubernetes.io/app"
+var (
+	ControlPlaneLabelKey = v1alpha1.SchemeGroupVersion.Group + "/control-plane-name"
+	AppNameLabelKey      = v1alpha1.SchemeGroupVersion.Group + "/app"
 )
 
 func WithOwner(owner, obj client.Object) client.Object {

@@ -29,8 +29,10 @@ import (
 	. "github.com/awslabs/kit/operator/pkg/test/expectations"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -79,8 +81,7 @@ var _ = Describe("ControlPlane", func() {
 				// Create the control plane cluster
 				ExpectCreated(kubeClient, controlPlane)
 				// Reconcile the controller for the given control plane
-				genController := &controllers.GenericController{Controller: controller, Client: kubeClient}
-				ExpectReconcile(context.Background(), genController, client.ObjectKeyFromObject(controlPlane))
+				ExpectReconcileWithInjectedService(context.Background(), controlPlane)
 				// check master and etcd services are created
 				ExpectServiceExists(kubeClient, etcd.ServiceNameFor(controlPlane.Name), controlPlane.Namespace)
 				ExpectServiceExists(kubeClient, master.ServiceNameFor(controlPlane.Name), controlPlane.Namespace)
@@ -115,3 +116,20 @@ var _ = Describe("ControlPlane", func() {
 		})
 	})
 })
+
+func ExpectReconcileWithInjectedService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
+	genController := &controllers.GenericController{Controller: controller, Client: kubeClient}
+	ExpectReconcile(ctx, genController, client.ObjectKeyFromObject(controlPlane))
+	// Master components expect the service has a loadbalancer provisioned for
+	// certificates generation. We manually patch the status and reconcile again
+	// for all the objects to be generated.
+	patchControlPlaneService(ctx, controlPlane)
+	ExpectReconcile(ctx, genController, client.ObjectKeyFromObject(controlPlane))
+}
+
+func patchControlPlaneService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
+	svc := &v1.Service{}
+	Expect(kubeClient.Get(ctx, types.NamespacedName{controlPlane.Namespace, master.ServiceNameFor(controlPlane.Name)}, svc)).To(Succeed())
+	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{Hostname: "elb-endpoint"}}
+	Expect(kubeClient.Status().Update(ctx, svc)).To(Succeed())
+}
