@@ -36,7 +36,7 @@ metadata:
   name: kit-controller
 rules:
 - apiGroups:
-  - kit.k8s.amazonaws.com
+  - kit.k8s.sh
   resources:
   - controlplanes
   - controlplanes/status

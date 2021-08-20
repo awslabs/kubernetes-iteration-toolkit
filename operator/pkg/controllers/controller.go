@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/errors"
 	"github.com/awslabs/kit/operator/pkg/results"
 	"go.uber.org/zap"
@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	FinalizerForAWSResources = "kit.k8s.amazonaws.com/%s"
+var (
+	FinalizerForAWSResources = v1alpha1.SchemeGroupVersion.Group + "/%s"
 )
 
 // GenericController implements controllerruntime.Reconciler and runs a

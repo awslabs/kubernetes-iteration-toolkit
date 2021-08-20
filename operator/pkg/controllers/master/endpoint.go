@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/errors"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	v1 "k8s.io/api/core/v1"

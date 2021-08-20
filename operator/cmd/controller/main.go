@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
 

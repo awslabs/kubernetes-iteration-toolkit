@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/patch"
