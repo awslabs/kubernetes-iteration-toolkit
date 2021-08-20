@@ -19,25 +19,24 @@ import (
 	"fmt"
 
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/results"
+	"github.com/awslabs/kit/operator/pkg/utils/reconciler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type controlPlane struct {
-	ec2api           *awsprovider.EC2
 	etcdController   *etcd.Controller
 	masterController *master.Controller
 }
 
 // NewController returns a controller for managing VPCs in AWS
-func NewController(ec2api *awsprovider.EC2, kubeClient client.Client) *controlPlane {
-	return &controlPlane{ec2api: ec2api,
+func NewController(kubeClient client.Client) *controlPlane {
+	return &controlPlane{
 		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
 		masterController: master.New(kubeprovider.New(kubeClient)),
 	}
@@ -53,17 +52,15 @@ func (c *controlPlane) For() controllers.Object {
 	return &v1alpha1.ControlPlane{}
 }
 
-type reconciler func(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error)
-
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
-	for _, reconcile := range []reconciler{
-		c.etcdController.Reconcile,
-		c.masterController.Reconcile,
+	for _, resource := range []reconciler.Interface{
+		c.etcdController,
+		c.masterController,
 	} {
-		if err := reconcile(ctx, object.(*v1alpha1.ControlPlane)); err != nil {
+		if err := resource.Reconcile(ctx, object.(*v1alpha1.ControlPlane)); err != nil {
 			return nil, fmt.Errorf("reconciling, %w", err)
 		}
 	}

@@ -20,6 +20,8 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
+	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	"go.uber.org/zap"
 )
 
@@ -40,6 +42,9 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileCertificates,
 		c.reconcileKubeConfigs,
 		c.reconcileSAKeyPair,
+		c.reconcileApiServer,
+		c.reconcileKCM,
+		c.reconcileScheduler,
 	} {
 		if err := reconcile(ctx, controlPlane); err != nil {
 			return err
@@ -47,4 +52,12 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 	}
 	zap.S().Infof("[%v] control plane reconciled", controlPlane.ClusterName())
 	return nil
+}
+
+// Karpenter only created nodes for API server pods, as KCM and scheduler pods
+// are configured with pod afinity. So the control plane nodes for a cluster
+// will have 2 labels cluster name and clustername-apiserver
+func nodeSelector(clusterName string) map[string]string {
+	return patch.UnionStringMaps(apiServerLabels(clusterName),
+		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }

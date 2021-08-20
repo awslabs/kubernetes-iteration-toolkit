@@ -65,6 +65,6 @@ func ServiceNameFor(clusterName string) string {
 
 func labelsFor(clusterName string) map[string]string {
 	return map[string]string{
-		"app": ServiceNameFor(clusterName),
+		object.AppNameLabelKey: ServiceNameFor(clusterName),
 	}
 }

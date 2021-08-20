@@ -20,8 +20,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -34,7 +37,22 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
-		NodeSelector:                  labelsFor(controlPlane.ClusterName()),
+		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
+		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
+			MaxSkew:           int32(1),
+			TopologyKey:       "topology.kubernetes.io/zone",
+			WhenUnsatisfiable: v1.DoNotSchedule,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: labelsFor(controlPlane.ClusterName()),
+			},
+		}, {
+			MaxSkew:           int32(1),
+			TopologyKey:       "kubernetes.io/hostname",
+			WhenUnsatisfiable: v1.DoNotSchedule,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: labelsFor(controlPlane.ClusterName()),
+			},
+		}},
 		Containers: []v1.Container{{
 			Name:  "etcd",
 			Image: defaultEtcdImage,
@@ -181,4 +199,9 @@ func caServerName(controlPlane *v1alpha1.ControlPlane) string {
 }
 func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 	return fmt.Sprintf("%s-etcd-peer", controlPlane.ClusterName())
+}
+
+func nodeSelector(clusterName string) map[string]string {
+	return patch.UnionStringMaps(labelsFor(clusterName),
+		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }

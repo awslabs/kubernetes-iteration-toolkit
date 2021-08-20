@@ -59,7 +59,7 @@ func (c *Controller) reconcileCertificates(ctx context.Context, cp *v1alpha1.Con
 
 func rootCACertConfig(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
-		Name:      rootCASecretNameFor(nn.Name),
+		Name:      RootCASecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
 		Type:      secrets.CA,
 		Config: &certutil.Config{
@@ -70,7 +70,7 @@ func rootCACertConfig(nn types.NamespacedName) *secrets.Request {
 
 func kubeAPIServerCertConfig(hostname string, nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
-		Name:      kubeAPIServerSecretNameFor(nn.Name),
+		Name:      KubeAPIServerSecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
 		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
@@ -88,7 +88,7 @@ func kubeAPIServerCertConfig(hostname string, nn types.NamespacedName) *secrets.
 // Certificate used by the API server to connect to the kubelet
 func kubeletClientCertConfig(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
-		Name:      kubeletClientSecretNameFor(nn.Name),
+		Name:      KubeletClientSecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
 		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
@@ -101,7 +101,7 @@ func kubeletClientCertConfig(nn types.NamespacedName) *secrets.Request {
 
 func frontProxyCACertConfig(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
-		Name:      frontProxyCASecretNameFor(nn.Name),
+		Name:      FrontProxyCASecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
 		Type:      secrets.CA,
 		Config: &certutil.Config{
@@ -113,7 +113,7 @@ func frontProxyCACertConfig(nn types.NamespacedName) *secrets.Request {
 // Cert used by the API server to access the front proxy.
 func kubeFrontProxyClient(nn types.NamespacedName) *secrets.Request {
 	return &secrets.Request{
-		Name:      kubeFrontProxyClientSecretNameFor(nn.Name),
+		Name:      KubeFrontProxyClientSecretNameFor(nn.Name),
 		Namespace: nn.Namespace,
 		Type:      secrets.KeyWithSignedCert,
 		Config: &certutil.Config{
@@ -123,23 +123,23 @@ func kubeFrontProxyClient(nn types.NamespacedName) *secrets.Request {
 	}
 }
 
-func kubeAPIServerSecretNameFor(clusterName string) string {
+func KubeAPIServerSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-apiserver", clusterName)
 }
 
-func kubeFrontProxyClientSecretNameFor(clusterName string) string {
+func KubeFrontProxyClientSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-front-proxy-client", clusterName)
 }
 
-func kubeletClientSecretNameFor(clusterName string) string {
+func KubeletClientSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-apiserver-kubelet-client", clusterName)
 }
 
-func rootCASecretNameFor(clusterName string) string {
+func RootCASecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-controlplane-ca", clusterName)
 }
 
-func frontProxyCASecretNameFor(clusterName string) string {
+func FrontProxyCASecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-front-proxy-ca", clusterName)
 }
 

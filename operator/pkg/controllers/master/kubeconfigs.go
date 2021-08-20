@@ -40,7 +40,7 @@ const (
 func (c *Controller) reconcileKubeConfigs(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	// kubeconfig certs are signed by master root CA certs, if the root CA is not found return
 	caSecret, err := c.keypairs.GetSecretFromServer(ctx,
-		object.NamespacedName(rootCASecretNameFor(controlPlane.ClusterName()), controlPlane.Namespace))
+		object.NamespacedName(RootCASecretNameFor(controlPlane.ClusterName()), controlPlane.Namespace))
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func kubeAdminCertConfig(clusterName, endpoint string, caSecret *v1.Secret) *con
 	return &configRequest{
 		endpoint: endpoint,
 		auth: &secrets.Request{
-			Name:     kubeAdminSecretNameFor(clusterName),
+			Name:     KubeAdminSecretNameFor(clusterName),
 			Type:     secrets.KeyWithSignedCert,
 			CASecret: caSecret,
 			Config: &certutil.Config{
@@ -144,7 +144,7 @@ func kubeSchedulerCertConfig(clusterName, endpoint string, caSecret *v1.Secret) 
 	return &configRequest{
 		endpoint: endpoint,
 		auth: &secrets.Request{
-			Name:     kubeSchedulerSecretNameFor(clusterName),
+			Name:     KubeSchedulerSecretNameFor(clusterName),
 			Type:     secrets.KeyWithSignedCert,
 			CASecret: caSecret,
 			Config: &certutil.Config{
@@ -159,7 +159,7 @@ func kubeControllerManagerCertConfig(clusterName, endpoint string, caSecret *v1.
 	return &configRequest{
 		endpoint: endpoint,
 		auth: &secrets.Request{
-			Name:     kubeControllerManagerSecretNameFor(clusterName),
+			Name:     KubeControllerManagerSecretNameFor(clusterName),
 			Type:     secrets.KeyWithSignedCert,
 			CASecret: caSecret,
 			Config: &certutil.Config{
@@ -170,14 +170,14 @@ func kubeControllerManagerCertConfig(clusterName, endpoint string, caSecret *v1.
 	}
 }
 
-func kubeSchedulerSecretNameFor(clusterName string) string {
+func KubeSchedulerSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-kube-scheduler-config", clusterName)
 }
 
-func kubeAdminSecretNameFor(clusterName string) string {
+func KubeAdminSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-kube-admin-config", clusterName)
 }
 
-func kubeControllerManagerSecretNameFor(clusterName string) string {
+func KubeControllerManagerSecretNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-kube-controller-manager-config", clusterName)
 }
