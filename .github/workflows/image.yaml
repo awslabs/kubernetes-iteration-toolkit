@@ -23,8 +23,8 @@ jobs:
       - name: Build & Test
         run: |
           make toolchain
-	  echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
-	  make build && make test
+          echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
+          make build && make test
         working-directory: operator
       - uses: docker/login-action@v1
         with:
