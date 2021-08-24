@@ -56,3 +56,5 @@ spec:
       params:
       - name: cluster-name
         value: "eks-small-upstream-load-$(context.pipelineRun.uid)"
+      - name: results-bucket
+        value: "$(date +'%Y/%m/%d/%HH/%mm)/$(context.pipelineRun.uid)"

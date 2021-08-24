@@ -43,6 +43,8 @@ spec:
   - name: cl2-load-test-throughput
     description: "throughput used for mutate operations"
     default: "15"
+  - name: results-bucket
+    description: "Results bucket with path of s3 to upload results"
   tasks:
   - name: create-eks-cluster
     taskRef:
@@ -80,6 +82,8 @@ spec:
         value: '$(params.nodes-per-namespace)'
       - name: cl2-load-test-throughput
         value: '$(params.cl2-load-test-throughput)'
+      - name: results-bucket
+        value: '$(params.results-bucket)'
     workspaces:
       - name: source
         workspace: source
