@@ -17,6 +17,8 @@ spec:
     description: "pod density"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
+  - name: results-bucket
+    description: "Results bucket with path of s3 to upload results"
   workspaces:
   - name: source
   - name: config
@@ -73,3 +75,7 @@ spec:
     env:
     - name: ENABLE_EXEC_SERVICE
       value: "false"
+  - name: upload-results
+    image: amazon/aws-cli
+    workingDir: $(workspaces.results.path)
+    command: ["aws s3 cp . s3://$(params.results-bucket)/  --recursive "]
