@@ -14,7 +14,7 @@ Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kube
 
 ```bash
 cat <<EOF | kubectl apply -f -
-apiVersion: kit.k8s.amazonaws.com/v1alpha1
+apiVersion: kit.k8s.sh/v1alpha1
 kind: ControlPlane
 metadata:
   name: foo # Desired Cluster name

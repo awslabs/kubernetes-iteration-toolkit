@@ -4,12 +4,12 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
 
-	"github.com/awslabs/karpenter/pkg/utils/log"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,11 +41,12 @@ func main() {
 	flag.IntVar(&options.MetricsPort, "metrics-port", 8080, "The port the metric endpoint binds to for operating metrics about the controller itself")
 	flag.Parse()
 
-	log.Setup(
-		controllerruntimezap.UseDevMode(options.EnableVerboseLogging),
+	logger := controllerruntimezap.NewRaw(controllerruntimezap.UseDevMode(options.EnableVerboseLogging),
 		controllerruntimezap.ConsoleEncoder(),
-		controllerruntimezap.StacktraceLevel(zapcore.DPanicLevel),
-	)
+		controllerruntimezap.StacktraceLevel(zapcore.DPanicLevel))
+	controllerruntime.SetLogger(zapr.NewLogger(logger))
+	zap.ReplaceGlobals(logger)
+
 	manager := controllers.NewManagerOrDie(controllerruntime.GetConfigOrDie(), controllerruntime.Options{
 		LeaderElection:          true,
 		LeaderElectionID:        "kit-leader-election",
@@ -56,10 +57,7 @@ func main() {
 	})
 
 	err := manager.RegisterControllers(
-		controlplane.NewController(
-			awsprovider.EC2Client(awsprovider.NewSession()),
-			manager.GetClient(),
-		)).Start(controllerruntime.SetupSignalHandler())
+		controlplane.NewController(manager.GetClient())).Start(controllerruntime.SetupSignalHandler())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start manager, %v", err))
 	}

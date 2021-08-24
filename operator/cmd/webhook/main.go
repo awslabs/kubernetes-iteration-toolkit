@@ -18,7 +18,7 @@ import (
 	"context"
 	"flag"
 
-	"github.com/awslabs/kit/operator/pkg/apis/infrastructure/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
@@ -63,7 +63,7 @@ func main() {
 
 func NewCRDDefaultingWebhook(ctx context.Context, w configmap.Watcher) *controller.Impl {
 	return defaulting.NewAdmissionController(ctx,
-		"defaulting.webhook.controlplane.kit.sh",
+		"defaulting.webhook.controlplane.kit.k8s.sh",
 		"/default-resource",
 		v1alpha1.Resources,
 		InjectContext,
@@ -73,7 +73,7 @@ func NewCRDDefaultingWebhook(ctx context.Context, w configmap.Watcher) *controll
 
 func NewCRDValidationWebhook(ctx context.Context, w configmap.Watcher) *controller.Impl {
 	return validation.NewAdmissionController(ctx,
-		"validation.webhook.controlplane.kit.sh",
+		"validation.webhook.controlplane.kit.k8s.sh",
 		"/validate-resource",
 		v1alpha1.Resources,
 		InjectContext,

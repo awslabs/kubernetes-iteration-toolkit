@@ -23,6 +23,6 @@ jobs:
           go-version: 1.16
       - name: Build & Test
         run: |
-          go build -v ./cmd/controller
-          go test ./...
+          echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
+          make toolchain build test
         working-directory: operator

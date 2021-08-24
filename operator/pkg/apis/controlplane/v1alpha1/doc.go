@@ -16,7 +16,7 @@ limitations under the License.
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package,register
 // +k8s:defaulter-gen=TypeMeta
-// +groupName=kit.k8s.amazonaws.com
+// +groupName=kit.k8s.sh
 package v1alpha1
 
 import (
@@ -30,8 +30,9 @@ var (
 	// APIVersion is the current API version used to register these objects
 	APIVersion = "v1alpha1"
 
+	ControlPlaneKind = "ControlPlane"
 	// SchemeGroupVersion is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group: "kit.k8s.amazonaws.com", Version: APIVersion}
+	SchemeGroupVersion = schema.GroupVersion{Group: "kit.k8s.sh", Version: APIVersion}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
@@ -40,7 +41,7 @@ var (
 	AddToScheme = SchemeBuilder.AddToScheme
 
 	Resources = map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
-		SchemeGroupVersion.WithKind("ControlPlane"): &ControlPlane{},
+		SchemeGroupVersion.WithKind(ControlPlaneKind): &ControlPlane{},
 	}
 )
 

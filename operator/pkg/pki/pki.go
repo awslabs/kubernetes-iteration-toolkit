@@ -40,7 +40,7 @@ const (
 
 // RootCA for a given config will check existing certs if they are valid, else
 // will generate new root CA for the certutil.Config provided
-func RootCA(config *certutil.Config) (certBytes, keyBytes []byte, err error) {
+func RootCA(config *certutil.Config) (keyBytes, certBytes []byte, err error) {
 	// create private key, defaults to x509.RSA
 	key, err := rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 	if err != nil {
@@ -50,17 +50,16 @@ func RootCA(config *certutil.Config) (certBytes, keyBytes []byte, err error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create self-signed CA certificate, %w", err)
 	}
-	certBytes, keyBytes = encode(cert, key)
-	return
+	return encodePrivateKey(key), encodeCertificate(cert), nil
 }
 
 // GenerateCertAndKey for a given config and valid CA, will check existing certs
 // if they are valid, else will generate new cert and key for the
 // certutil.Config provided
-func GenerateCertAndKey(config *certutil.Config, caCertBytes, caKeyBytes []byte) (certBytes, keyBytes []byte, err error) {
-	caCert, caKey, err := parseCerts(caCertBytes, caKeyBytes)
+func GenerateSignedCertAndKey(config *certutil.Config, caCertBytes, caKeyBytes []byte) (keyBytes, certBytes []byte, err error) {
+	caKey, caCert, err := parseCerts(caCertBytes, caKeyBytes)
 	if err != nil {
-		return nil, nil, fmt.Errorf("root CA is invalid, %w", err)
+		return nil, nil, err
 	}
 	key, err := rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 	if err != nil {
@@ -70,32 +69,52 @@ func GenerateCertAndKey(config *certutil.Config, caCertBytes, caKeyBytes []byte)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating signed cert, %w", err)
 	}
-	certBytes, keyBytes = encode(cert, key)
-	return
+	return encodePrivateKey(key), encodeCertificate(cert), nil
 }
 
-func parseCerts(certBytes, keyBytes []byte) (*x509.Certificate, crypto.Signer, error) {
-	cert, err := certutil.ParseCertsPEM(certBytes)
+func GenerateKeyPair() (private, public []byte, err error) {
+	key, err := rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to generate key, %w", err)
+	}
+	der, err := x509.MarshalPKIXPublicKey(key.Public())
 	if err != nil {
 		return nil, nil, err
+	}
+	return encodePrivateKey(key), encodePublicKey(der), nil
+}
+
+func parseCerts(certBytes, keyBytes []byte) (crypto.Signer, *x509.Certificate, error) {
+	cert, err := certutil.ParseCertsPEM(certBytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing cert, %w", err)
 	}
 	key, err := keyutil.ParsePrivateKeyPEM(keyBytes)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("parsing private key, %w", err)
 	}
-	return cert[0], key.(crypto.Signer), nil
+	return key.(crypto.Signer), cert[0], nil
 }
 
-func encode(cert *x509.Certificate, key crypto.Signer) (certBytes, keyBytes []byte) {
-	certBytes = pem.EncodeToMemory(&pem.Block{
+func encodeCertificate(cert *x509.Certificate) []byte {
+	return pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert.Raw,
 	})
-	keyBytes = pem.EncodeToMemory(&pem.Block{
+}
+
+func encodePrivateKey(key crypto.Signer) []byte {
+	return pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(key.(*rsa.PrivateKey)),
 	})
-	return
+}
+
+func encodePublicKey(key []byte) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: key,
+	})
 }
 
 // signedCert creates a signed certificate using the given CA certificate and key

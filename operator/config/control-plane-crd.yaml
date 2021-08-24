@@ -4,9 +4,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: controlplanes.kit.k8s.amazonaws.com
+  name: controlplanes.kit.k8s.sh
 spec:
-  group: kit.k8s.amazonaws.com
+  group: kit.k8s.sh
   names:
     kind: ControlPlane
     listKind: ControlPlaneList
