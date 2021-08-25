@@ -24,6 +24,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/test/environment"
+	"github.com/awslabs/kit/operator/pkg/utils/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/awslabs/kit/operator/pkg/test/expectations"
@@ -31,22 +32,14 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 var (
 	controller controllers.Controller
 	kubeClient client.Client
 	env        *environment.Environment
-	scheme     = runtime.NewScheme()
 )
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = v1alpha1.AddToScheme(scheme)
-}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -55,7 +48,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	env = environment.New()
-	Expect(env.Start(scheme)).To(Succeed(), "Failed to start environment")
+	Expect(env.Start(scheme.ManagementCluster)).To(Succeed(), "Failed to start environment")
 	kubeClient = env.Client
 	controller = controlplane.NewController(kubeClient)
 })

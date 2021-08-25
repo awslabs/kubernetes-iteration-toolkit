@@ -20,18 +20,24 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
+	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	"go.uber.org/zap"
 )
 
 type Controller struct {
-	kubeClient *kubeprovider.Client
-	keypairs   *keypairs.Provider
+	kubeClient  *kubeprovider.Client
+	keypairs    *keypairs.Provider
+	kubeConfigs *kubeconfigs.Provider
 }
 
 func New(kubeclient *kubeprovider.Client) *Controller {
-	return &Controller{kubeClient: kubeclient, keypairs: keypairs.Reconciler(kubeclient)}
+	return &Controller{
+		kubeClient:  kubeclient,
+		keypairs:    keypairs.Reconciler(kubeclient),
+		kubeConfigs: kubeconfigs.Reconciler(kubeclient),
+	}
 }
 
 type reconciler func(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error)

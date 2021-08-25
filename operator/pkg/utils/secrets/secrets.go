@@ -17,6 +17,7 @@ package secrets
 import (
 	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +75,7 @@ func IsValid(secret *v1.Secret) error {
 	return nil
 }
 
-func CreateWithConfig(nn types.NamespacedName, config []byte) *v1.Secret {
+func CreateWithConfig(nn types.NamespacedName, config []byte) client.Object {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      nn.Name,
