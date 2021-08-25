@@ -62,7 +62,7 @@ func (c *Controller) kubeConfigForKubeProxy(ctx context.Context, managerCluster 
 
 func (c *Controller) daemonsetForKubeProxy(ctx context.Context, _ *Controller, controlPlane *v1alpha1.ControlPlane) (err error) {
 	podSpec := kubeProxyPodSpecFor(controlPlane)
-	// TODO merge custom falgs for the user
+	// TODO merge custom flags from the user
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
 		&appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -92,8 +92,14 @@ func kubeConfigRequest(endpoint, ns string, auth *authRequest) *kubeconfigs.Requ
 		Namespace:         ns,
 		ApiServerEndpoint: endpoint,
 		Name:              auth.name,
-		Contexts:          contexts(),
 		AuthInfo:          auth,
+		Contexts: map[string]*clientcmdapi.Context{
+			defaultStr: {
+				Cluster:   defaultStr,
+				Namespace: defaultStr,
+				AuthInfo:  defaultStr,
+			},
+		},
 	}
 }
 
@@ -126,16 +132,6 @@ func (r *authRequest) Generate() (map[string]*clientcmdapi.AuthInfo, error) {
 
 func (r *authRequest) CACert() []byte {
 	return r.caCert
-}
-
-func contexts() map[string]*clientcmdapi.Context {
-	return map[string]*clientcmdapi.Context{
-		defaultStr: {
-			Cluster:   defaultStr,
-			Namespace: defaultStr,
-			AuthInfo:  defaultStr,
-		},
-	}
 }
 
 func kubeProxyPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
