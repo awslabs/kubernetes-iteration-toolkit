@@ -1,7 +1,7 @@
 import cdk = require('@aws-cdk/core');
 import eks = require('@aws-cdk/aws-eks');
-import * as yaml from 'js-yaml';
-import * as request from 'sync-request';
+import * as yaml from 'js-yaml'
+import * as request from 'sync-request'
 
 export interface FluxProps {
     cluster: eks.Cluster;
@@ -14,7 +14,6 @@ export interface RepositoryProps {
     branch?: string;
     path?: string;
 }
-
 export class Flux extends cdk.Construct {
     constructor(scope: cdk.Construct, id: string, props: FluxProps) {
         super(scope, id);
@@ -33,7 +32,7 @@ export class Flux extends cdk.Construct {
                     namespace: 'default'
                 },
                 spec: {
-                    // we can adjust this later if we want to be more aggressive  
+                    // we can adjust this later if we want to be more aggressive
                     interval: '5m0s',
                     ref: {
                         branch: value.branch ?? "main",
@@ -53,7 +52,7 @@ export class Flux extends cdk.Construct {
                     namespace: 'default'
                 },
                 spec: {
-                    // we can adjust this later if we want to be more aggressive  
+                    // we can adjust this later if we want to be more aggressive
                     interval: '5m0s',
                     path: value.path ?? "test/workflows",
                     prune: true,
