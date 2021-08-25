@@ -16,6 +16,7 @@ package controlplane_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
@@ -123,6 +124,6 @@ func ExpectReconcileWithInjectedService(ctx context.Context, controlPlane *v1alp
 func patchControlPlaneService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
 	svc := &v1.Service{}
 	Expect(kubeClient.Get(ctx, types.NamespacedName{controlPlane.Namespace, master.ServiceNameFor(controlPlane.Name)}, svc)).To(Succeed())
-	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{Hostname: "elb-endpoint"}}
+	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{Hostname: fmt.Sprintf("%s-example-controlplane-endpoint.default.svc.cluster.local", controlPlane.Name)}}
 	Expect(kubeClient.Status().Update(ctx, svc)).To(Succeed())
 }
