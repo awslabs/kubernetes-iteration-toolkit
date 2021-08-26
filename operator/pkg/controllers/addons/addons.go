@@ -87,8 +87,12 @@ func (c *Controller) createKubeClient(ctx context.Context, nn types.NamespacedNa
 		}
 		if errors.IsNetIOTimeOut(err) {
 			// This happens 1-2 times, but if it happens more we would want to know in the logs
-			zap.S().Warnf("Creating kubeclient, net i/o timed out for control plane %s endpoint", nn.Name)
+			zap.S().Errorf("Creating kubeclient, net i/o timed out for control plane %s endpoint", nn.Name)
 			return nil, fmt.Errorf("net i/o timeout for %v control plane endpoint, %w", nn.Name, errors.WaitingForSubResources)
+		}
+		if errors.IsConnectionRefused(err) {
+			zap.S().Errorf("Creating kubeclient, connection refused for control plane %s endpoint", nn.Name)
+			return nil, fmt.Errorf("connection refused %v control plane endpoint, %w", nn.Name, errors.WaitingForSubResources)
 		}
 		return nil, fmt.Errorf("creating kubeclient for new cluster, %w", err)
 	}
