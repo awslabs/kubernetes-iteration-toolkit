@@ -17,6 +17,7 @@ package expectations
 import (
 	"context"
 	"fmt"
+	"syscall"
 	"time"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
@@ -45,6 +46,11 @@ func ExpectCreated(c client.Client, objects ...client.Object) {
 func ExpectReconcile(ctx context.Context, resource reconcile.Reconciler, key client.ObjectKey) {
 	_, err := resource.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 	Expect(err).ToNot(HaveOccurred())
+}
+
+func ExpectReconcileErrConnectionRefused(ctx context.Context, resource reconcile.Reconciler, key client.ObjectKey) {
+	_, err := resource.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+	Expect(err).To(MatchError(syscall.ECONNREFUSED))
 }
 
 func ExpectServiceExists(c client.Client, name string, namespace string) *v1.Service {

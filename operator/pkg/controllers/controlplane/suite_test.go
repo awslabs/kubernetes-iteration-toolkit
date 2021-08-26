@@ -117,7 +117,9 @@ func ExpectReconcileWithInjectedService(ctx context.Context, controlPlane *v1alp
 	// certificates generation. We manually patch the status and reconcile again
 	// for all the objects to be generated.
 	patchControlPlaneService(ctx, controlPlane)
-	ExpectReconcile(ctx, genController, client.ObjectKeyFromObject(controlPlane))
+	// When a new cluster is created, addons controller tries to connect.
+	// In our case it fails to connect and returns connection refused.
+	ExpectReconcileErrConnectionRefused(ctx, genController, client.ObjectKeyFromObject(controlPlane))
 }
 
 func patchControlPlaneService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
