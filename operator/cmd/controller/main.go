@@ -4,9 +4,19 @@ import (
 	"flag"
 	"fmt"
 
+<<<<<<< HEAD
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
 	"github.com/awslabs/kit/operator/pkg/utils/scheme"
+=======
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	dpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/launchtemplate"
+	"github.com/awslabs/kit/operator/pkg/controllers"
+	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
+	"github.com/awslabs/kit/operator/pkg/controllers/dataplane"
+>>>>>>> b34b9b8 (Initial commit for worker nodes)
 
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
@@ -48,8 +58,12 @@ func main() {
 		LeaderElectionNamespace: "kit",
 	})
 
+	session := awsprovider.NewSession()
 	err := manager.RegisterControllers(
-		controlplane.NewController(manager.GetClient())).Start(controllerruntime.SetupSignalHandler())
+		controlplane.NewController(manager.GetClient()),
+		dataplane.NewController(manager.GetClient(),
+			launchtemplate.NewController(awsprovider.EC2Client(session), awsprovider.SSMClient(session))),
+	).Start(controllerruntime.SetupSignalHandler())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start manager, %v", err))
 	}
