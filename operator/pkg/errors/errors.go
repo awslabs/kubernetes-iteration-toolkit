@@ -45,6 +45,5 @@ func IsNetIOTimeOut(err error) bool {
 }
 
 func IsConnectionRefused(err error) bool {
-	var netOpErr *net.OpError
-	return errors.As(err, &netOpErr) && errors.Is(err, syscall.ECONNREFUSED)
+	return errors.Is(err, syscall.ECONNREFUSED)
 }
