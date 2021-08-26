@@ -40,6 +40,8 @@ rules:
   resources:
   - controlplanes
   - controlplanes/status
+  - dataplanes
+  - dataplanes/status
   verbs:
   - create
   - delete
