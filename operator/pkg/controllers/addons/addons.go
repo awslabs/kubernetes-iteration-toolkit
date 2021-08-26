@@ -80,7 +80,7 @@ func (c *Controller) createKubeClient(ctx context.Context, nn types.NamespacedNa
 	if err != nil {
 		return nil, fmt.Errorf("creating rest config for new cluster, %w", err)
 	}
-	newClient, err := client.New(restConfig, client.Options{Scheme: scheme.KitCluster})
+	newClient, err := client.New(restConfig, client.Options{Scheme: scheme.GuestCluster})
 	if err != nil {
 		if errors.IsDNSLookUpNoSuchHost(err) {
 			return nil, fmt.Errorf("%v control plane endpoint not ready, lookup failed, %w", nn.Name, errors.WaitingForSubResources)
