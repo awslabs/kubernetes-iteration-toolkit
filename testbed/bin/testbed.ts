@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-import * as cdk from '@aws-cdk/core';
-import { TestbedStack } from '../stack';
+import * as cdk from '@aws-cdk/core'
+import { Testbed } from '../stack'
 
-const app = new cdk.App();
-new TestbedStack(app, 'TestbedStack', {
+new Testbed(new cdk.App(), 'testbed', {
     env: {
         account: process.env.CDK_DEFAULT_ACCOUNT,
         region: process.env.CDK_DEFAULT_REGION
