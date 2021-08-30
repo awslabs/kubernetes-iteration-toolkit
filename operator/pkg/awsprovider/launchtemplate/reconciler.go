@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/securitygroup"
 	"go.uber.org/zap"
 )
 
@@ -32,14 +33,14 @@ const (
 )
 
 type Controller struct {
-	ec2api *awsprovider.EC2
-	ssm    *awsprovider.SSM
+	ec2api        *awsprovider.EC2
+	ssm           *awsprovider.SSM
+	securityGroup *securitygroup.Provider
 }
 
-// NewLaunchTemplateController returns a controller for managing LaunchTemplates in AWS
-func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM) *Controller {
-	return &Controller{ec2api: ec2api, ssm: ssm}
-	// return &launchTemplate{ec2api: awsprovider.EC2Client(session), ssm: awsprovider.SSMClient(session)}
+// NewController returns a controller for managing LaunchTemplates in AWS
+func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM, sg *securitygroup.Provider) *Controller {
+	return &Controller{ec2api: ec2api, ssm: ssm, securityGroup: sg}
 }
 
 func (l *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
@@ -53,15 +54,18 @@ func (l *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 		if err := l.createLaunchTemplate(ctx, dataplane); err != nil {
 			return fmt.Errorf("creating launch template, %w", err)
 		}
-		zap.S().Infof("Successfully created launch templatefor cluster %v", dataplane.Spec.ClusterName)
-	} else {
-		zap.S().Debugf("Successfully discovered launch template for cluster %v", dataplane.Spec.ClusterName)
+		zap.S().Infof("Created launch template for cluster %v", dataplane.Spec.ClusterName)
+		return nil
 	}
 	return nil
 }
-func (l *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	securityGroupID := "sg-0dd66a817537d3411"
-	paramOutput, err := l.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
+
+func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
+	securityGroupID, err := c.securityGroup.For(ctx, dataplane.Spec.ClusterName)
+	if err != nil {
+		return fmt.Errorf("getting security group for control plane nodes, %w", err)
+	}
+	paramOutput, err := c.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name: aws.String("/aws/service/eks/optimized-ami/1.20/amazon-linux-2/recommended/image_id"),
 	})
 	if err != nil {
@@ -79,9 +83,10 @@ func (l *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 					VolumeType:          aws.String("gp3"),
 				}},
 			},
-			KeyName:      aws.String("dev-account-manually-created-VMs"),
+			KeyName:      aws.String("eks-dev-stack-key-pair"),
 			InstanceType: aws.String("t2.xlarge"),
 			ImageId:      aws.String(amiID),
+			// TODO Get the right instance profile
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
 				// Arn:  aws.String("arn:aws:iam::674320443449:instance-profile/cluster-foo-master-instance-profile"),
 				Name: aws.String("cluster-foo-master-instance-profile"),
@@ -90,14 +95,12 @@ func (l *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 			SecurityGroupIds: []*string{aws.String(securityGroupID)},
 			UserData:         aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData, dataplane.Spec.ClusterName, clusterca, endpoint)))),
 		},
-		LaunchTemplateName: aws.String(fmt.Sprintf("%s-nodes-template", dataplane.Spec.ClusterName)),
+		LaunchTemplateName: aws.String(templateName(dataplane.Spec.ClusterName)),
 		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),
 	}
-	output, err := l.ec2api.CreateLaunchTemplate(input)
-	if err != nil {
+	if _, err := c.ec2api.CreateLaunchTemplate(input); err != nil {
 		return fmt.Errorf("creating launch template, %w", err)
 	}
-	zap.S().Infof("Launch template output is %+v", output)
 	return nil
 }
 
@@ -114,9 +117,9 @@ func (l *Controller) getLaunchTemplates(ctx context.Context, clusterName string)
 	return output.LaunchTemplates, nil
 }
 
-func existingTemplateMatchesDesired(templates []*ec2.LaunchTemplate, templateName string) bool {
+func existingTemplateMatchesDesired(templates []*ec2.LaunchTemplate, clusterName string) bool {
 	for _, template := range templates {
-		if *template.LaunchTemplateName == templateName {
+		if *template.LaunchTemplateName == templateName(clusterName) {
 			return true
 		}
 	}
@@ -139,8 +142,15 @@ func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {
 		}, {
 			Key:   aws.String("Name"),
 			Value: aws.String(fmt.Sprintf("%s-%s", clusterName, svcName)),
+		}, {
+			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterName)),
+			Value: aws.String("owned"),
 		}},
 	}}
+}
+
+func templateName(clusterName string) string {
+	return fmt.Sprintf("kit-%s-cluster-nodes", clusterName)
 }
 
 var (
@@ -152,7 +162,8 @@ yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/li
 	--b64-cluster-ca %s \
 	--apiserver-endpoint %s`
 )
+
 var (
-	clusterca = `LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM1ekNDQWMrZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJeE1EZ3lOVEUxTURNeU5Gb1hEVE14TURneU16RTFNRE15TkZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTjhwCkQ4aE9RUi9sRjZmcDBmMXdCcWlZSmh2MjR2ZEhlVlZ2RzFJUDZrRUpPaGs0aEVwQjB5ekVnK1JZeFY0aTMzYmQKekQ2U1dyYUpoL051L0h3S2ZzOTVEY20vSTBZbE1GMjJDckJCUDZVVUFLc2pXak14STZidFB3Qk93dytwUGRhTAphc0tWSVNQSG9KTXNNaU55SWNoUk96dkJEbC8yUUc0TVJwdTcxTXM1VkxXNmJwQlVYK3NMWVVRREJnNk5sTlZoCmJOVUZlWi9EU0lDaXZuQ255Z2dkWGVVSEM2d0JjeGlURGVRRzBPRWgydzdLYWs2R29XbEhsR084OTJ3UkM1eTEKUEpiME5zN3hQVnZ5WjhKZTNlMXZGaHAvcHVBc2RqTlhuSlBhYWFoTlN1VURKazVBQk55b0NyVW9xNk1Nb1VPdQp4M2hCblpMcjlJTmtwa0FjZnJrQ0F3RUFBYU5DTUVBd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZPUjlkT0tNdTZoVnRYZE1iYjRQOWJJc0xIQTNNQTBHQ1NxR1NJYjMKRFFFQkN3VUFBNElCQVFCTU9kbWZlSHBpeEZBWHpBZTNUUWRtRHZDbEVQeEVBMEpzZWEzQWZMTzAyQU51aVY5OQozZEF5cUJRSlY1UFhWZEM1bjduUFhQT0xLSytkV0FYNG44eEhqOFNuUEdoQUFqb1JDQlJoUHZYRXEvMVdGNEZpCmhvOEpLTlZnaHoxZkk4K01CTGdBWXFhVy9rZlB1ZTUzRVZmeVpNRllOMC9uREF1Tno3MEJNRnpNOTBkb0ZTZU4KV1pGQmZrdGNEcS8rR1lvMEJlR0tYRE15RUptNlk2dU5RVWJHN1puaWJMcnFmd2h4aXhEVHpIZmM4dkNqM1QrQwo2emMrYU1yWGQ5YlI4bDVpQzlnQUlvQUpFeFJSZHAxZW8vYUNWNmYxQkdqakw3VnJ2VC85cGFxaUQ3alZXcXBxCkJzSkI3YjJNNkJoTm9WU0djb3pzN2FQRmVjWDNBTDY5dzdxZAotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==`
-	endpoint  = "k8s-default-examplec-0a133f4cf3-75fe4dd366a0459d.elb.us-west-2.amazonaws.com"
+	clusterca = ``
+	endpoint  = ``
 )
