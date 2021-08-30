@@ -20,6 +20,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers"
+	"github.com/awslabs/kit/operator/pkg/controllers/addons"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
@@ -32,6 +33,7 @@ import (
 type controlPlane struct {
 	etcdController   *etcd.Controller
 	masterController *master.Controller
+	addonsController *addons.Controller
 }
 
 // NewController returns a controller for managing VPCs in AWS
@@ -39,6 +41,7 @@ func NewController(kubeClient client.Client) *controlPlane {
 	return &controlPlane{
 		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
 		masterController: master.New(kubeprovider.New(kubeClient)),
+		addonsController: addons.New(kubeprovider.New(kubeClient)),
 	}
 }
 
@@ -59,6 +62,7 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	for _, resource := range []reconciler.Interface{
 		c.etcdController,
 		c.masterController,
+		c.addonsController,
 	} {
 		if err := resource.Reconcile(ctx, object.(*v1alpha1.ControlPlane)); err != nil {
 			return nil, fmt.Errorf("reconciling, %w", err)

@@ -42,7 +42,7 @@ func (c *Client) EnsureCreate(ctx context.Context, desired client.Object) error 
 		if errors.IsNotFound(err) {
 			return c.Create(ctx, desired)
 		}
-		return fmt.Errorf("getting object %v, name %v, %w",
+		return fmt.Errorf("getting object when creating %v, name %v, %w",
 			desired.GetObjectKind().GroupVersionKind().GroupKind().String(), desired.GetName(), err)
 	}
 	return nil

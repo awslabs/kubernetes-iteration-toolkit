@@ -16,6 +16,8 @@ package errors
 
 import (
 	"errors"
+	"net"
+	"syscall"
 
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -30,4 +32,18 @@ func IsNotFound(err error) bool {
 
 func IsWaitingForSubResource(err error) bool {
 	return errors.Is(err, WaitingForSubResources)
+}
+
+func IsDNSLookUpNoSuchHost(err error) bool {
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr) && dnsErr.IsNotFound
+}
+
+func IsNetIOTimeOut(err error) bool {
+	netErr := net.Error(nil)
+	return errors.As(err, &netErr) && netErr.Temporary() && netErr.Timeout()
+}
+
+func IsConnectionRefused(err error) bool {
+	return errors.Is(err, syscall.ECONNREFUSED)
 }

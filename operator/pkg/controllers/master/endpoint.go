@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.ControlPlane) (err error) {
@@ -40,7 +41,7 @@ func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.Control
 		},
 		Spec: v1.ServiceSpec{
 			Type:     v1.ServiceTypeLoadBalancer,
-			Selector: labelsFor(cp.ClusterName()),
+			Selector: apiServerLabels(cp.ClusterName()),
 			Ports: []v1.ServicePort{{
 				Port:       443,
 				Name:       apiserverPortName(cp.ClusterName()),
@@ -52,8 +53,12 @@ func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.Control
 }
 
 func (c *Controller) getClusterEndpoint(ctx context.Context, nn types.NamespacedName) (string, error) {
+	return GetClusterEndpoint(ctx, c.kubeClient, nn)
+}
+
+func GetClusterEndpoint(ctx context.Context, client client.Client, nn types.NamespacedName) (string, error) {
 	svc := &v1.Service{}
-	if err := c.kubeClient.Get(ctx, types.NamespacedName{nn.Namespace, ServiceNameFor(nn.Name)}, svc); err != nil {
+	if err := client.Get(ctx, types.NamespacedName{nn.Namespace, ServiceNameFor(nn.Name)}, svc); err != nil {
 		if errors.IsNotFound(err) {
 			return "", fmt.Errorf("getting control plane endpoint, %w", errors.WaitingForSubResources)
 		}

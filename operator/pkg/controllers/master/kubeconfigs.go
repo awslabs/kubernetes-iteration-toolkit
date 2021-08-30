@@ -20,15 +20,14 @@ import (
 	"fmt"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/errors"
+	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
+	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	"go.uber.org/zap"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -49,12 +48,14 @@ func (c *Controller) reconcileKubeConfigs(ctx context.Context, controlPlane *v1a
 	if err != nil {
 		return err
 	}
-	for _, request := range []*configRequest{
-		kubeAdminCertConfig(controlPlane.ClusterName(), endpoint, caSecret),
-		kubeSchedulerCertConfig(controlPlane.ClusterName(), localhostEndpoint, caSecret),
-		kubeControllerManagerCertConfig(controlPlane.ClusterName(), localhostEndpoint, caSecret),
+	clusterName := controlPlane.ClusterName()
+	ns := controlPlane.Namespace
+	for _, request := range []*kubeconfigs.Request{
+		kubeConfigRequest(clusterName, ns, endpoint, kubeAdminAuthRequest(clusterName, caSecret)),
+		kubeConfigRequest(clusterName, ns, localhostEndpoint, kubeSchedulerAuthRequest(clusterName, caSecret)),
+		kubeConfigRequest(clusterName, ns, localhostEndpoint, kubeControllerManagerAuthRequest(clusterName, caSecret)),
 	} {
-		if err := c.reconcileConfigFor(ctx, controlPlane, request); err != nil {
+		if err := c.kubeConfigs.ReconcileConfigFor(ctx, controlPlane, request); err != nil {
 			return err
 		}
 	}
@@ -62,112 +63,86 @@ func (c *Controller) reconcileKubeConfigs(ctx context.Context, controlPlane *v1a
 	return nil
 }
 
-func (c *Controller) reconcileConfigFor(ctx context.Context, controlPlane *v1alpha1.ControlPlane, request *configRequest) error {
-	clusterName := controlPlane.ClusterName()
-	namespace := controlPlane.Namespace
-	// Check if this secret for kubeconfig exists in the api server
-	_, err := c.keypairs.GetSecretFromServer(ctx, object.NamespacedName(request.auth.Name, namespace))
-	if err != nil && errors.IsNotFound(err) {
-		// Generate the cert and key for the user
-		secret, err := request.auth.Create()
-		if err != nil {
-			return fmt.Errorf("creating cert and key for %v, %w", request.auth.CommonName, err)
-		}
-		// certs generated for clients (admin, KCM, scheduler) are stored in the kubeconfig format.
-		// generate kubeconfig for this is client and convert to YAML
-		configBytes, err := runtime.Encode(clientcmdlatest.Codec, kubeConfigFor(request, clusterName, secret))
-		if err != nil {
-			return fmt.Errorf("encoding kube config object %v, %w", request.auth.CommonName, err)
-		}
-		// Create a secret object with config and ensure the secret object is in the api server
-		if err := c.kubeClient.EnsureCreate(ctx, object.WithOwner(controlPlane,
-			secrets.CreateWithConfig(object.NamespacedName(request.auth.Name, namespace), configBytes)),
-		); err != nil {
-			return fmt.Errorf("ensuring kube config for %v, %w", request.auth.CommonName, err)
-		}
-		return nil
-	}
-	// TODO validate the existing config in the secret
-	return err
+type authRequest struct {
+	config *certutil.Config
+	name   string
+	caCert []byte
+	caKey  []byte
 }
 
-func kubeConfigFor(request *configRequest, clusterName string, userSecret *v1.Secret) *clientcmdapi.Config {
-	contextName := fmt.Sprintf("%s@%s", request.auth.Name, clusterName)
-	_, caCert := secrets.Parse(request.auth.CASecret)
-	key, cert := secrets.Parse(userSecret)
-	return &clientcmdapi.Config{
-		Kind: "Config",
-		Clusters: map[string]*clientcmdapi.Cluster{
-			clusterName: {
-				Server:                   fmt.Sprintf("https://%s:443", request.endpoint),
-				CertificateAuthorityData: caCert,
-			},
-		},
+func kubeConfigRequest(clusterName, ns, endpoint string, clientAuth *authRequest) *kubeconfigs.Request {
+	contextName := fmt.Sprintf("%s@%s", clientAuth.name, clusterName)
+	return &kubeconfigs.Request{
+		ClusterContext:    contextName,
+		ApiServerEndpoint: endpoint,
+		Name:              clientAuth.name,
+		ClusterName:       clusterName,
+		Namespace:         ns,
+		AuthInfo:          clientAuth,
 		Contexts: map[string]*clientcmdapi.Context{
 			contextName: {
 				Cluster:  clusterName,
-				AuthInfo: request.auth.Name,
-			},
-		},
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			request.auth.Name: {
-				ClientKeyData:         key,
-				ClientCertificateData: cert,
-			},
-		},
-		CurrentContext: contextName,
-	}
-}
-
-type configRequest struct {
-	endpoint string
-	auth     *secrets.Request
-}
-
-func kubeAdminCertConfig(clusterName, endpoint string, caSecret *v1.Secret) *configRequest {
-	return &configRequest{
-		endpoint: endpoint,
-		auth: &secrets.Request{
-			Name:     KubeAdminSecretNameFor(clusterName),
-			Type:     secrets.KeyWithSignedCert,
-			CASecret: caSecret,
-			Config: &certutil.Config{
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-				CommonName:   "kubernetes-admin",
-				Organization: []string{"system:masters"},
+				AuthInfo: clientAuth.name,
 			},
 		},
 	}
 }
 
-func kubeSchedulerCertConfig(clusterName, endpoint string, caSecret *v1.Secret) *configRequest {
-	return &configRequest{
-		endpoint: endpoint,
-		auth: &secrets.Request{
-			Name:     KubeSchedulerSecretNameFor(clusterName),
-			Type:     secrets.KeyWithSignedCert,
-			CASecret: caSecret,
-			Config: &certutil.Config{
-				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-				CommonName: "system:kube-scheduler",
-			},
+func kubeAdminAuthRequest(clusterName string, caSecret *v1.Secret) *authRequest {
+	caKey, caCert := secrets.Parse(caSecret)
+	return &authRequest{
+		name:   KubeAdminSecretNameFor(clusterName),
+		caCert: caCert,
+		caKey:  caKey,
+		config: &certutil.Config{
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			CommonName:   "kubernetes-admin",
+			Organization: []string{"system:masters"},
 		},
 	}
 }
 
-func kubeControllerManagerCertConfig(clusterName, endpoint string, caSecret *v1.Secret) *configRequest {
-	return &configRequest{
-		endpoint: endpoint,
-		auth: &secrets.Request{
-			Name:     KubeControllerManagerSecretNameFor(clusterName),
-			Type:     secrets.KeyWithSignedCert,
-			CASecret: caSecret,
-			Config: &certutil.Config{
-				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-				CommonName: "system:kube-controller-manager",
-			},
+func kubeSchedulerAuthRequest(clusterName string, caSecret *v1.Secret) *authRequest {
+	caKey, caCert := secrets.Parse(caSecret)
+	return &authRequest{
+		name:   KubeSchedulerSecretNameFor(clusterName),
+		caCert: caCert,
+		caKey:  caKey,
+		config: &certutil.Config{
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			CommonName: "system:kube-scheduler",
 		},
 	}
+}
+
+func kubeControllerManagerAuthRequest(clusterName string, caSecret *v1.Secret) *authRequest {
+	caKey, caCert := secrets.Parse(caSecret)
+	return &authRequest{
+		name:   KubeControllerManagerSecretNameFor(clusterName),
+		caCert: caCert,
+		caKey:  caKey,
+		config: &certutil.Config{
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			CommonName: "system:kube-controller-manager",
+		},
+	}
+}
+
+func (r *authRequest) Generate() (map[string]*clientcmdapi.AuthInfo, error) {
+	private, public, err := pkiutil.GenerateSignedCertAndKey(r.config, r.caCert, r.caKey)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]*clientcmdapi.AuthInfo{
+		r.name: {
+			ClientKeyData:         private,
+			ClientCertificateData: public,
+		},
+	}, err
+}
+
+func (r *authRequest) CACert() []byte {
+	return r.caCert
 }
 
 func KubeSchedulerSecretNameFor(clusterName string) string {
