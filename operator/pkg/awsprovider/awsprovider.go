@@ -82,3 +82,11 @@ type AutoScaling struct {
 func AutoScalingClient(sess *session.Session) *AutoScaling {
 	return &AutoScaling{AutoScaling: autoscaling.New(sess)}
 }
+
+func AccountID(sess *session.Session) (string, error) {
+	doc, err := ec2metadata.New(sess).GetInstanceIdentityDocument()
+	if err != nil {
+		return "", fmt.Errorf("getting instance metadata, %v", err)
+	}
+	return doc.AccountID, nil
+}

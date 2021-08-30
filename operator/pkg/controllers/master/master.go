@@ -17,6 +17,7 @@ package master
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
@@ -30,13 +31,15 @@ type Controller struct {
 	kubeClient  *kubeprovider.Client
 	keypairs    *keypairs.Provider
 	kubeConfigs *kubeconfigs.Provider
+	session     *session.Session
 }
 
-func New(kubeclient *kubeprovider.Client) *Controller {
+func New(kubeclient *kubeprovider.Client, sess *session.Session) *Controller {
 	return &Controller{
 		kubeClient:  kubeclient,
 		keypairs:    keypairs.Reconciler(kubeclient),
 		kubeConfigs: kubeconfigs.Reconciler(kubeclient),
+		session:     sess,
 	}
 }
 
@@ -64,6 +67,6 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 // are configured with pod afinity. So the control plane nodes for a cluster
 // will have 2 labels cluster name and clustername-apiserver
 func nodeSelector(clusterName string) map[string]string {
-	return patch.UnionStringMaps(apiServerLabels(clusterName),
+	return patch.UnionStringMaps(APIServerLabels(clusterName),
 		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }

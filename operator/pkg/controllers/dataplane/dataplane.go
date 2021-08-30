@@ -17,9 +17,13 @@ package dataplane
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/launchtemplate"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/securitygroup"
 	"github.com/awslabs/kit/operator/pkg/controllers"
+	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/results"
 	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,13 +31,19 @@ import (
 )
 
 type dataplane struct {
-	kubeClient     client.Client
+	kubeClient     *kubeprovider.Client
 	launchTemplate *launchtemplate.Controller
 }
 
 // NewController returns a controller for managing VPCs in AWS
-func NewController(kubeClient client.Client, lt *launchtemplate.Controller) *dataplane {
-	return &dataplane{kubeClient: kubeClient, launchTemplate: lt}
+func NewController(kubeClient client.Client, session *session.Session) *dataplane {
+	return &dataplane{kubeClient: kubeprovider.New(kubeClient),
+		launchTemplate: launchtemplate.NewController(
+			awsprovider.EC2Client(session),
+			awsprovider.SSMClient(session),
+			securitygroup.New(awsprovider.EC2Client(session), kubeprovider.New(kubeClient)),
+		),
+	}
 }
 
 // Name returns the name of the controller
@@ -64,7 +74,7 @@ func (d *dataplane) Reconcile(ctx context.Context, object controllers.Object) (r
 	if err := d.launchTemplate.Reconcile(ctx, dp); err != nil {
 		return results.Failed, err
 	}
-	// Create an ASG with desired nodecount
+	// Create a flex fleet with desired nodecount
 	return results.Created, nil
 }
 

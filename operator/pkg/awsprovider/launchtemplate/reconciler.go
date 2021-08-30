@@ -43,15 +43,16 @@ func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM, sg *securitygr
 	return &Controller{ec2api: ec2api, ssm: ssm, securityGroup: sg}
 }
 
-func (l *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
+func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
+	// c.ec2api
 	// get launch template
-	templates, err := l.getLaunchTemplates(ctx, dataplane.Spec.ClusterName)
+	templates, err := c.getLaunchTemplates(ctx, dataplane.Spec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("getting launch template, %w", err)
 	}
 	if !existingTemplateMatchesDesired(templates, dataplane.Spec.ClusterName) { // TODO check if existing LT is same as desired LT
 		// if not present create launch template
-		if err := l.createLaunchTemplate(ctx, dataplane); err != nil {
+		if err := c.createLaunchTemplate(ctx, dataplane); err != nil {
 			return fmt.Errorf("creating launch template, %w", err)
 		}
 		zap.S().Infof("Created launch template for cluster %v", dataplane.Spec.ClusterName)
@@ -104,8 +105,8 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 	return nil
 }
 
-func (l *Controller) getLaunchTemplates(ctx context.Context, clusterName string) ([]*ec2.LaunchTemplate, error) {
-	output, err := l.ec2api.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{
+func (c *Controller) getLaunchTemplates(ctx context.Context, clusterName string) ([]*ec2.LaunchTemplate, error) {
+	output, err := c.ec2api.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{
 		Filters: ec2FilterFor(clusterName),
 	})
 	if err != nil {
