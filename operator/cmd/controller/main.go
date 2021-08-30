@@ -4,18 +4,11 @@ import (
 	"flag"
 	"fmt"
 
-<<<<<<< HEAD
-	"github.com/awslabs/kit/operator/pkg/controllers"
-	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
-	"github.com/awslabs/kit/operator/pkg/utils/scheme"
-=======
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	dpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
 	"github.com/awslabs/kit/operator/pkg/controllers/dataplane"
->>>>>>> b34b9b8 (Initial commit for worker nodes)
+	"github.com/awslabs/kit/operator/pkg/utils/scheme"
 
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
@@ -56,7 +49,6 @@ func main() {
 		Port:                    options.WebhookPort,
 		LeaderElectionNamespace: "kit",
 	})
-
 	session := awsprovider.NewSession()
 	err := manager.RegisterControllers(
 		controlplane.NewController(manager.GetClient(), session),

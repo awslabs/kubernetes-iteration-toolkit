@@ -58,6 +58,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 	for _, reconcile := range []reconciler{
 		newCluster.kubeConfigForKubeProxy,
 		newCluster.daemonsetForKubeProxy,
+		newCluster.reconcileCoreDNS,
 	} {
 		if err := reconcile(ctx, c, controlPlane); err != nil {
 			return err
