@@ -3,32 +3,29 @@ package securitygroup
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
-	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	v1 "k8s.io/api/core/v1"
+	cpinstances "github.com/awslabs/kit/operator/pkg/utils/instances"
 	"knative.dev/pkg/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Provider struct {
-	ec2api     *awsprovider.EC2
-	kubeClient *kubeprovider.Client
+	ec2api    *awsprovider.EC2
+	instances *cpinstances.Provider
 }
 
 func New(ec2api *awsprovider.EC2, client *kubeprovider.Client) *Provider {
-	return &Provider{ec2api: ec2api, kubeClient: client}
+	return &Provider{ec2api: ec2api, instances: cpinstances.New(client)}
 }
 
 func (p *Provider) For(ctx context.Context, clusterName string) (string, error) {
-	instanceID, err := p.controlPlaneInstancesFor(ctx, clusterName)
+	instanceID, err := p.instances.ControlPlaneInstancesFor(ctx, clusterName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getting control plane instances for %v, %w", clusterName, err)
 	}
-	return p.getSecurityGroupFor(ctx, instanceID)
+	return p.getSecurityGroupFor(ctx, instanceID[0])
 }
 
 func (p *Provider) getSecurityGroupFor(ctx context.Context, instanceID string) (string, error) {
@@ -49,31 +46,4 @@ func (p *Provider) getSecurityGroupFor(ctx context.Context, instanceID string) (
 			len(output.Reservations[0].Instances[0].SecurityGroups))
 	}
 	return *output.Reservations[0].Instances[0].SecurityGroups[0].GroupId, nil
-}
-
-func (p *Provider) controlPlaneInstancesFor(ctx context.Context, clusterName string) (string, error) {
-	nodes, err := p.nodesWithLabelFor(ctx, clusterName)
-	if err != nil {
-		return "", err
-	}
-	return parseInstanceID(nodes.Items[0].Spec.ProviderID)
-}
-
-func (p *Provider) nodesWithLabelFor(ctx context.Context, clusterName string) (*v1.NodeList, error) {
-	nodes := &v1.NodeList{}
-	if err := p.kubeClient.List(ctx, nodes, client.MatchingLabels(master.APIServerLabels(clusterName))); err != nil {
-		return nil, fmt.Errorf("getting kube nodes for cluster %v, %w", clusterName, err)
-	}
-	return nodes, nil
-}
-
-func parseInstanceID(providerID string) (string, error) {
-	if !strings.HasPrefix(providerID, "aws:///") {
-		return "", fmt.Errorf("incorrect format for provider ID, %s", providerID)
-	}
-	values := strings.Split(strings.TrimPrefix(providerID, "aws:///"), "/")
-	if len(values) != 2 {
-		return "", fmt.Errorf("parsing provider ID, %s", providerID)
-	}
-	return values[1], nil
 }

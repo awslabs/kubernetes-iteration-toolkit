@@ -22,74 +22,65 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
+
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kuberuntime "k8s.io/apimachinery/pkg/runtime"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // reconcileAuthenticatorConfig creates required configs for aws-iam-authenticator and stores them as secret in api server
 func (c *Controller) reconcileAuthenticatorConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	awsAccountID, err := awsprovider.AccountID(c.session)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting AWS account ID, %w", err)
 	}
-	configBytes, err := ParseTemplate(authenticatorConfig, struct{ ClusterName, Group, AWSAccountID string }{
+	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ ClusterName, Namespace, Group, AWSAccountID, PrivateDNS string }{
 		ClusterName:  controlPlane.ClusterName(),
+		Namespace:    controlPlane.Namespace,
 		Group:        v1alpha1.SchemeGroupVersion.Group,
 		AWSAccountID: awsAccountID,
+		PrivateDNS:   "{{EC2PrivateDNSName}}",
 	})
 	if err != nil {
 		return fmt.Errorf("generating authenticator config, %w", err)
 	}
-	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "aws-iam-authenticator",
-			Namespace: controlPlane.Namespace,
-			Labels:    authenticatorLabel(),
-		},
-		Data: map[string]string{
-			"config.yaml": string(configBytes),
-		},
-	})
-}
-
-func authenticatorLabel() map[string]string {
-	return map[string]string{
-		"k8s-app": "aws-iam-authenticator",
+	configMap := &v1.ConfigMap{}
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configMapBytes, configMap); err != nil {
+		return fmt.Errorf("decoding authenticator config map, %w", err)
 	}
+	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, configMap)
 }
 
 var (
-	authenticatorConfig = `clusterID: {{ .ClusterName }}.{{ .Group }}
-server:
-	mapRoles:
-	- groups:
-		- system:bootstrappers
-		- system:nodes
-		rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/KitNodeRole-{{ .ClusterName }}-cluster
-		username: system:node:{{EC2PrivateDNSName}}
-	# List of Account IDs to whitelist for authentication
-	mapAccounts:
-	- {{ .AWSAccountID }}`
+	authenticatorConfig = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-iam-authenticator
+  namespace: {{ .Namespace }}
+data:
+  config.yaml: |
+    clusterID: {{ .ClusterName }}.{{ .Group }}
+    server:
+      mapRoles:
+        - groups:
+          - system:bootstrappers
+          - system:nodes
+          rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/KitNodeRole-{{ .ClusterName }}-cluster
+          username: system:node:{{ .PrivateDNS}}
+      # List of Account IDs to whitelist for authentication
+      mapAccounts:
+        - {{ .AWSAccountID }}
+`
 )
 
 // TODO move this to util. ParseTemplate validates and parses passed as argument template
 func ParseTemplate(strtmpl string, obj interface{}) ([]byte, error) {
 	var buf bytes.Buffer
-	tmpl, err := template.New("template").Parse(strtmpl)
-	if err != nil {
-		return nil, fmt.Errorf("error when parsing template, %w", err)
-	}
-	err = tmpl.Execute(&buf, obj)
+	tmpl := template.Must(template.New("Text").Parse(strtmpl))
+	err := tmpl.Execute(&buf, obj)
 	if err != nil {
 		return nil, fmt.Errorf("error when executing template, %w", err)
 	}
 	return buf.Bytes(), nil
 }
-
-// c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{}, &appsv1.DaemonSet{
-// 	ObjectMeta: metav1.ObjectMeta{
-// 		Name:      "coredns",
-// 		Namespace: kubeSystem,
-// 		Labels:    coreDNSLabels(),
-// 	},
-// })

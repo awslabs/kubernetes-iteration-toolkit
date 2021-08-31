@@ -15,7 +15,8 @@ limitations under the License.
 package scheme
 
 import (
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	cp "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	dp "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -28,7 +29,8 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(SubstrateCluster)
-	_ = v1alpha1.AddToScheme(SubstrateCluster)
+	_ = cp.AddToScheme(SubstrateCluster)
+	_ = dp.AddToScheme(SubstrateCluster)
 
 	_ = clientgoscheme.AddToScheme(GuestCluster)
 }

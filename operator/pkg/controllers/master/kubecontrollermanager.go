@@ -46,7 +46,7 @@ func kcmDeploymentSpec(controlPlane *v1alpha1.ControlPlane) *appsv1.Deployment {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: kcmLabels(controlPlane.ClusterName()),
 			},
-			Replicas: aws.Int32(1),
+			Replicas: aws.Int32(3),
 			Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

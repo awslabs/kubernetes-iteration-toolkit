@@ -25,7 +25,13 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/securitygroup"
+	"github.com/awslabs/kit/operator/pkg/controllers/master"
+	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
+	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -33,18 +39,17 @@ const (
 )
 
 type Controller struct {
-	ec2api        *awsprovider.EC2
-	ssm           *awsprovider.SSM
-	securityGroup *securitygroup.Provider
+	ec2api     *awsprovider.EC2
+	ssm        *awsprovider.SSM
+	kubeclient *kubeprovider.Client
 }
 
 // NewController returns a controller for managing LaunchTemplates in AWS
-func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM, sg *securitygroup.Provider) *Controller {
-	return &Controller{ec2api: ec2api, ssm: ssm, securityGroup: sg}
+func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM, client *kubeprovider.Client) *Controller {
+	return &Controller{ec2api: ec2api, ssm: ssm, kubeclient: client}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	// c.ec2api
 	// get launch template
 	templates, err := c.getLaunchTemplates(ctx, dataplane.Spec.ClusterName)
 	if err != nil {
@@ -61,11 +66,32 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 	return nil
 }
 
+func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
+	if _, err := c.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
+		LaunchTemplateName: aws.String(TemplateName(dataplane.Spec.ClusterName)),
+	}); err != nil {
+		return fmt.Errorf("deleting launch template, %w", err)
+	}
+	return nil
+}
+
 func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	securityGroupID, err := c.securityGroup.For(ctx, dataplane.Spec.ClusterName)
+	// Currently, we get the same security group assigned to control plane instances
+	// At some point, we will be creating dataplane specific security groups
+	securityGroupID, err := securitygroup.New(c.ec2api, c.kubeclient).For(ctx, dataplane.Spec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("getting security group for control plane nodes, %w", err)
 	}
+	clusterEndpoint, err := master.GetClusterEndpoint(ctx, c.kubeclient, types.NamespacedName{dataplane.Namespace, dataplane.Spec.ClusterName})
+	if err != nil {
+		return fmt.Errorf("getting cluster endpoint, %w", err)
+	}
+	caSecret, err := keypairs.Reconciler(c.kubeclient).GetSecretFromServer(ctx,
+		object.NamespacedName(master.RootCASecretNameFor(dataplane.Spec.ClusterName), dataplane.Namespace))
+	if err != nil {
+		return fmt.Errorf("getting control plane ca certificate, %w", err)
+	}
+	_, clusterCA := secrets.Parse(caSecret)
 	paramOutput, err := c.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name: aws.String("/aws/service/eks/optimized-ami/1.20/amazon-linux-2/recommended/image_id"),
 	})
@@ -84,19 +110,17 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 					VolumeType:          aws.String("gp3"),
 				}},
 			},
-			KeyName:      aws.String("eks-dev-stack-key-pair"),
-			InstanceType: aws.String("t2.xlarge"),
+			InstanceType: aws.String("t2.xlarge"), // TODO get this from dataplane spec
 			ImageId:      aws.String(amiID),
-			// TODO Get the right instance profile
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				// Arn:  aws.String("arn:aws:iam::674320443449:instance-profile/cluster-foo-master-instance-profile"),
-				Name: aws.String("cluster-foo-master-instance-profile"),
+				Name: aws.String(fmt.Sprintf("KitNodeInstanceProfile-%s", dataplane.Spec.ClusterName)),
 			},
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 			SecurityGroupIds: []*string{aws.String(securityGroupID)},
-			UserData:         aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData, dataplane.Spec.ClusterName, clusterca, endpoint)))),
+			UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
+				dataplane.Spec.ClusterName, v1alpha1.SchemeGroupVersion.Group, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
 		},
-		LaunchTemplateName: aws.String(templateName(dataplane.Spec.ClusterName)),
+		LaunchTemplateName: aws.String(TemplateName(dataplane.Spec.ClusterName)),
 		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),
 	}
 	if _, err := c.ec2api.CreateLaunchTemplate(input); err != nil {
@@ -120,7 +144,7 @@ func (c *Controller) getLaunchTemplates(ctx context.Context, clusterName string)
 
 func existingTemplateMatchesDesired(templates []*ec2.LaunchTemplate, clusterName string) bool {
 	for _, template := range templates {
-		if *template.LaunchTemplateName == templateName(clusterName) {
+		if *template.LaunchTemplateName == TemplateName(clusterName) {
 			return true
 		}
 	}
@@ -150,7 +174,7 @@ func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {
 	}}
 }
 
-func templateName(clusterName string) string {
+func TemplateName(clusterName string) string {
 	return fmt.Sprintf("kit-%s-cluster-nodes", clusterName)
 }
 
@@ -158,13 +182,8 @@ var (
 	userData = `
 #!/bin/bash
 yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
-/etc/eks/bootstrap.sh %s \
+/etc/eks/bootstrap.sh %s.%s \
 	--kubelet-extra-args '--node-labels=kit.sh/provisioned=true' \
 	--b64-cluster-ca %s \
-	--apiserver-endpoint %s`
-)
-
-var (
-	clusterca = ``
-	endpoint  = ``
+	--apiserver-endpoint https://%s`
 )

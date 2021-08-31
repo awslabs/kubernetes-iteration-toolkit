@@ -16,16 +16,20 @@ package dataplane
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws/session"
+	cpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/instances"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/launchtemplate"
-	"github.com/awslabs/kit/operator/pkg/awsprovider/securitygroup"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/results"
+	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -33,6 +37,7 @@ import (
 type dataplane struct {
 	kubeClient     *kubeprovider.Client
 	launchTemplate *launchtemplate.Controller
+	instances      *instances.Controller
 }
 
 // NewController returns a controller for managing VPCs in AWS
@@ -41,7 +46,11 @@ func NewController(kubeClient client.Client, session *session.Session) *dataplan
 		launchTemplate: launchtemplate.NewController(
 			awsprovider.EC2Client(session),
 			awsprovider.SSMClient(session),
-			securitygroup.New(awsprovider.EC2Client(session), kubeprovider.New(kubeClient)),
+			kubeprovider.New(kubeClient),
+		),
+		instances: instances.NewController(awsprovider.EC2Client(session),
+			awsprovider.AutoScalingClient(session),
+			kubeprovider.New(kubeClient),
 		),
 	}
 }
@@ -56,28 +65,50 @@ func (d *dataplane) For() controllers.Object {
 	return &v1alpha1.DataPlane{}
 }
 
+type reconciler func(context.Context, *v1alpha1.DataPlane) (err error)
+
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the ControlPlane.Status
 // object
 func (d *dataplane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
 	dp := object.(*v1alpha1.DataPlane)
-	_ = dp
-	zap.S().Info("Reconciling dataplane object")
-	// Get the control plane object, if not found error
-	// Get CA cert from secrets, if not found error
-	// Get control plane endpoint, if not found error
-
-	// Find the VPC we are currently running inside
-	// Get the subnets possible in the VPC, hardcode the subnet for now
-	// Get the security group current VM is running in, hardcode the group for now
-	// Create a launch template with user data
-	if err := d.launchTemplate.Reconcile(ctx, dp); err != nil {
-		return results.Failed, err
+	// Get the control plane object, if not found error, add Owner reference to control plane object
+	if err := d.setOwnerForDataplane(ctx, dp); err != nil {
+		return results.Failed, fmt.Errorf("setting owner reference for dataplane, %w", err)
 	}
-	// Create a flex fleet with desired nodecount
+	// Create a launch template and ASG with desired node count
+	for _, reconciler := range []reconciler{
+		d.launchTemplate.Reconcile,
+		d.instances.Reconcile,
+	} {
+		if err := reconciler(ctx, dp); err != nil {
+			return results.Failed, err
+		}
+	}
+	zap.S().Info("[%s] data plane reconciled", dp.Spec.ClusterName)
 	return results.Created, nil
 }
 
-func (d *dataplane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
+func (d *dataplane) setOwnerForDataplane(ctx context.Context, dataplane *v1alpha1.DataPlane) (err error) {
+	if len(dataplane.GetOwnerReferences()) == 0 {
+		cp := &cpv1alpha1.ControlPlane{}
+		if err := d.kubeClient.Get(ctx, types.NamespacedName{dataplane.GetNamespace(), dataplane.Spec.ClusterName}, cp); err != nil {
+			return fmt.Errorf("getting control plane object, %w", err)
+		}
+		return d.kubeClient.Update(ctx, object.WithOwner(cp, dataplane))
+	}
+	return nil
+}
+
+func (d *dataplane) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	dp := object.(*v1alpha1.DataPlane)
+	for _, reconciler := range []reconciler{
+		d.launchTemplate.Finalize,
+		d.instances.Finalize,
+	} {
+		if err := reconciler(ctx, dp); err != nil {
+			return results.Failed, err
+		}
+	}
 	return results.Terminated, nil
 }

@@ -26,9 +26,3 @@ spec:
       # https://github.com/aws/amazon-eks-pod-identity-webhook/issues/8#issuecomment-636888074
       securityContext:
         fsGroup: 1000
-      nodeSelector:
-        kubernetes.io/hostname: ip-192-168-12-204.us-west-2.compute.internal
-      tolerations:
-      - key: "block_load"
-        operator: "Exists"
-        effect: "NoSchedule"

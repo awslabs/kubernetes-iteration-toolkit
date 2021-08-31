@@ -45,11 +45,11 @@ rules:
   verbs:
   - create
   - delete
-  - patch
   - get
   - list
   - patch
   - watch
+  - update
 - apiGroups:
   - coordination.k8s.io
   resources:

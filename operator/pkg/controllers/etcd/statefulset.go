@@ -45,8 +45,9 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelsFor(controlPlane.ClusterName()),
 			},
-			ServiceName: ServiceNameFor(controlPlane.ClusterName()),
-			Replicas:    aws.Int32(defaultEtcdReplicas),
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			ServiceName:         ServiceNameFor(controlPlane.ClusterName()),
+			Replicas:            aws.Int32(defaultEtcdReplicas),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labelsFor(controlPlane.ClusterName()),
