@@ -18,8 +18,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/addons"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
@@ -38,10 +38,10 @@ type controlPlane struct {
 }
 
 // NewController returns a controller for managing VPCs in AWS
-func NewController(kubeClient client.Client, session *session.Session) *controlPlane {
+func NewController(kubeClient client.Client, account awsprovider.Account) *controlPlane {
 	return &controlPlane{
 		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
-		masterController: master.New(kubeprovider.New(kubeClient), session),
+		masterController: master.New(kubeprovider.New(kubeClient), account),
 		addonsController: addons.New(kubeprovider.New(kubeClient)),
 	}
 }

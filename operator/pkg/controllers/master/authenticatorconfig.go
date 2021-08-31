@@ -21,7 +21,6 @@ import (
 	"html/template"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/awsprovider"
 
 	v1 "k8s.io/api/core/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +29,7 @@ import (
 
 // reconcileAuthenticatorConfig creates required configs for aws-iam-authenticator and stores them as secret in api server
 func (c *Controller) reconcileAuthenticatorConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	awsAccountID, err := awsprovider.AccountID(c.session)
+	awsAccountID, err := c.cloudProvider.ID()
 	if err != nil {
 		return fmt.Errorf("getting AWS account ID, %w", err)
 	}

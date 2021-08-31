@@ -41,6 +41,11 @@ var (
 	env        *environment.Environment
 )
 
+type fakeAccountProvider struct{}
+
+func (f *fakeAccountProvider) ID() (string, error) {
+	return "fakeAccountID", nil
+}
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "ControlPlane")
@@ -50,7 +55,7 @@ var _ = BeforeSuite(func() {
 	env = environment.New()
 	Expect(env.Start(scheme.SubstrateCluster)).To(Succeed(), "Failed to start environment")
 	kubeClient = env.Client
-	controller = controlplane.NewController(kubeClient, nil)
+	controller = controlplane.NewController(kubeClient, &fakeAccountProvider{})
 })
 
 var _ = AfterSuite(func() {

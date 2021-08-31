@@ -51,7 +51,7 @@ func main() {
 	})
 	session := awsprovider.NewSession()
 	err := manager.RegisterControllers(
-		controlplane.NewController(manager.GetClient(), session),
+		controlplane.NewController(manager.GetClient(), &awsprovider.AccountInfo{session}),
 		dataplane.NewController(manager.GetClient(), session),
 	).Start(controllerruntime.SetupSignalHandler())
 	if err != nil {

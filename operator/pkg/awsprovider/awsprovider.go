@@ -83,8 +83,17 @@ func AutoScalingClient(sess *session.Session) *AutoScaling {
 	return &AutoScaling{AutoScaling: autoscaling.New(sess)}
 }
 
-func AccountID(sess *session.Session) (string, error) {
-	doc, err := ec2metadata.New(sess).GetInstanceIdentityDocument()
+// TODO fix this name, needs a better name
+type Account interface {
+	ID() (string, error)
+}
+
+type AccountInfo struct {
+	Session *session.Session
+}
+
+func (a *AccountInfo) ID() (string, error) {
+	doc, err := ec2metadata.New(a.Session).GetInstanceIdentityDocument()
 	if err != nil {
 		return "", fmt.Errorf("getting instance metadata, %v", err)
 	}
