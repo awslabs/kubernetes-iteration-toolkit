@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- tasks/generators/clusterloader/load.yaml
+- tasks/generators/clusterloader/pod-density.yaml
+- tasks/setup/eksctl/default.yaml
+- tasks/teardown/eksctl.yaml
+- pipelines/eks/upstream-load.yaml

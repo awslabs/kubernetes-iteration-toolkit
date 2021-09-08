@@ -15,19 +15,19 @@ spec:
     default: "1.20"
     description: The EKS version to install.
   - name: region
-    default: us-west-2
+    default: "us-west-2"
     description: The region where the cluster is in.
   - name: zones
-    default: us-west-2a,us-west-2b,us-west-2c
+    default: "us-west-2a,us-west-2b,us-west-2c"
     description: The zones where the cluster is in.
   - name: nodegroup-name
-    default: linux-nodes
+    default: "linux-nodes"
     description: The name of the nodegroup of the cluster.
   - name: instance-selector-vcpus
-    default: 2
+    default: "2"
     description: The vcpus of the EC2 instaces for the nodegroup of the cluster.
   - name: instance-selector-memory
-    default: 4
+    default: "4"
     description: The memory of the EC2 instaces for the nodegroup of the cluster.
   - name: desired-nodes
     default: "10"
@@ -44,7 +44,7 @@ spec:
       A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
   steps:
   - name: write-kubeconfig
-    image: docker.io/weaveworks/eksctl:0.35.0@sha256:48c1fa508970a01fd87a73ac7932a7160479d678cd019a3c84533d911fc54327
+    image: docker.io/weaveworks/eksctl:0.66.0
     script: |
       eksctl create cluster \
         --name $(params.cluster-name) \

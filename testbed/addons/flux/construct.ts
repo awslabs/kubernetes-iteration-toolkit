@@ -21,10 +21,10 @@ export class Flux extends cdk.Construct {
         const fluxManifest = props.cluster.addManifest(
             'flux', ...yaml.loadAll(request.default(
                 "GET", "https://github.com/fluxcd/flux2/releases/download/v0.15.0/install.yaml").getBody().toString()));
-
-        props.repositories.forEach(function (value) {
+        
+        props.repositories.forEach(function (value, index) {
             // Bootstrap manifests
-            const gitRepoManifest = props.cluster.addManifest('GitRepoSelf', {
+            props.cluster.addManifest('GitRepoSelf'+index, {
                 apiVersion: 'source.toolkit.fluxcd.io/v1beta1',
                 kind: 'GitRepository',
                 metadata: {
@@ -42,9 +42,8 @@ export class Flux extends cdk.Construct {
                     },
                     url: value.url
                 }
-            });
-            gitRepoManifest.node.addDependency(fluxManifest);
-            const kustomizationManifest = props.cluster.addManifest('KustomizationSelf', {
+            }).node.addDependency(fluxManifest);
+            props.cluster.addManifest('KustomizationSelf'+index, {
                 apiVersion: 'kustomize.toolkit.fluxcd.io/v1beta1',
                 kind: 'Kustomization',
                 metadata: {
@@ -54,7 +53,7 @@ export class Flux extends cdk.Construct {
                 spec: {
                     // we can adjust this later if we want to be more aggressive
                     interval: '5m0s',
-                    path: value.path ?? "test/workflows",
+                    path: value.path ?? "tests",
                     prune: true,
                     sourceRef: {
                         kind: 'GitRepository',
@@ -62,8 +61,7 @@ export class Flux extends cdk.Construct {
                     },
                     validation: 'client'
                 }
-            });
-            kustomizationManifest.node.addDependency(fluxManifest);
+            }).node.addDependency(fluxManifest);
         });
     }
 }

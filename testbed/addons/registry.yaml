@@ -57,3 +57,18 @@ spec:
     kind: GitRepository
     name: testbed
   validation: client
+
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta1
+kind: Kustomization
+metadata:
+  name: kit-operator
+  namespace: default
+spec:
+  interval: 5m0s
+  path: ./testbed/addons/kit
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: testbed
+  validation: client
