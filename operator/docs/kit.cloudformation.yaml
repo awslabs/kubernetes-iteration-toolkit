@@ -52,6 +52,7 @@ Resources:
               - "autoscaling:CreateAutoScalingGroup"
               - "autoscaling:DeleteAutoScalingGroup"
               - "autoscaling:UpdateAutoScalingGroup"
+              - "autoscaling:SetDesiredCapacity"
               # Read Operations
               - "ec2:DescribeInstances"
               - "ec2:DescribeLaunchTemplates"

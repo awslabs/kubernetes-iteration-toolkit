@@ -80,6 +80,7 @@ rules:
   resources:
   - statefulsets
   - deployments
+  - daemonsets
   verbs:
   - get
   - create
