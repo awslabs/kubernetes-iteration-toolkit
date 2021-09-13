@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -32,16 +33,24 @@ const (
 	coreDNSImage = "public.ecr.aws/eks-distro/coredns/coredns:v1.8.3-eks-1-20-4"
 )
 
-type reconcileResources func(context.Context) (err error)
+type CoreDNS struct {
+	kubeClient *kubeprovider.Client
+}
 
-func (c *Controller) reconcileCoreDNS(ctx context.Context, _ *Controller, controlPlane *v1alpha1.ControlPlane) error {
-	for _, reconcile := range []reconcileResources{
-		c.reconcileServiceAccount,
-		c.reconcileClusterRole,
-		c.reconcileClusterRoleBinding,
-		c.reconcileService,
-		c.reconcileConfigMap,
-		c.reconcileDeployment,
+func CoreDNSController(kubeClient *kubeprovider.Client) *CoreDNS {
+	return &CoreDNS{kubeClient: kubeClient}
+}
+
+type reconcileCoreDNSResources func(context.Context) (err error)
+
+func (c *CoreDNS) Reconcile(ctx context.Context, _ *v1alpha1.ControlPlane) error {
+	for _, reconcile := range []reconcileCoreDNSResources{
+		c.serviceAccount,
+		c.clusterRole,
+		c.clusterRoleBinding,
+		c.service,
+		c.configMap,
+		c.deployment,
 	} {
 		if err := reconcile(ctx); err != nil {
 			return err
@@ -50,7 +59,7 @@ func (c *Controller) reconcileCoreDNS(ctx context.Context, _ *Controller, contro
 	return nil
 }
 
-func (c *Controller) reconcileServiceAccount(ctx context.Context) error {
+func (c *CoreDNS) serviceAccount(ctx context.Context) error {
 	return c.kubeClient.EnsurePatch(ctx, &v1.ServiceAccount{}, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "coredns",
@@ -59,7 +68,7 @@ func (c *Controller) reconcileServiceAccount(ctx context.Context) error {
 	})
 }
 
-func (c *Controller) reconcileClusterRole(ctx context.Context) error {
+func (c *CoreDNS) clusterRole(ctx context.Context) error {
 	return c.kubeClient.EnsureCreate(ctx, &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "system:coredns",
@@ -76,7 +85,7 @@ func (c *Controller) reconcileClusterRole(ctx context.Context) error {
 	})
 }
 
-func (c *Controller) reconcileClusterRoleBinding(ctx context.Context) error {
+func (c *CoreDNS) clusterRoleBinding(ctx context.Context) error {
 	return c.kubeClient.EnsureCreate(ctx, &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "system:coredns",
@@ -94,7 +103,7 @@ func (c *Controller) reconcileClusterRoleBinding(ctx context.Context) error {
 	})
 }
 
-func (c *Controller) reconcileService(ctx context.Context) error {
+func (c *CoreDNS) service(ctx context.Context) error {
 	return c.kubeClient.EnsureCreate(ctx, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "kube-dns",
@@ -151,7 +160,7 @@ const coreDNSConfigData = `.:53 {
 	loadbalance
 }`
 
-func (c *Controller) reconcileConfigMap(ctx context.Context) error {
+func (c *CoreDNS) configMap(ctx context.Context) error {
 	return c.kubeClient.EnsureCreate(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "coredns",
@@ -163,7 +172,7 @@ func (c *Controller) reconcileConfigMap(ctx context.Context) error {
 	})
 }
 
-func (c *Controller) reconcileDeployment(ctx context.Context) error {
+func (c *CoreDNS) deployment(ctx context.Context) error {
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.Deployment{}, &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "coredns",

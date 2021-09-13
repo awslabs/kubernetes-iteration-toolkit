@@ -28,7 +28,6 @@ import (
 	"github.com/awslabs/kit/operator/pkg/errors"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	cpinstances "github.com/awslabs/kit/operator/pkg/utils/instances"
-	"go.uber.org/zap"
 
 	"knative.dev/pkg/ptr"
 )
@@ -64,6 +63,7 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	if _, err := c.autoscaling.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
 		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
+		ForceDelete:          ptr.Bool(true),
 	}); err != nil {
 		return fmt.Errorf("deleting auto scaling group, %w", err)
 	}
@@ -126,7 +126,6 @@ func (c *Controller) getPrivateSubnetsFor(ctx context.Context, clusterName strin
 	if err != nil {
 		return nil, err
 	}
-	zap.S().Infof("instanceIDs from API server are %v", instanceIDs)
 	// TODO hardcoded for now
 	desiredCPInstanceCount := 3
 	// We want to wait for all the control plane nodes to be running

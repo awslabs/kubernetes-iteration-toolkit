@@ -26,6 +26,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/securitygroup"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
+	"github.com/awslabs/kit/operator/pkg/errors"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
@@ -70,6 +71,9 @@ func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane
 	if _, err := c.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
 		LaunchTemplateName: aws.String(TemplateName(dataplane.Spec.ClusterName)),
 	}); err != nil {
+		if errors.IsLaunchTemplateDoNotExist(err) {
+			return nil
+		}
 		return fmt.Errorf("deleting launch template, %w", err)
 	}
 	return nil
