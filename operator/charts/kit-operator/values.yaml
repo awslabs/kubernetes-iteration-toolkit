@@ -1,0 +1,20 @@
+# Default values for kit-operator.
+serviceAccount:
+  create: true
+  name: kit-controller
+  # Annotations to add to the service account (like the ARN of the IRSA role)
+  annotations: {}
+controller:
+  env: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # TODO this will be updated by the git actions
+  image: "public.ecr.aws/kit/kit-operator:latest"
+webhook:
+  env: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # TODO this will be updated by the git actions
+  image: "public.ecr.aws/kit/kit-webhook:latest"
