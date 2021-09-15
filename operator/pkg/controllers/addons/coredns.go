@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	clusterIP    = "10.96.0.10"
+	clusterIP    = "10.96.0.10" // TODO hard coded for now fix this
 	coreDNSImage = "public.ecr.aws/eks-distro/coredns/coredns:v1.8.3-eks-1-20-4"
 )
 

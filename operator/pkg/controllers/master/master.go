@@ -31,10 +31,10 @@ type Controller struct {
 	kubeClient    *kubeprovider.Client
 	keypairs      *keypairs.Provider
 	kubeConfigs   *kubeconfigs.Provider
-	cloudProvider awsprovider.Account
+	cloudProvider awsprovider.AccountMetadata
 }
 
-func New(kubeclient *kubeprovider.Client, account awsprovider.Account) *Controller {
+func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata) *Controller {
 	return &Controller{
 		kubeClient:    kubeclient,
 		keypairs:      keypairs.Reconciler(kubeclient),

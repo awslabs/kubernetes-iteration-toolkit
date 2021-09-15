@@ -83,8 +83,7 @@ func AutoScalingClient(sess *session.Session) *AutoScaling {
 	return &AutoScaling{AutoScaling: autoscaling.New(sess)}
 }
 
-// TODO fix this name, needs a better name
-type Account interface {
+type AccountMetadata interface {
 	ID() (string, error)
 }
 

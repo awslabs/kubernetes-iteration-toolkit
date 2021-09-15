@@ -89,7 +89,7 @@ func (d *dataplane) Reconcile(ctx context.Context, object controllers.Object) (r
 	return results.Created, nil
 }
 
-func (d *dataplane) setOwnerForDataplane(ctx context.Context, dataplane *v1alpha1.DataPlane) (err error) {
+func (d *dataplane) setOwnerForDataplane(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	if len(dataplane.GetOwnerReferences()) == 0 {
 		cp := &cpv1alpha1.ControlPlane{}
 		if err := d.kubeClient.Get(ctx, types.NamespacedName{dataplane.GetNamespace(), dataplane.Spec.ClusterName}, cp); err != nil {
