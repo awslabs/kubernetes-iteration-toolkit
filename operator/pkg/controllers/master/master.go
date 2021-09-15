@@ -20,10 +20,10 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	"go.uber.org/zap"
 )
 
@@ -69,6 +69,6 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 // are configured with pod afinity. So the control plane nodes for a cluster
 // will have 2 labels cluster name and clustername-apiserver
 func nodeSelector(clusterName string) map[string]string {
-	return patch.UnionStringMaps(APIServerLabels(clusterName),
+	return functional.UnionStringMaps(APIServerLabels(clusterName),
 		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }

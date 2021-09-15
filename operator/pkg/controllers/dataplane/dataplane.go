@@ -85,7 +85,7 @@ func (d *dataplane) Reconcile(ctx context.Context, object controllers.Object) (r
 			return results.Failed, err
 		}
 	}
-	zap.S().Info("[%s] data plane reconciled", dp.Spec.ClusterName)
+	zap.S().Infof("[%s] data plane reconciled", dp.Spec.ClusterName)
 	return results.Created, nil
 }
 

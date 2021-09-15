@@ -20,8 +20,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,7 +63,7 @@ func KCMDeploymentName(clusterName string) string {
 }
 
 func kcmLabels(clustername string) map[string]string {
-	return patch.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "kube-controller-manager"})
+	return functional.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "kube-controller-manager"})
 }
 
 func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {

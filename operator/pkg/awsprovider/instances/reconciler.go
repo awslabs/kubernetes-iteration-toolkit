@@ -25,9 +25,10 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/launchtemplate"
-	"github.com/awslabs/kit/operator/pkg/errors"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	cpinstances "github.com/awslabs/kit/operator/pkg/utils/instances"
+	"go.uber.org/zap"
 
 	"knative.dev/pkg/ptr"
 )
@@ -38,24 +39,32 @@ type Controller struct {
 	instances   *cpinstances.Provider
 }
 
-// NewController returns a controller for managing LaunchTemplates in AWS
+// NewController returns a controller for managing LaunchTemplates and ASG in AWS
 func NewController(ec2api *awsprovider.EC2, autoscaling *awsprovider.AutoScaling, client *kubeprovider.Client) *Controller {
 	return &Controller{ec2api: ec2api, autoscaling: autoscaling, instances: cpinstances.New(client)}
 }
 
 func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
+	privateSubnets, err := c.getPrivateSubnetsFor(ctx, dataplane.Spec.ClusterName)
+	if err != nil {
+		return fmt.Errorf("getting private subnet for %s, %w", dataplane.Spec.ClusterName, err)
+	}
+	if len(privateSubnets) == 0 {
+		return fmt.Errorf("failed to find private subnets for dataplane")
+	}
 	asg, err := c.getAutoScalingGroup(ctx, AutoScalingGroupNameFor(dataplane.Spec.ClusterName))
 	if err != nil {
 		return fmt.Errorf("getting auto scaling group for %v, %w", dataplane.Spec.ClusterName, err)
 	}
 	if asg == nil {
-		if err := c.createAutoScalingGroup(ctx, dataplane); err != nil {
+		if err := c.createAutoScalingGroup(ctx, dataplane, privateSubnets); err != nil {
 			return fmt.Errorf("creating auto scaling group for %v, %w", dataplane.Spec.ClusterName, err)
 		}
+		zap.S().Infof("[%s] Created autoscaling group", dataplane.Spec.ClusterName)
 		return nil
 	}
-	if ptr.Int64Value(asg.DesiredCapacity) != int64(dataplane.Spec.NodeCount) {
-		return c.setDesiredCapacity(ctx, dataplane)
+	if err := c.updateAutoScalingGroup(ctx, dataplane, asg, privateSubnets); err != nil {
+		return fmt.Errorf("updating auto scaling group %v, %w", AutoScalingGroupNameFor(dataplane.Spec.ClusterName), err)
 	}
 	return nil
 }
@@ -63,23 +72,32 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	if _, err := c.autoscaling.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
 		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
-		ForceDelete:          ptr.Bool(true),
+		ForceDelete:          ptr.Bool(true), // terminate all the nodes in the ASG
 	}); err != nil {
 		return fmt.Errorf("deleting auto scaling group, %w", err)
 	}
 	return nil
 }
 
-func (c *Controller) createAutoScalingGroup(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	// TODO improve subnet detection for these worker nodes
-	privateSubnets, err := c.getPrivateSubnetsFor(ctx, dataplane.Spec.ClusterName)
-	if err != nil {
-		return err
+func (c *Controller) updateAutoScalingGroup(ctx context.Context, dataplane *v1alpha1.DataPlane, asg *autoscaling.Group, subnets []string) error {
+	if functional.ValidateAll(
+		func() bool { return asg != nil },
+		func() bool {
+			return functional.StringsMatch(strings.Split(ptr.StringValue(asg.VPCZoneIdentifier), ","), subnets)
+		},
+		func() bool { return ptr.Int64Value(asg.DesiredCapacity) == int64(dataplane.Spec.NodeCount) }) {
+		return nil
 	}
-	if len(privateSubnets) == 0 {
-		return fmt.Errorf("failed to find private subnets for dataplane")
-	}
-	if _, err := c.autoscaling.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
+	_, err := c.autoscaling.UpdateAutoScalingGroupWithContext(ctx, &autoscaling.UpdateAutoScalingGroupInput{
+		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
+		DesiredCapacity:      ptr.Int64(int64(dataplane.Spec.NodeCount)),
+		VPCZoneIdentifier:    ptr.String(strings.Join(subnets, ",")),
+	})
+	return err
+}
+
+func (c *Controller) createAutoScalingGroup(ctx context.Context, dataplane *v1alpha1.DataPlane, subnets []string) error {
+	_, err := c.autoscaling.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
 		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
 		DesiredCapacity:      ptr.Int64(int64(dataplane.Spec.NodeCount)),
 		MaxSize:              ptr.Int64(int64(1000)),
@@ -87,12 +105,10 @@ func (c *Controller) createAutoScalingGroup(ctx context.Context, dataplane *v1al
 		LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
 			LaunchTemplateName: ptr.String(launchtemplate.TemplateName(dataplane.Spec.ClusterName)),
 		},
-		VPCZoneIdentifier: ptr.String(strings.Join(privateSubnets, ",")),
+		VPCZoneIdentifier: ptr.String(strings.Join(subnets, ",")),
 		Tags:              generateAutoScalingTags(dataplane.Spec.ClusterName),
-	}); err != nil {
-		return fmt.Errorf("creating autoscaling group, %w", err)
-	}
-	return nil
+	})
+	return err
 }
 
 func (c *Controller) getAutoScalingGroup(ctx context.Context, groupName string) (*autoscaling.Group, error) {
@@ -111,26 +127,10 @@ func (c *Controller) getAutoScalingGroup(ctx context.Context, groupName string) 
 	return output.AutoScalingGroups[0], nil
 }
 
-func (c *Controller) setDesiredCapacity(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	if _, err := c.autoscaling.SetDesiredCapacityWithContext(ctx, &autoscaling.SetDesiredCapacityInput{
-		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
-		DesiredCapacity:      ptr.Int64(int64(dataplane.Spec.NodeCount)),
-	}); err != nil {
-		return fmt.Errorf("setting desired asg capacity, %w", err)
-	}
-	return nil
-}
-
 func (c *Controller) getPrivateSubnetsFor(ctx context.Context, clusterName string) ([]string, error) {
 	instanceIDs, err := c.instances.ControlPlaneInstancesFor(ctx, clusterName)
 	if err != nil {
 		return nil, err
-	}
-	// TODO hardcoded for now
-	desiredCPInstanceCount := 3
-	// We want to wait for all the control plane nodes to be running
-	if len(instanceIDs) != desiredCPInstanceCount {
-		return nil, fmt.Errorf("waiting for control plane instances %w", errors.WaitingForSubResources)
 	}
 	subnetIDs, err := c.getSubnetIDsFor(ctx, instanceIDs)
 	if err != nil {

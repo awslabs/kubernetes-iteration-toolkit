@@ -61,7 +61,7 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 		if err := c.createLaunchTemplate(ctx, dataplane); err != nil {
 			return fmt.Errorf("creating launch template, %w", err)
 		}
-		zap.S().Infof("Created launch template for cluster %v", dataplane.Spec.ClusterName)
+		zap.S().Infof("[%s] Created launch template", dataplane.Spec.ClusterName)
 		return nil
 	}
 	return nil
