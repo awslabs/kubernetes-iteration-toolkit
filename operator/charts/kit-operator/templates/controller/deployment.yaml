@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kit-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    control-plane: kit-controller
+spec:
+  selector:
+    matchLabels:
+      control-plane: kit-controller
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: kit-controller
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+      - name: manager
+        image: {{ .Values.controller.image }}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 20Mi
+      # https://github.com/aws/amazon-eks-pod-identity-webhook/issues/8#issuecomment-636888074
+      securityContext:
+        fsGroup: 1000
