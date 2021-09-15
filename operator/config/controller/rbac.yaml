@@ -40,14 +40,16 @@ rules:
   resources:
   - controlplanes
   - controlplanes/status
+  - dataplanes
+  - dataplanes/status
   verbs:
   - create
   - delete
-  - patch
   - get
   - list
   - patch
   - watch
+  - update
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -62,6 +64,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - nodes
   - secrets
   - services
   - statefulsets
@@ -77,6 +80,7 @@ rules:
   resources:
   - statefulsets
   - deployments
+  - daemonsets
   verbs:
   - get
   - create

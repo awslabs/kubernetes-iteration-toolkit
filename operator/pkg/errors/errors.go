@@ -19,6 +19,7 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -46,4 +47,9 @@ func IsNetIOTimeOut(err error) bool {
 
 func IsConnectionRefused(err error) bool {
 	return errors.Is(err, syscall.ECONNREFUSED)
+}
+
+func IsLaunchTemplateDoNotExist(err error) bool {
+	awsErr := awserr.Error(nil)
+	return errors.As(err, &awsErr) && awsErr.Code() == "InvalidLaunchTemplateName.NotFoundException"
 }

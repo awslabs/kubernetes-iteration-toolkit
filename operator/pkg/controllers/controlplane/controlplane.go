@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/addons"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
@@ -36,11 +37,11 @@ type controlPlane struct {
 	addonsController *addons.Controller
 }
 
-// NewController returns a controller for managing VPCs in AWS
-func NewController(kubeClient client.Client) *controlPlane {
+// NewController returns a controller for managing controlPlane components of the cluster
+func NewController(kubeClient client.Client, account awsprovider.AccountMetadata) *controlPlane {
 	return &controlPlane{
 		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
-		masterController: master.New(kubeprovider.New(kubeClient)),
+		masterController: master.New(kubeprovider.New(kubeClient), account),
 		addonsController: addons.New(kubeprovider.New(kubeClient)),
 	}
 }
@@ -55,9 +56,7 @@ func (c *controlPlane) For() controllers.Object {
 	return &v1alpha1.ControlPlane{}
 }
 
-// Reconcile will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with the ControlPlane.Status
-// object
+// Reconcile will reconcile all the components running on the control plane
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
 	for _, resource := range []reconciler.Interface{
 		c.etcdController,
@@ -65,7 +64,7 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 		c.addonsController,
 	} {
 		if err := resource.Reconcile(ctx, object.(*v1alpha1.ControlPlane)); err != nil {
-			return nil, fmt.Errorf("reconciling, %w", err)
+			return nil, fmt.Errorf("control plane reconciling, %w", err)
 		}
 	}
 	return results.Created, nil

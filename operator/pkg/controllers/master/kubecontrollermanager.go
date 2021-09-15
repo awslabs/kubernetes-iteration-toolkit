@@ -20,8 +20,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,6 +47,7 @@ func kcmDeploymentSpec(controlPlane *v1alpha1.ControlPlane) *appsv1.Deployment {
 				MatchLabels: kcmLabels(controlPlane.ClusterName()),
 			},
 			Replicas: aws.Int32(3),
+			Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: kcmLabels(controlPlane.ClusterName()),
@@ -62,7 +63,7 @@ func KCMDeploymentName(clusterName string) string {
 }
 
 func kcmLabels(clustername string) map[string]string {
-	return patch.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "kube-controller-manager"})
+	return functional.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "kube-controller-manager"})
 }
 
 func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
@@ -90,7 +91,7 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		}},
 		Affinity: &v1.Affinity{PodAffinity: &v1.PodAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
-				LabelSelector: &metav1.LabelSelector{MatchLabels: apiServerLabels(controlPlane.ClusterName())},
+				LabelSelector: &metav1.LabelSelector{MatchLabels: APIServerLabels(controlPlane.ClusterName())},
 				TopologyKey:   "kubernetes.io/hostname",
 			}},
 		}},

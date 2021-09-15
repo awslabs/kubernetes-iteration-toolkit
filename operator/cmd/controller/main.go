@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
+	"github.com/awslabs/kit/operator/pkg/controllers/dataplane"
 	"github.com/awslabs/kit/operator/pkg/utils/scheme"
 
 	"github.com/go-logr/zapr"
@@ -47,9 +49,11 @@ func main() {
 		Port:                    options.WebhookPort,
 		LeaderElectionNamespace: "kit",
 	})
-
+	session := awsprovider.NewSession()
 	err := manager.RegisterControllers(
-		controlplane.NewController(manager.GetClient())).Start(controllerruntime.SetupSignalHandler())
+		controlplane.NewController(manager.GetClient(), &awsprovider.AccountInfo{Session: session}),
+		dataplane.NewController(manager.GetClient(), session),
+	).Start(controllerruntime.SetupSignalHandler())
 	if err != nil {
 		panic(fmt.Sprintf("Unable to start manager, %v", err))
 	}

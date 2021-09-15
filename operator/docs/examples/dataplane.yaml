@@ -1,0 +1,7 @@
+apiVersion: kit.k8s.sh/v1alpha1
+kind: DataPlane
+metadata:
+  name: example-nodes 
+spec: 
+  clusterName: example # Desired Cluster Name
+  nodeCount: 1

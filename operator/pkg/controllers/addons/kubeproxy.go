@@ -21,6 +21,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
+	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
@@ -28,6 +30,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -40,30 +43,92 @@ const (
 	KubeProxyDaemonSetName = "kubeproxy-daemonset"
 )
 
-func (c *Controller) kubeConfigForKubeProxy(ctx context.Context, managerCluster *Controller, controlPlane *v1alpha1.ControlPlane) error {
-	// Get the admin config stored in secret in the management cluster
-	caSecret, err := managerCluster.keypairs.GetSecretFromServer(ctx,
-		object.NamespacedName(master.RootCASecretNameFor(controlPlane.ClusterName()), controlPlane.Namespace))
+type KubeProxy struct {
+	kubeClient       *kubeprovider.Client
+	substrateCluster *kubeprovider.Client
+}
+
+type reconcileProxyResources func(context.Context, *v1alpha1.ControlPlane) (err error)
+
+func KubeProxyController(kubeClient, substrateCluster *kubeprovider.Client) *KubeProxy {
+	return &KubeProxy{
+		kubeClient:       kubeClient,
+		substrateCluster: substrateCluster,
+	}
+}
+
+func (k *KubeProxy) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	for _, reconcileResource := range []reconcileProxyResources{
+		k.serviceAccount,
+		k.clusterRoleBinding,
+		k.kubeConfig,
+		k.daemonsetForKubeProxy,
+	} {
+		if err := reconcileResource(ctx, controlPlane); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (k *KubeProxy) serviceAccount(ctx context.Context, _ *v1alpha1.ControlPlane) error {
+	return k.kubeClient.EnsurePatch(ctx, &v1.ServiceAccount{}, &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-proxy",
+			Namespace: kubeSystem,
+		},
+	})
+}
+
+func (k *KubeProxy) kubeConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	caSecret, err := k.controlPlaneCASecret(ctx, controlPlane)
 	if err != nil {
 		return fmt.Errorf("getting ca certificate, %w", err)
 	}
-	endpoint, err := master.GetClusterEndpoint(ctx, managerCluster.kubeClient,
-		object.NamespacedName(controlPlane.ClusterName(), controlPlane.Namespace))
+	endpoint, err := k.controlPlaneEndPoint(ctx, controlPlane)
 	if err != nil {
 		return fmt.Errorf("getting cluster endpoint, %w", err)
 	}
 	// controlPlane is nil as the owner for secret object is not required
-	if err := kubeconfigs.Reconciler(c.kubeClient).ReconcileConfigFor(ctx, nil, kubeConfigRequest(
+	if err := kubeconfigs.Reconciler(k.kubeClient).ReconcileConfigFor(ctx, nil, kubeConfigRequest(
 		endpoint, kubeSystem, authRequestFor(controlPlane.ClusterName(), caSecret))); err != nil {
 		return fmt.Errorf("reconciling kubeconfig for kube-proxy, %w", err)
 	}
 	return nil
 }
 
-func (c *Controller) daemonsetForKubeProxy(ctx context.Context, _ *Controller, controlPlane *v1alpha1.ControlPlane) (err error) {
+func (k *KubeProxy) controlPlaneCASecret(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (*v1.Secret, error) {
+	return keypairs.Reconciler(k.substrateCluster).GetSecretFromServer(ctx,
+		object.NamespacedName(master.RootCASecretNameFor(controlPlane.ClusterName()), controlPlane.Namespace))
+}
+
+func (k *KubeProxy) controlPlaneEndPoint(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (string, error) {
+	return master.GetClusterEndpoint(ctx, k.substrateCluster,
+		object.NamespacedName(controlPlane.ClusterName(), controlPlane.Namespace))
+}
+
+func (k *KubeProxy) clusterRoleBinding(ctx context.Context, _ *v1alpha1.ControlPlane) error {
+	return k.kubeClient.EnsureCreate(ctx, &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kit:kube-proxy",
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "system:node-proxier",
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:      rbacv1.ServiceAccountKind,
+			Name:      "kube-proxy",
+			Namespace: kubeSystem,
+		}},
+	})
+}
+
+func (k *KubeProxy) daemonsetForKubeProxy(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
 	podSpec := kubeProxyPodSpecFor(controlPlane)
 	// TODO merge custom flags from the user
-	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
+	return k.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
 		&appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      KubeProxyDaemonSetName,
@@ -138,9 +203,13 @@ func kubeProxyPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
 	return v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
+		ServiceAccountName:            "kube-proxy",
 		HostNetwork:                   true,
-		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
+		DNSPolicy:                     v1.DNSClusterFirst,
 		PriorityClassName:             "system-node-critical",
+		Tolerations: []v1.Toleration{{
+			Operator: v1.TolerationOpExists,
+		}},
 		Containers: []v1.Container{
 			{
 				Name:  "kubeproxy",
@@ -180,7 +249,6 @@ func kubeProxyPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
 					Path: "/var/log",
-					Type: &hostPathFileOrCreate,
 				},
 			},
 		}, {

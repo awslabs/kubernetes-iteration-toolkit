@@ -24,6 +24,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"github.com/awslabs/kit/operator/pkg/utils/reconciler"
 	"github.com/awslabs/kit/operator/pkg/utils/scheme"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	"go.uber.org/zap"
@@ -34,32 +35,26 @@ import (
 )
 
 type Controller struct {
-	kubeClient *kubeprovider.Client
-	keypairs   *keypairs.Provider
+	substrateClient *kubeprovider.Client
 }
 
 func New(kubeClient *kubeprovider.Client) *Controller {
-	return &Controller{
-		kubeClient: kubeClient,
-		keypairs:   keypairs.Reconciler(kubeClient),
-	}
+	return &Controller{substrateClient: kubeClient}
 }
 
-type reconciler func(context.Context, *Controller, *v1alpha1.ControlPlane) (err error)
-
+// Reconcile adds add-ons to the guest cluster provisioned
 func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	newClusterClient, err := c.createKubeClient(ctx, object.NamespacedName(
+	guestClusterClient, err := c.createKubeClient(ctx, object.NamespacedName(
 		controlPlane.ClusterName(), controlPlane.Namespace))
 	if err != nil {
 		return err
 	}
-	// reconcile addons to the new cluster
-	newCluster := &Controller{kubeClient: newClusterClient}
-	for _, reconcile := range []reconciler{
-		newCluster.kubeConfigForKubeProxy,
-		newCluster.daemonsetForKubeProxy,
+	// reconcile addons to the guest cluster
+	for _, resource := range []reconciler.Interface{
+		KubeProxyController(guestClusterClient, c.substrateClient),
+		CoreDNSController(guestClusterClient),
 	} {
-		if err := reconcile(ctx, c, controlPlane); err != nil {
+		if err := resource.Reconcile(ctx, controlPlane); err != nil {
 			return err
 		}
 	}
@@ -71,7 +66,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 // admin config stored in management cluster
 func (c *Controller) createKubeClient(ctx context.Context, nn types.NamespacedName) (*kubeprovider.Client, error) {
 	// Get the admin kube config stored in a secret in the management cluster
-	adminSecret, err := c.keypairs.GetSecretFromServer(ctx, object.NamespacedName(
+	adminSecret, err := keypairs.Reconciler(c.substrateClient).GetSecretFromServer(ctx, object.NamespacedName(
 		master.KubeAdminSecretNameFor(nn.Name), nn.Namespace))
 	if err != nil {
 		return nil, err

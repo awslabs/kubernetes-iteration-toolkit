@@ -41,7 +41,7 @@ func (c *Controller) reconcileEndpoint(ctx context.Context, cp *v1alpha1.Control
 		},
 		Spec: v1.ServiceSpec{
 			Type:     v1.ServiceTypeLoadBalancer,
-			Selector: apiServerLabels(cp.ClusterName()),
+			Selector: APIServerLabels(cp.ClusterName()),
 			Ports: []v1.ServicePort{{
 				Port:       443,
 				Name:       apiserverPortName(cp.ClusterName()),
