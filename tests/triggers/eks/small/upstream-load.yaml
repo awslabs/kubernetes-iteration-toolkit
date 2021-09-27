@@ -12,7 +12,7 @@ spec:
           containers:
           - name: curl
             image: curlimages/curl
-            args: ["curl", "-X", "POST", "--data", "{}", "el-eks-small-upstream-load.svc.cluster.local:8080"]
+            args: ["curl", "-X", "POST", "--data", "{}", "el-eks-small-upstream-load.default.svc.cluster.local:8080"]
           restartPolicy: Never
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
@@ -25,6 +25,7 @@ kind: EventListener
 metadata:
   name: eks-small-upstream-load
 spec:
+  serviceAccountName: tekton-triggers
   triggers:
     - name: cron
       bindings:
@@ -57,4 +58,4 @@ spec:
       - name: cluster-name
         value: "eks-small-upstream-load-$(context.pipelineRun.uid)"
       - name: results-bucket
-        value: "$(date +'%Y/%m/%d/%HH/%mm)/$(context.pipelineRun.uid)"
+        value: "eks-scalability-dev/$(date +'%Y/%m/%d/%HH/%mm)/$(context.pipelineRun.uid)"

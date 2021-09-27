@@ -18,13 +18,14 @@ spec:
     description: The region where the cluster is in.
     default: "us-west-2"
   - name: instance-selector-vcpus
-    default: 2
+    default: "2"
     description: The vcpus of the EC2 instaces for the nodegroup of the cluster.
   - name: instance-selector-memory
-    default: 4
+    default: "4"
     description: The memory of the EC2 instaces for the nodegroup of the cluster.
   - name: desired-nodes
     description: The desired number of nodes in the cluster.
+    default: "100"
   - name: min-nodes
     default: "1"
     description: The minimum number of nodes in the cluster.
@@ -84,6 +85,8 @@ spec:
         value: '$(params.cl2-load-test-throughput)'
       - name: results-bucket
         value: '$(params.results-bucket)'
+      - name: nodes
+        value: '$(params.desired-nodes)'
     workspaces:
       - name: source
         workspace: source
