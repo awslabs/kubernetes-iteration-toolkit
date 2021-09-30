@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
@@ -58,7 +59,7 @@ func mergePatch(defaultObj, patch, object interface{}) ([]byte, error) {
 
 func mergeContainerArgs(defaultSpec, patch *v1.PodSpec) *v1.PodSpec {
 	merged := []string{}
-	for key, value := range UnionStringMaps(parseArgsFor(defaultSpec), parseArgsFor(patch)) {
+	for key, value := range functional.UnionStringMaps(parseArgsFor(defaultSpec), parseArgsFor(patch)) {
 		merged = append(merged, strings.Join([]string{key, value}, "="))
 	}
 	patch.Containers[0].Args = merged
@@ -70,17 +71,6 @@ func parseArgsFor(podSpec *v1.PodSpec) map[string]string {
 	for _, arg := range podSpec.Containers[0].Args {
 		kv := strings.Split(arg, "=")
 		result[kv[0]] = result[kv[1]]
-	}
-	return result
-}
-
-func UnionStringMaps(dest, src map[string]string) map[string]string {
-	result := map[string]string{}
-	for key, value := range dest {
-		result[key] = value
-	}
-	for key, value := range src {
-		result[key] = value
 	}
 	return result
 }

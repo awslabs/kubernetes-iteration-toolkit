@@ -53,7 +53,7 @@ func (m *GenericControllerManager) RegisterControllers(controllers ...Controller
 		})
 		builder.Named(c.Name())
 		if err := builder.Complete(&GenericController{Controller: c, Client: m.GetClient()}); err != nil {
-			panic(fmt.Sprintf("Failed to register controller to manager for %s", controlledObject))
+			panic(fmt.Sprintf("Failed to register controller to manager for %s, %v", controlledObject, err))
 		}
 		if err := controllerruntime.NewWebhookManagedBy(m).For(controlledObject).Complete(); err != nil {
 			panic(fmt.Sprintf("Failed to register webhook for %s", controlledObject))

@@ -1,42 +1,40 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Resources used by https://github.com/awslabs/kit/operator
 Parameters:
-  OpenIDConnectIdentityProvider:
-    Type: String
-    Description: "Example oidc.eks.us-west-2.amazonaws.com/id/1234567890"
   ClusterName:
     Type: String
-    Description: "EKS cluster name"
+    Description: "Desired cluster name"
 Resources:
-  KitControllerRole:
+  KitNodeInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: !Sub "KitNodeInstanceProfile-${ClusterName}"
+      Path: "/"
+      Roles:
+        - Ref: "KitNodeRole"
+  KitNodeRole:
     Type: "AWS::IAM::Role"
     Properties:
-      RoleName: "KITControllerRole"
+      RoleName: !Sub "KitNodeRole-${ClusterName}-cluster"
       Path: /
-      AssumeRolePolicyDocument: !Sub |
-        {
-          "Version": "2012-10-17",
-          "Statement": [{
-            "Effect": "Allow",
-            "Principal": {
-              "Federated": "arn:aws:iam::${AWS::AccountId}:oidc-provider/${OpenIDConnectIdentityProvider}"
-            },
-            "Action": "sts:AssumeRoleWithWebIdentity",
-            "Condition": {
-              "StringEquals": {
-                "${OpenIDConnectIdentityProvider}:aud": "sts.${AWS::URLSuffix}",
-                "${OpenIDConnectIdentityProvider}:sub": "system:serviceaccount:kit:kit"
-              }
-            }
-          }]
-        }
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                !Sub "ec2.${AWS::URLSuffix}"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
   KitControllerPolicy:
-    Type: "AWS::IAM::Policy"
+    Type: "AWS::IAM::ManagedPolicy"
     Properties:
-      PolicyName: "KitControllerPolicy"
-      Roles:
-        -
-          Ref: "KitControllerRole"
+      ManagedPolicyName: "KitControllerPolicy"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -44,12 +42,21 @@ Resources:
             Resource: "*"
             Action:
               # Write Operations
-              - "ec2:CreateVpc"
-              - "ec2:CreateSubnet"
-              - "ec2:DeleteVpc"
-              - "ec2:DeleteSubnet"
               - "ec2:CreateTags"
-              - "iam:PassRole"
+              - "ec2:CreateLaunchTemplate"
+              - "ec2:CreateLaunchTemplateVersion"
+              - "ec2:DeleteLaunchTemplate"
+              - "ec2:RunInstances"
+              - "iam:passRole"
+              - "autoscaling:CreateOrUpdateTags"
+              - "autoscaling:CreateAutoScalingGroup"
+              - "autoscaling:DeleteAutoScalingGroup"
+              - "autoscaling:UpdateAutoScalingGroup"
+              - "autoscaling:SetDesiredCapacity"
               # Read Operations
-              - "ec2:DescribeVpcs"
+              - "ec2:DescribeInstances"
+              - "ec2:DescribeLaunchTemplates"
+              - "ec2:DescribeLaunchTemplateVersions"
               - "ec2:DescribeSubnets"
+              - "ssm:GetParameter"
+              - "autoscaling:DescribeAutoScalingGroups"

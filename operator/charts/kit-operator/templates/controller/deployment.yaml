@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kit-controller
-  namespace: kit
+  namespace: {{ .Release.Namespace }}
   labels:
     control-plane: kit-controller
 spec:
@@ -15,10 +15,10 @@ spec:
       labels:
         control-plane: kit-controller
     spec:
-      serviceAccountName: kit-controller
+      serviceAccountName: {{ .Values.serviceAccount.name }}
       containers:
       - name: manager
-        image: ko://github.com/awslabs/kit/operator/cmd/controller
+        image: {{ .Values.controller.image }}
         resources:
           requests:
             cpu: 100m

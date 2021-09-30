@@ -20,8 +20,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -202,6 +202,6 @@ func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 }
 
 func nodeSelector(clusterName string) map[string]string {
-	return patch.UnionStringMaps(labelsFor(clusterName),
+	return functional.UnionStringMaps(labelsFor(clusterName),
 		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }

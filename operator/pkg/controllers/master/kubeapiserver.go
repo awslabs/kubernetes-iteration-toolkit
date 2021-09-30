@@ -50,13 +50,13 @@ func (c *Controller) reconcileApiServer(ctx context.Context, controlPlane *v1alp
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
-					MatchLabels: apiServerLabels(controlPlane.ClusterName()),
+					MatchLabels: APIServerLabels(controlPlane.ClusterName()),
 				},
 				Replicas: aws.Int32(3),
 				Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Labels: apiServerLabels(controlPlane.ClusterName()),
+						Labels: APIServerLabels(controlPlane.ClusterName()),
 					},
 					Spec: apiServerPodSpec,
 				},
@@ -68,7 +68,7 @@ func APIServerDeploymentName(clusterName string) string {
 	return fmt.Sprintf("%s-apiserver", clusterName)
 }
 
-func apiServerLabels(clustername string) map[string]string {
+func APIServerLabels(clustername string) map[string]string {
 	return map[string]string{
 		object.AppNameLabelKey: APIServerDeploymentName(clustername),
 	}
@@ -76,6 +76,7 @@ func apiServerLabels(clustername string) map[string]string {
 
 func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	hostPathDirectory := v1.HostPathDirectory
 	return v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
@@ -87,14 +88,14 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			TopologyKey:       "topology.kubernetes.io/zone",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: apiServerLabels(controlPlane.ClusterName()),
+				MatchLabels: APIServerLabels(controlPlane.ClusterName()),
 			},
 		}, {
 			MaxSkew:           int32(1),
 			TopologyKey:       "kubernetes.io/hostname",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: apiServerLabels(controlPlane.ClusterName()),
+				MatchLabels: APIServerLabels(controlPlane.ClusterName()),
 			},
 		}},
 		Containers: []v1.Container{
@@ -136,6 +137,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--service-cluster-ip-range=" + serviceClusterIPRange,
 					"--tls-cert-file=/etc/kubernetes/pki/apiserver/apiserver.crt",
 					"--tls-private-key-file=/etc/kubernetes/pki/apiserver/apiserver.key",
+					"--authentication-token-webhook-config-file=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 				},
 				Env: []v1.EnvVar{{
 					Name: "NODE_IP",
@@ -187,6 +189,10 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				}, {
 					Name:      "apiserver",
 					MountPath: "/etc/kubernetes/pki/apiserver",
+					ReadOnly:  true,
+				}, {
+					Name:      "authenticator-config",
+					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
 					ReadOnly:  true,
 				}},
 			}},
@@ -310,6 +316,14 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 						Key:  "private",
 						Path: "apiserver.key",
 					}},
+				},
+			},
+		}, {
+			Name: "authenticator-config",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/var/aws-iam-authenticator/kubeconfig/",
+					Type: &hostPathDirectory,
 				},
 			},
 		}},

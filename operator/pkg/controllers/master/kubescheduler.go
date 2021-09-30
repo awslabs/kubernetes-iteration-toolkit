@@ -46,6 +46,7 @@ func schedulerDeploymentSpec(controlPlane *v1alpha1.ControlPlane) *appsv1.Deploy
 				MatchLabels: schedulerLabels(controlPlane.ClusterName()),
 			},
 			Replicas: aws.Int32(3),
+			Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: schedulerLabels(controlPlane.ClusterName()),
@@ -91,7 +92,7 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		}},
 		Affinity: &v1.Affinity{PodAffinity: &v1.PodAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
-				LabelSelector: &metav1.LabelSelector{MatchLabels: apiServerLabels(controlPlane.ClusterName())},
+				LabelSelector: &metav1.LabelSelector{MatchLabels: APIServerLabels(controlPlane.ClusterName())},
 				TopologyKey:   "kubernetes.io/hostname",
 			}},
 		}},

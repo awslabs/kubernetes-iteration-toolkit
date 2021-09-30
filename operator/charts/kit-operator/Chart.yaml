@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kit-operator
+description: A Helm chart for https://github.com/awslabs/kubernetes-iteration-toolkit/.
+type: application
+version: 0.0.1

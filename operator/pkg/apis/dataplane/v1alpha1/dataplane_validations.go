@@ -12,25 +12,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheme
+package v1alpha1
 
 import (
-	cp "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	dp "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
+	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"knative.dev/pkg/apis"
 )
 
-var (
-	SubstrateCluster = runtime.NewScheme()
-	GuestCluster     = runtime.NewScheme()
-)
-
-func init() {
-	_ = clientgoscheme.AddToScheme(SubstrateCluster)
-	_ = cp.AddToScheme(SubstrateCluster)
-	_ = dp.AddToScheme(SubstrateCluster)
-
-	_ = clientgoscheme.AddToScheme(GuestCluster)
+func (c *DataPlane) Validate(ctx context.Context) (errs *apis.FieldError) {
+	// TODO
+	return nil
 }

@@ -12,25 +12,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheme
+package v1alpha1
 
 import (
-	cp "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	dp "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"context"
 )
 
-var (
-	SubstrateCluster = runtime.NewScheme()
-	GuestCluster     = runtime.NewScheme()
-)
+func (c *DataPlane) SetDefaults(ctx context.Context) {
+	c.Spec.SetDefaults(ctx)
+}
 
-func init() {
-	_ = clientgoscheme.AddToScheme(SubstrateCluster)
-	_ = cp.AddToScheme(SubstrateCluster)
-	_ = dp.AddToScheme(SubstrateCluster)
-
-	_ = clientgoscheme.AddToScheme(GuestCluster)
+// SetDefaults for the DataPlaneSpec, cascading to all subspecs
+func (s *DataPlaneSpec) SetDefaults(ctx context.Context) {
 }
