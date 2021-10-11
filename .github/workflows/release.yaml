@@ -1,4 +1,4 @@
-name: Build and test operator images on push to every branch except main and pull requests
+name: Release operator version, generates a new Docker image and helm charts
 on:
   push:
     branches: [charts]
