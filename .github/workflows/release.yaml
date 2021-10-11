@@ -1,8 +1,7 @@
 name: Release operator version, generates a new Docker image and helm charts
 on:
-  push:
-    branches: [charts]
-    tags: ['v*']
+  release:
+    types: [published, created, edited] 
 jobs:
   release:
     runs-on: ubuntu-latest
