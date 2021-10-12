@@ -68,8 +68,9 @@ docs:
 		-template-dir $(shell go env GOMODCACHE)/github.com/ahmetb/gen-crd-api-reference-docs@v0.3.0/template
 
 publish: ## Generate release manifests and publish a versioned container image.
-	@aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(RELEASE_REPO)
-	KO_DOCKER_REPO=$(WITH_RELEASE_REPO) ko publish --bare ./cmd/controller
+	yq e -i ".controller.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-operator ko publish --bare -t $(RELEASE_VERSION) ./cmd/controller)\"" charts/kit-operator/values.yaml
+	yq e -i ".webhook.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-webhook ko publish --bare -t $(RELEASE_VERSION) ./cmd/webhook)\"" charts/kit-operator/values.yaml
+	yq e -i '.version = "$(subst v,,${RELEASE_VERSION})"' charts/kit-operator/Chart.yaml
 
 toolchain: ## Install developer toolchain
 	./hack/toolchain.sh
