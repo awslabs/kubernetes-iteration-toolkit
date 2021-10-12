@@ -1,4 +1,3 @@
-
 RELEASE_REPO ?= public.ecr.aws/i7d3g4r4/kit-operator
 RELEASE_VERSION ?= $(shell git describe --tags --always)
 
