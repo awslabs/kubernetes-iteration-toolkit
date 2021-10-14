@@ -1,0 +1,61 @@
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: kit-small-upstream-load
+spec:
+  schedule: "0 8 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: curl
+            image: curlimages/curl
+            args: ["curl", "-X", "POST", "--data", "{}", "el-kit-small-upstream-load.default.svc.cluster.local:8080"]
+          restartPolicy: Never
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: kit-small-upstream-load
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: kit-small-upstream-load
+spec:
+  serviceAccountName: tekton-triggers
+  triggers:
+    - name: cron
+      bindings:
+      - ref: kit-small-upstream-load
+      template:
+        ref: kit-small-upstream-load 
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: kit-small-upstream-load
+spec:
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun
+    metadata:
+      generateName: kit-small-upstream-load-
+    spec:
+      pipelineRef:
+        name: loadtest
+      serviceAccountName: test-executor
+      workspaces:
+      - name: source
+        emptyDir: {}
+      - name: config
+        emptyDir: {}
+      - name: results
+        emptyDir: {}
+      params:
+      - name: cluster-name
+        value: "kit-small"
+      - name: results-bucket
+        value: "kit-scalability-dev/$(date +'%Y/%m/%d/%HH/%mm)/$(context.pipelineRun.uid)"

@@ -20,7 +20,7 @@ export class Flux extends cdk.Construct {
 
         const fluxManifest = props.cluster.addManifest(
             'flux', ...yaml.loadAll(request.default(
-                "GET", "https://github.com/fluxcd/flux2/releases/download/v0.15.0/install.yaml").getBody().toString()));
+                "GET", "https://github.com/fluxcd/flux2/releases/download/v0.15.0/install.yaml").getBody().toString()) as [Record<string,unknown>]);
         
         props.repositories.forEach(function (value, index) {
             // Bootstrap manifests

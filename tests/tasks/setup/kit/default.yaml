@@ -1,0 +1,44 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kit-cluster-create
+spec:
+  description: |
+    Create a KIT cluster.
+    This Task can be used to create an KIT cluster in an AWS account and write a kubeconfig to a desired location that
+    can be used by other tasks (in a context with kubectl) to make requests to the cluster.
+  params:
+  - name: cluster-name
+    description: The name of the KIT cluster you want to spin.
+  - name: host-cluster-region
+    default: "us-east-1"
+    description: The region where the Host EKS cluster is in.
+  - name: guest-cluster-region
+    default: "us-west-2"
+    description: The region where the kit cluster is created.
+  - name: control-plane-spec
+    description:  url to the controlplane spec.
+  - name: dataplane-spec
+    description: url to the dataplane spec.
+  workspaces:
+  - name: config
+    description: |
+      A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
+  steps:
+  - name: write-kubeconfig
+    image: amazon/aws-cli
+    script: |
+      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      kubectl version
+      aws eks update-kubeconfig --name testbed --region $(params.host-cluster-region)
+      kubectl config current-context
+      #Provision a control plane for the guest cluster
+      kubectl create -f $(params.control-plane-spec)
+      #Provision a dataplane plane for the guest cluster
+      kubectl create -f $(params.dataplane-spec)
+      #Get the admin KUBECONFIG for the guest cluster from the substrate cluster
+      kubectl get secret example-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > $(workspaces.config.path)/kubeconfig
+      #Deploy CNI plugin to the guest cluster for the nodes to be ready.
+      kubectl --kubeconfig=$(workspaces.config.path)/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/v1.9/aws-k8s-cni.yaml

@@ -63,11 +63,6 @@ export class Kit extends cdk.Construct {
             ]
         })
 
-        props.cluster.awsAuth.addRoleMapping(nodeRole, {
-            username: 'system:node:{{EC2PrivateDNSName}}',
-            groups: ['system:bootstrappers', 'system:nodes']
-        })
-
         new iam.CfnInstanceProfile(this, 'kit-instance-profile', {
             roles: [nodeRole.roleName],
             instanceProfileName: `KitNodeInstanceProfile-${props.cluster.clusterName}`
@@ -75,9 +70,8 @@ export class Kit extends cdk.Construct {
 
         // Install kit
         const chart = props.cluster.addHelmChart('kit', {
-            chart: 'kit',
-            release: 'kit',
-            version: 'v0.0.1',
+            chart: 'kit-operator',
+            release: 'kit-operator',
             repository: 'https://github.com/awslabs/kubernetes-iteration-toolkit/tree/main/operator/charts/kit-operator',
             namespace: namespace,
             createNamespace: false,
