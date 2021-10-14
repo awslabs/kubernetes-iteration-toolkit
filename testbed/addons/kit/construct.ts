@@ -63,6 +63,11 @@ export class Kit extends cdk.Construct {
             ]
         })
 
+        props.cluster.awsAuth.addRoleMapping(nodeRole, {
+            username: 'system:node:{{EC2PrivateDNSName}}',
+            groups: ['system:bootstrappers', 'system:nodes']
+        })
+
         new iam.CfnInstanceProfile(this, 'kit-instance-profile', {
             roles: [nodeRole.roleName],
             instanceProfileName: `KitNodeInstanceProfile-${props.cluster.clusterName}`
