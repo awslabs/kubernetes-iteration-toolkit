@@ -3,6 +3,7 @@ import * as eks from '@aws-cdk/aws-eks'
 import { AWSLoadBalancerController } from './awslb/construct'
 import { Flux, RepositoryProps } from './flux/construct'
 import { Karpenter } from './karpenter/construct'
+import { Kit } from './kit/construct'
 
 export interface AddonsProps {
   cluster: eks.Cluster
@@ -24,6 +25,10 @@ export class Addons extends cdk.Construct {
     })
 
     new Karpenter(this, 'karpenter', {
+      cluster: props.cluster
+    })
+
+    new Kit(this, 'kit', {
       cluster: props.cluster
     })
   }

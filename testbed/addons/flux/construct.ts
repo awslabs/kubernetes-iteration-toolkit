@@ -35,7 +35,7 @@ export class Flux extends cdk.Construct {
                     // we can adjust this later if we want to be more aggressive
                     interval: '5m0s',
                     ref: {
-                        branch: value.branch ?? "main",
+                        branch: value.branch ?? "testbed",
                     },
                     secretRef: {
                         name: 'github-key'
