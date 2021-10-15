@@ -23,7 +23,7 @@ export class AWSLoadBalancerController extends cdk.Construct {
             managedPolicyArn: `arn:aws:iam::aws:policy/AdministratorAccess`
         });
 
-        const manifest = props.cluster.addManifest('awsLbcCrdManifest', ...yaml.loadAll(request.default('GET', 'https://raw.githubusercontent.com/aws/eks-charts/master/stable/aws-load-balancer-controller/crds/crds.yaml').getBody().toString()));
+        const manifest = props.cluster.addManifest('awsLbcCrdManifest', ...yaml.loadAll(request.default('GET', 'https://raw.githubusercontent.com/aws/eks-charts/master/stable/aws-load-balancer-controller/crds/crds.yaml').getBody().toString()) as [Record<string,unknown>]);
 
         const chart = props.cluster.addHelmChart('AWSLBCHelmChart', {
             chart: 'aws-load-balancer-controller',

@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
 - triggers/eks/small/upstream-load.yaml
 - triggers/rbac.yaml
+- triggers/kit/small/upstream-load.yaml
