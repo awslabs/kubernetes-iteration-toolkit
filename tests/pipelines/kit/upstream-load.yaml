@@ -12,7 +12,7 @@ spec:
   - name: cluster-name
     description: The name of the kit cluster you want to spin.
   - name: host-cluster-region
-    default: "us-east-1"
+    default: "us-west-2"
     description: The region where the Host EKS cluster is in.
   - name: guest-cluster-region
     default: "us-west-2"

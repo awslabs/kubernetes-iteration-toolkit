@@ -6,6 +6,6 @@ resources:
 - tasks/setup/eksctl/default.yaml
 - tasks/teardown/eksctl.yaml
 - pipelines/eks/upstream-load.yaml
-- tasks/setup/kit/default.yaml
+- tasks/setup/kit-cluster/default.yaml
 - tasks/teardown/kit.yaml
 - pipelines/kit/upstream-load.yaml

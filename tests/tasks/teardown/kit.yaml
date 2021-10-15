@@ -19,4 +19,3 @@ spec:
       kubectl config current-context 
       #delete kit controlplane spec and dataplane spec crds
       kubectl delete ControlPlane --name $(params.cluster-name)
-      kubectl delete DataPlane --name $(params.cluster-name)-nodes

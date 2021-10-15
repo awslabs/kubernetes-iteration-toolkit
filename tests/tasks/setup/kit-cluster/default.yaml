@@ -12,7 +12,7 @@ spec:
   - name: cluster-name
     description: The name of the KIT cluster you want to spin.
   - name: host-cluster-region
-    default: "us-east-1"
+    default: "us-west-2"
     description: The region where the Host EKS cluster is in.
   - name: guest-cluster-region
     default: "us-west-2"
@@ -24,7 +24,7 @@ spec:
   workspaces:
   - name: config
     description: |
-      A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
+      A workspace into which a kubeconfig file called `kubeconfig` for Guest(kit-type) cluster will be written that will contain the information required to access the cluster.
   steps:
   - name: write-kubeconfig
     image: amazon/aws-cli
@@ -39,6 +39,8 @@ spec:
       #Provision a dataplane plane for the guest cluster
       kubectl create -f $(params.dataplane-spec)
       #Get the admin KUBECONFIG for the guest cluster from the substrate cluster
-      kubectl get secret example-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > $(workspaces.config.path)/kubeconfig
+      kubectl get secret $(params.cluster-name)-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > $(workspaces.config.path)/kubeconfig
       #Deploy CNI plugin to the guest cluster for the nodes to be ready.
+      #Todo: CNI installation only works for `us-west-2`, yet to decide how to tackle other regions.
       kubectl --kubeconfig=$(workspaces.config.path)/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/v1.9/aws-k8s-cni.yaml
+      sleep 300
