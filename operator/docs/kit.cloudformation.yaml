@@ -34,7 +34,7 @@ Resources:
   KitControllerPolicy:
     Type: "AWS::IAM::ManagedPolicy"
     Properties:
-      ManagedPolicyName: "KitControllerPolicy"
+      ManagedPolicyName: !Sub "KitControllerPolicy-${ClusterName}-cluster"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:

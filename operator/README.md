@@ -41,7 +41,7 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
     --name kit-controller \
     --namespace kit \
     --cluster ${SUBSTRATE_CLUSTER_NAME} \
-    --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy \
+    --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy-${SUBSTRATE_CLUSTER_NAME}-cluster \
     --approve \
     --override-existing-serviceaccounts \
     --region=${AWS_REGION}
@@ -50,7 +50,8 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
 #### Install KIT operator to the cluster
 
 ```bash
-   helm upgrade --install kit-operator -n kit charts/kit-operator
+   helm repo add kit https://awslabs.github.io/kubernetes-iteration-toolkit/
+   helm upgrade --install kit-operator kit/kit-operator --namespace kit --create-namespace --version 0.0.1
 ```
 
 Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kubernetes control plane and worker nodes by following these steps in any namespace in the substrate cluster
@@ -105,6 +106,6 @@ Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kube
 ```bash
   eksctl delete iamserviceaccount --name kit-controller \
     --namespace kit \
-    --cluster ${CLUSTER_NAME} \
+    --cluster ${SUBSTRATE_CLUSTER_NAME} \
     --region=$AWS_REGION
 ```
