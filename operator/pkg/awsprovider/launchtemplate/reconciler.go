@@ -19,9 +19,9 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	cpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/securitygroup"
@@ -33,6 +33,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/types"
+	"knative.dev/pkg/ptr"
 )
 
 const (
@@ -57,7 +58,7 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 		return fmt.Errorf("getting launch template, %w", err)
 	}
 	if !existingTemplateMatchesDesired(templates, dataplane.Spec.ClusterName) { // TODO check if existing LT is same as desired LT
-		// if not present create launch template
+		// create launch template
 		if err := c.createLaunchTemplate(ctx, dataplane); err != nil {
 			return fmt.Errorf("creating launch template, %w", err)
 		}
@@ -68,8 +69,12 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 }
 
 func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
+	return c.deleteLaunchTemplate(ctx, TemplateName(dataplane.Spec.ClusterName))
+}
+
+func (c *Controller) deleteLaunchTemplate(ctx context.Context, templateName string) error {
 	if _, err := c.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
-		LaunchTemplateName: aws.String(TemplateName(dataplane.Spec.ClusterName)),
+		LaunchTemplateName: ptr.String(templateName),
 	}); err != nil {
 		if errors.IsLaunchTemplateDoNotExist(err) {
 			return nil
@@ -96,41 +101,60 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 		return fmt.Errorf("getting control plane ca certificate, %w", err)
 	}
 	_, clusterCA := secrets.Parse(caSecret)
-	paramOutput, err := c.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
-		Name: aws.String("/aws/service/eks/optimized-ami/1.20/amazon-linux-2/recommended/image_id"),
-	})
+	amiID, err := c.amiID(ctx, dataplane)
 	if err != nil {
-		return fmt.Errorf("getting ssm parameter, %w", err)
+		return fmt.Errorf("getting ami id for worker nodes, %w", err)
 	}
-	amiID := *paramOutput.Parameter.Value
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
 			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{{
-				DeviceName: aws.String("/dev/xvda"),
+				DeviceName: ptr.String("/dev/xvda"),
 				Ebs: &ec2.LaunchTemplateEbsBlockDeviceRequest{
-					DeleteOnTermination: aws.Bool(true),
-					Iops:                aws.Int64(3000),
-					VolumeSize:          aws.Int64(40),
-					VolumeType:          aws.String("gp3"),
+					DeleteOnTermination: ptr.Bool(true),
+					Iops:                ptr.Int64(3000),
+					VolumeSize:          ptr.Int64(40),
+					VolumeType:          ptr.String("gp3"),
 				}},
 			},
-			InstanceType: aws.String("t2.xlarge"), // TODO get this from dataplane spec
-			ImageId:      aws.String(amiID),
+			InstanceType: ptr.String("t2.xlarge"), // TODO get this from dataplane spec
+			ImageId:      ptr.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				Name: aws.String(fmt.Sprintf("KitNodeInstanceProfile-%s", dataplane.Spec.ClusterName)),
+				Name: ptr.String(fmt.Sprintf("KitNodeInstanceProfile-%s", dataplane.Spec.ClusterName)),
 			},
-			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
-			SecurityGroupIds: []*string{aws.String(securityGroupID)},
-			UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
+			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
+			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
+			UserData: ptr.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
 				dataplane.Spec.ClusterName, v1alpha1.SchemeGroupVersion.Group, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
 		},
-		LaunchTemplateName: aws.String(TemplateName(dataplane.Spec.ClusterName)),
+		LaunchTemplateName: ptr.String(TemplateName(dataplane.Spec.ClusterName)),
 		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),
 	}
 	if _, err := c.ec2api.CreateLaunchTemplate(input); err != nil {
 		return fmt.Errorf("creating launch template, %w", err)
 	}
 	return nil
+}
+
+func (c *Controller) amiID(ctx context.Context, dataplane *v1alpha1.DataPlane) (string, error) {
+	kubeVersion, err := c.desiredKubernetesVersion(ctx, dataplane)
+	if err != nil {
+		return "", fmt.Errorf("getting kubernetes version, %w", err)
+	}
+	paramOutput, err := c.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
+		Name: ptr.String(fmt.Sprintf("/aws/service/eks/optimized-ami/%s/amazon-linux-2/recommended/image_id", kubeVersion)),
+	})
+	if err != nil {
+		return "", fmt.Errorf("getting ssm parameter, %w", err)
+	}
+	return *paramOutput.Parameter.Value, nil
+}
+
+func (c *Controller) desiredKubernetesVersion(ctx context.Context, dataplane *v1alpha1.DataPlane) (string, error) {
+	cp := &cpv1alpha1.ControlPlane{}
+	if err := c.kubeclient.Get(ctx, types.NamespacedName{dataplane.GetNamespace(), dataplane.Spec.ClusterName}, cp); err != nil {
+		return "", fmt.Errorf("getting control plane object, %w", err)
+	}
+	return cp.Spec.KubernetesVersion, nil
 }
 
 func (c *Controller) getLaunchTemplates(ctx context.Context, clusterName string) ([]*ec2.LaunchTemplate, error) {
@@ -157,23 +181,23 @@ func existingTemplateMatchesDesired(templates []*ec2.LaunchTemplate, clusterName
 
 func ec2FilterFor(clusterName string) []*ec2.Filter {
 	return []*ec2.Filter{{
-		Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
-		Values: []*string{aws.String(clusterName)},
+		Name:   ptr.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
+		Values: []*string{ptr.String(clusterName)},
 	}}
 }
 
 func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {
 	return []*ec2.TagSpecification{{
-		ResourceType: aws.String(svcName),
+		ResourceType: ptr.String(svcName),
 		Tags: []*ec2.Tag{{
-			Key:   aws.String(TagKeyNameForAWSResources),
-			Value: aws.String(clusterName),
+			Key:   ptr.String(TagKeyNameForAWSResources),
+			Value: ptr.String(clusterName),
 		}, {
-			Key:   aws.String("Name"),
-			Value: aws.String(fmt.Sprintf("%s-%s", clusterName, svcName)),
+			Key:   ptr.String("Name"),
+			Value: ptr.String(fmt.Sprintf("%s-%s", clusterName, svcName)),
 		}, {
-			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterName)),
-			Value: aws.String("owned"),
+			Key:   ptr.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterName)),
+			Value: ptr.String("owned"),
 		}},
 	}}
 }

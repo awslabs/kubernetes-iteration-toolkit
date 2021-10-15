@@ -21,6 +21,7 @@ import (
 	"html/template"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"knative.dev/pkg/ptr"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,11 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
-)
-
-const (
-	busyBoxImage             = "public.ecr.aws/runecast/busybox:1.33.1"
-	awsIamAuthenticatorImage = "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon/aws-iam-authenticator:v0.5.3-amazonlinux-2"
 )
 
 // reconcileAuthenticatorConfig creates required configs for aws-iam-authenticator and stores them as secret in api server
@@ -81,7 +77,7 @@ func (c *Controller) reconcileAuthenticatorDaemonSet(ctx context.Context, contro
 						Tolerations:  []v1.Toleration{{Operator: v1.TolerationOpExists}},
 						InitContainers: []v1.Container{{
 							Name:  "chown",
-							Image: busyBoxImage,
+							Image: imageprovider.BusyBox(),
 							Command: []string{
 								"sh",
 								"-c",
@@ -98,7 +94,7 @@ func (c *Controller) reconcileAuthenticatorDaemonSet(ctx context.Context, contro
 						}},
 						Containers: []v1.Container{{
 							Name:  "aws-iam-authenticator",
-							Image: awsIamAuthenticatorImage,
+							Image: imageprovider.AWSIamAuthenticator(),
 							Args: []string{
 								"server",
 								"--master=https://localhost/",
