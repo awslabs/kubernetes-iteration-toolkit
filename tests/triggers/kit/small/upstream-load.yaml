@@ -56,6 +56,6 @@ spec:
         emptyDir: {}
       params:
       - name: cluster-name
-        value: "kit-small"
+        value: "kit-small-upstream-load-$(context.pipelineRun.uid)"
       - name: results-bucket
         value: "kit-scalability-dev/$(date +'%Y/%m/%d/%HH/%mm)/$(context.pipelineRun.uid)"
