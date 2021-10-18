@@ -19,11 +19,6 @@ import (
 	"fmt"
 	"strings"
 
-<<<<<<< HEAD
-	"go.uber.org/zap"
-=======
-	"github.com/awslabs/kit/operator/pkg/utils/functional"
->>>>>>> 02e4cba (minor remove log)
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
@@ -98,6 +93,5 @@ func additionalArgs(defaultSpec map[string]string, patch *v1.PodSpec) []string {
 		}
 		result = append(result, arg)
 	}
-	zap.S().Infof("Parsed pod spec are %+v", result)
 	return result
 }
