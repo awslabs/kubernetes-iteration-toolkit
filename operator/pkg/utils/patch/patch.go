@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 
+	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
@@ -93,5 +94,6 @@ func additionalArgs(defaultSpec map[string]string, patch *v1.PodSpec) []string {
 		}
 		result = append(result, arg)
 	}
+	zap.S().Infof("Parsed pod spec are %+v", result)
 	return result
 }
