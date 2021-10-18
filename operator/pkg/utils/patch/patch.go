@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
+	"go.uber.org/zap"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
@@ -70,7 +71,8 @@ func parseArgsFor(podSpec *v1.PodSpec) map[string]string {
 	result := map[string]string{}
 	for _, arg := range podSpec.Containers[0].Args {
 		kv := strings.Split(arg, "=")
-		result[kv[0]] = result[kv[1]]
+		result[kv[0]] = kv[1]
 	}
+	zap.S().Infof("Parsed pod spec are %+v", result)
 	return result
 }
