@@ -10,19 +10,19 @@ spec:
         nodeSelector: 
           node.kubernetes.io/instance-type: m5.24xlarge
         containers: 
-          - name: apiserver
-            args: 
-              - --max-requests-inflight=500
-              - --max-mutating-requests-inflight=300
+        - name: apiserver
+          args: 
+            - --max-requests-inflight=500
+            - --max-mutating-requests-inflight=300
     controllerManager:
       spec:
         containers:
-          -name: controller-manager
+        - name: controller-manager
           args:
             - --kube-api-qps=50
     scheduler:
       spec:
         containers:
-          -name: scheduler
+        - name: scheduler
           args:
             - --kube-api-qps=50
