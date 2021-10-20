@@ -19,6 +19,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -29,8 +30,7 @@ import (
 )
 
 const (
-	clusterIP    = "10.96.0.10" // TODO hard coded for now fix this
-	coreDNSImage = "public.ecr.aws/eks-distro/coredns/coredns:v1.8.3-eks-1-20-4"
+	clusterIP = "10.96.0.10" // TODO hard coded for now fix this
 )
 
 type CoreDNS struct {
@@ -193,7 +193,7 @@ func (c *CoreDNS) deployment(ctx context.Context) error {
 					ServiceAccountName: "coredns",
 					Containers: []v1.Container{{
 						Name:            "coredns",
-						Image:           coreDNSImage,
+						Image:           imageprovider.CoreDNS(),
 						ImagePullPolicy: v1.PullIfNotPresent,
 						Resources: v1.ResourceRequirements{
 							Requests: map[v1.ResourceName]resource.Quantity{

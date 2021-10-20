@@ -22,6 +22,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
@@ -39,7 +40,6 @@ import (
 const (
 	kubeSystem             = "kube-system"
 	defaultStr             = "default"
-	kubeProxyImage         = "public.ecr.aws/eks-distro/kubernetes/kube-proxy:v1.20.7-eks-1-20-4"
 	KubeProxyDaemonSetName = "kubeproxy-daemonset"
 )
 
@@ -213,7 +213,7 @@ func kubeProxyPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		Containers: []v1.Container{
 			{
 				Name:  "kubeproxy",
-				Image: kubeProxyImage,
+				Image: imageprovider.KubeProxy(controlPlane.Spec.KubernetesVersion),
 				Resources: v1.ResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{
 						v1.ResourceCPU: resource.MustParse("1"),

@@ -21,15 +21,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	controllerManagerImage = "public.ecr.aws/eks-distro/kubernetes/kube-controller-manager:v1.20.7-eks-1-20-4"
 )
 
 func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
@@ -97,7 +94,7 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		}},
 		Containers: []v1.Container{{
 			Name:    "controller-manager",
-			Image:   controllerManagerImage,
+			Image:   imageprovider.KubeControllerManager(controlPlane.Spec.KubernetesVersion),
 			Command: []string{"kube-controller-manager"},
 			Resources: v1.ResourceRequirements{
 				Requests: map[v1.ResourceName]resource.Quantity{

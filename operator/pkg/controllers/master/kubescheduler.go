@@ -20,15 +20,12 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	schedulerImage = "public.ecr.aws/eks-distro/kubernetes/kube-scheduler:v1.20.7-eks-1-20-4"
 )
 
 func (c *Controller) reconcileScheduler(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
@@ -98,7 +95,7 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		}},
 		Containers: []v1.Container{{
 			Name:    "scheduler",
-			Image:   schedulerImage,
+			Image:   imageprovider.KubeScheduler(controlPlane.Spec.KubernetesVersion),
 			Command: []string{"kube-scheduler"},
 			Resources: v1.ResourceRequirements{
 				Requests: map[v1.ResourceName]resource.Quantity{

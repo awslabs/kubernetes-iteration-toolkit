@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	appsv1 "k8s.io/api/apps/v1"
@@ -30,7 +31,6 @@ import (
 )
 
 const (
-	apiserverImage        = "public.ecr.aws/eks-distro/kubernetes/kube-apiserver:v1.20.7-eks-1-20-4"
 	serviceClusterIPRange = "10.96.0.0/12"
 )
 
@@ -101,7 +101,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		Containers: []v1.Container{
 			{
 				Name:    "apiserver",
-				Image:   apiserverImage,
+				Image:   imageprovider.APIServer(controlPlane.Spec.KubernetesVersion),
 				Command: []string{"kube-apiserver"},
 				Resources: v1.ResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{

@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +30,6 @@ import (
 
 const (
 	defaultEtcdReplicas = 3
-	defaultEtcdImage    = "public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.14-eks-1-18-1"
 )
 
 func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
@@ -55,7 +55,7 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		}},
 		Containers: []v1.Container{{
 			Name:  "etcd",
-			Image: defaultEtcdImage,
+			Image: imageprovider.ETCD(),
 			Ports: []v1.ContainerPort{{
 				ContainerPort: 2379,
 				Name:          "etcd",
