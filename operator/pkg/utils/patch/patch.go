@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
@@ -57,12 +56,21 @@ func mergePatch(defaultObj, patch, object interface{}) ([]byte, error) {
 	return patchedBytes, nil
 }
 
+// Keep the order of the args same, if the ordering changes when object is patched Kubernetes restarts the pod
 func mergeContainerArgs(defaultSpec, patch *v1.PodSpec) *v1.PodSpec {
-	merged := []string{}
-	for key, value := range functional.UnionStringMaps(parseArgsFor(defaultSpec), parseArgsFor(patch)) {
-		merged = append(merged, strings.Join([]string{key, value}, "="))
+	patchedArgs := parseArgsFor(patch)
+	// get any additional args passed in patch
+	extraArgs := additionalArgs(parseArgsFor(defaultSpec), patch)
+	updatedArgs := []string{}
+	// for all the args in defaultSpec, check if the value for an arg has been updated in patch
+	for _, arg := range defaultSpec.Containers[0].Args {
+		kv := strings.Split(arg, "=")
+		if update, ok := patchedArgs[kv[0]]; ok {
+			kv[1] = update
+		}
+		updatedArgs = append(updatedArgs, strings.Join(kv, "="))
 	}
-	patch.Containers[0].Args = merged
+	patch.Containers[0].Args = append(updatedArgs, extraArgs...)
 	return patch
 }
 
@@ -70,7 +78,20 @@ func parseArgsFor(podSpec *v1.PodSpec) map[string]string {
 	result := map[string]string{}
 	for _, arg := range podSpec.Containers[0].Args {
 		kv := strings.Split(arg, "=")
-		result[kv[0]] = result[kv[1]]
+		result[kv[0]] = kv[1]
+	}
+	return result
+}
+
+// needs to preserve the order of args passed in patch in every iteration
+func additionalArgs(defaultSpec map[string]string, patch *v1.PodSpec) []string {
+	result := make([]string, 0)
+	for _, arg := range patch.Containers[0].Args {
+		kv := strings.Split(arg, "=")
+		if _, ok := defaultSpec[kv[0]]; ok {
+			continue
+		}
+		result = append(result, arg)
 	}
 	return result
 }
