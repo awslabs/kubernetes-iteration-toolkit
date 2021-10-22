@@ -17,10 +17,27 @@ spec:
   - name: guest-cluster-region
     default: "us-west-2"
     description: The region where the kit cluster is created.
-  - name: control-plane-spec
-    description:  url to the controlplane spec.
-  - name: dataplane-spec
-    description: url to the dataplane spec.
+  - name: version
+    default: "1.21"
+    description:  kubernetes version.
+  - name: cp-instance-type
+    default: "m5.8xlarge"
+    description: control plane instance type.
+  - name: max-requests-inflight
+    default: "400"
+    description: maximum number of inflight read request that apiserver could allow
+  - name: max-mutating-requests
+    default: "200"
+    description: maximum number of mutating requests in flight that apiserver could allow
+  - name: kcm-qps
+    default: "20"
+    description: Kubernetes-Controller-Manager QPS setting
+  - name: scheduler-qps
+    default: "20"
+    description: Kubernetes-Scheduler QPS setting
+  - name: node-count
+    default: "1000"
+    description: desired node count for Dataplane.
   - name: giturl
     description: "git url to clone the package"
     default: https://github.com/kubernetes/perf-tests.git
@@ -35,8 +52,6 @@ spec:
     default: "15"
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
-  - name: desired-nodes
-    description: The desired number of nodes in the cluster which we define in DataPlane spec.
   tasks:
   - name: create-kit-cluster
     taskRef:
@@ -48,10 +63,20 @@ spec:
         value: '$(params.host-cluster-region)'
       - name: guest-cluster-region
         value: '$(params.guest-cluster-region)'
-      - name: control-plane-spec
-        value: '$(params.control-plane-spec)'
-      - name: dataplane-spec
-        value: '$(params.dataplane-spec)'
+      - name: version
+        value: '$(params.version)'    
+      - name: cp-instance-type
+        value: '$(params.cp-instance-type)' 
+      - name: max-requests-inflight
+        value: '$(params.max-requests-inflight)' 
+      - name: max-mutating-requests
+        value: '$(params.max-mutating-requests)' 
+      - name: kcm-qps
+        value: '$(params.kcm-qps)' 
+      - name: scheduler-qps
+        value: '$(params.scheduler-qps)'
+      - name: node-count
+        value: '$(params.node-count)'      
     workspaces:
       - name: config    
         workspace: config
@@ -71,7 +96,7 @@ spec:
       - name: results-bucket
         value: '$(params.results-bucket)'
       - name: nodes
-        value: '$(params.desired-nodes)'
+        value: '$(params.node-count)'
     workspaces:
       - name: source
         workspace: source

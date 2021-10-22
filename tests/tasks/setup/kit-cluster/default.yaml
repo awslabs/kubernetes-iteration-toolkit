@@ -17,10 +17,27 @@ spec:
   - name: guest-cluster-region
     default: "us-west-2"
     description: The region where the kit cluster is created.
-  - name: control-plane-spec
-    description:  url to the controlplane spec.
-  - name: dataplane-spec
-    description: url to the dataplane spec.
+  - name: version
+    default: "1.21"
+    description:  kubernetes version.
+  - name: cp-instance-type
+    default: "m5.8xlarge"
+    description: control plane instance type.
+  - name: max-requests-inflight
+    default: "400"
+    description: maximum number of inflight read request that apiserver could allow
+  - name: max-mutating-requests
+    default: "200"
+    description: maximum number of mutating requests in flight that apiserver could allow
+  - name: kcm-qps
+    default: "20"
+    description: Kubernetes-Controller-Manager QPS setting
+  - name: scheduler-qps
+    default: "20"
+    description: Kubernetes-Scheduler QPS setting
+  - name: node-count
+    default: "1000"
+    description: desired node count for Dataplane.
   workspaces:
   - name: config
     description: |
@@ -35,9 +52,51 @@ spec:
       aws eks update-kubeconfig --name testbed --region $(params.host-cluster-region)
       kubectl config current-context
       #Provision a control plane for the guest cluster
-      kubectl create -f $(params.control-plane-spec)
+      cat > "$(workspaces.config.path)/cp.yaml" <<EOL
+      apiVersion: kit.k8s.sh/v1alpha1
+      kind: ControlPlane
+      metadata:
+        name: $(params.cluster-name) # Desired Cluster Name
+      spec:
+        kubernetesVersion: $(params.version)
+        master:
+          apiServer:
+            spec:
+              nodeSelector: 
+                node.kubernetes.io/instance-type: $(params.cp-instance-type)
+              containers: 
+              - name: apiserver
+                args: 
+                  - --max-requests-inflight=$(params.max-requests-inflight)
+                  - --max-mutating-requests-inflight=$(params.max-mutating-requests)
+          controllerManager:
+            spec:
+              containers:
+              - name: controller-manager
+                args:
+                  - --kube-api-qps=$(params.kcm-qps)
+          scheduler:
+            spec:
+              containers:
+              - name: scheduler
+                args:
+                  - --kube-api-qps=$(params.scheduler-qps)
+      EOL
+      kubectl create -f $(workspaces.config.path)/cp.yaml
+
+      cat > "$(workspaces.config.path)/dp.yaml" <<EOL
+      apiVersion: kit.k8s.sh/v1alpha1
+      kind: DataPlane
+      metadata:
+        name: $(params.cluster-name)-nodes 
+      spec: 
+        clusterName: $(params.cluster-name) # Desired Cluster Name
+        nodeCount: $(params.node-count)
+      EOL
+
       #Provision a dataplane plane for the guest cluster
-      kubectl create -f $(params.dataplane-spec)
+      kubectl create -f $(workspaces.config.path)/dp.yaml
+
       #Get the admin KUBECONFIG for the guest cluster from the substrate cluster
       kubectl get secret $(params.cluster-name)-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > $(workspaces.config.path)/kubeconfig
       #Deploy CNI plugin to the guest cluster for the nodes to be ready.

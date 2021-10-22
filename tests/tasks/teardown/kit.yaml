@@ -9,13 +9,16 @@ spec:
     This Task can be used to teardown an KIT cluster in an AWS account.
   params:
   - name: cluster-name
-    description: The name of the EKS cluster which will be teared down.
+    description: The name of the kit cluster which will be teared down.
+  - name: region
+    default: us-west-2
+    description: The region where the EKS/host cluster is in.
   steps:
   - name: delete-cluster
     image: amazon/aws-cli
     script: |
       kubectl version
-      aws eks update-kubeconfig --name testbed --region $(params.host-cluster-region)
+      aws eks update-kubeconfig --name testbed --region $(params.region)
       kubectl config current-context 
       #delete kit controlplane spec and dataplane spec crds
       kubectl delete ControlPlane --name $(params.cluster-name)
