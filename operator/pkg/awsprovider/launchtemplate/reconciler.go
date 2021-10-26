@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	cpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
@@ -119,7 +120,7 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 			InstanceType: ptr.String("t2.xlarge"), // TODO get this from dataplane spec
 			ImageId:      ptr.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				Name: ptr.String(fmt.Sprintf("KitNodeInstanceProfile-%s", dataplane.Spec.ClusterName)),
+				Name: aws.String(fmt.Sprintf("KitNodeInstanceProfile")),
 			},
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
 			SecurityGroupIds: []*string{ptr.String(securityGroupID)},

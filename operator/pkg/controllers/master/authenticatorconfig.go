@@ -164,7 +164,7 @@ data:
         - groups:
           - system:bootstrappers
           - system:nodes
-          rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/KitNodeRole-{{ .ClusterName }}-cluster
+          rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/KitNodeRole
           username: system:node:{{ .PrivateDNS}}
       # List of Account IDs to whitelist for authentication
       mapAccounts:

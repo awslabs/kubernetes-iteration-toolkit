@@ -1,21 +1,17 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Resources used by https://github.com/awslabs/kit/operator
-Parameters:
-  ClusterName:
-    Type: String
-    Description: "Desired cluster name"
 Resources:
   KitNodeInstanceProfile:
     Type: "AWS::IAM::InstanceProfile"
     Properties:
-      InstanceProfileName: !Sub "KitNodeInstanceProfile-${ClusterName}"
+      InstanceProfileName: "KitNodeInstanceProfile"
       Path: "/"
       Roles:
         - Ref: "KitNodeRole"
   KitNodeRole:
     Type: "AWS::IAM::Role"
     Properties:
-      RoleName: !Sub "KitNodeRole-${ClusterName}-cluster"
+      RoleName: "KitNodeRole"
       Path: /
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -34,7 +30,7 @@ Resources:
   KitControllerPolicy:
     Type: "AWS::IAM::ManagedPolicy"
     Properties:
-      ManagedPolicyName: !Sub "KitControllerPolicy-${ClusterName}-cluster"
+      ManagedPolicyName: "KitControllerPolicy"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
