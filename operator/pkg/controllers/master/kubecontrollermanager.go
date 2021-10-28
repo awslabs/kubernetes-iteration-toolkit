@@ -23,36 +23,42 @@ import (
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"github.com/awslabs/kit/operator/pkg/utils/patch"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	return c.kubeClient.EnsurePatch(ctx, &appsv1.Deployment{}, object.WithOwner(controlPlane, kcmDeploymentSpec(controlPlane)))
-}
-
-func kcmDeploymentSpec(controlPlane *v1alpha1.ControlPlane) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      KCMDeploymentName(controlPlane.ClusterName()),
-			Namespace: controlPlane.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: kcmLabels(controlPlane.ClusterName()),
-			},
-			Replicas: aws.Int32(3),
-			Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: kcmLabels(controlPlane.ClusterName()),
-				},
-				Spec: *kcmPodSpecFor(controlPlane),
-			},
-		},
+func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
+	kcmPodSpec := kcmPodSpecFor(controlPlane)
+	if controlPlane.Spec.Master.ControllerManager != nil {
+		kcmPodSpec, err = patch.PodSpec(&kcmPodSpec, controlPlane.Spec.Master.ControllerManager.Spec)
+		if err != nil {
+			return fmt.Errorf("patch KCM pod spec, %w", err)
+		}
 	}
+	return c.kubeClient.EnsurePatch(ctx, &appsv1.Deployment{},
+		object.WithOwner(controlPlane, &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      KCMDeploymentName(controlPlane.ClusterName()),
+				Namespace: controlPlane.Namespace,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: kcmLabels(controlPlane.ClusterName()),
+				},
+				Replicas: aws.Int32(3),
+				Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: kcmLabels(controlPlane.ClusterName()),
+					},
+					Spec: kcmPodSpec,
+				},
+			},
+		}),
+	)
 }
 
 func KCMDeploymentName(clusterName string) string {
@@ -63,9 +69,9 @@ func kcmLabels(clustername string) map[string]string {
 	return functional.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "kube-controller-manager"})
 }
 
-func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
+func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
-	return &v1.PodSpec{
+	return v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
