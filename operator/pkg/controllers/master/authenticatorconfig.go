@@ -37,12 +37,13 @@ func (c *Controller) reconcileAuthenticatorConfig(ctx context.Context, controlPl
 	if err != nil {
 		return fmt.Errorf("getting AWS account ID, %w", err)
 	}
-	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ ClusterName, Namespace, Group, AWSAccountID, PrivateDNS string }{
+	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ ClusterName, Namespace, Group, AWSAccountID, PrivateDNS, SessionName string }{
 		ClusterName:  controlPlane.ClusterName(),
 		Namespace:    controlPlane.Namespace,
 		Group:        v1alpha1.SchemeGroupVersion.Group,
 		AWSAccountID: awsAccountID,
 		PrivateDNS:   "{{EC2PrivateDNSName}}",
+		SessionName:  "{{SessionNameRaw}}",
 	})
 	if err != nil {
 		return fmt.Errorf("generating authenticator config, %w", err)
@@ -166,6 +167,11 @@ data:
           - system:nodes
           rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/KitNodeRole
           username: system:node:{{ .PrivateDNS}}
+        - groups:
+          - system:bootstrappers
+          - system:nodes
+          rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/KitletNodeRole
+          username: system:node:{{ .SessionName }}
       # List of Account IDs to whitelist for authentication
       mapAccounts:
         - {{ .AWSAccountID }}

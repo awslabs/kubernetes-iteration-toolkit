@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	clusterIP = "10.96.0.10" // TODO hard coded for now fix this
+	clusterIP = "10.100.0.10" // TODO hard coded for now fix this
 )
 
 type CoreDNS struct {
@@ -81,6 +81,10 @@ func (c *CoreDNS) clusterRole(ctx context.Context) error {
 			APIGroups: []string{""},
 			Resources: []string{"nodes"},
 			Verbs:     []string{"get"},
+		}, {
+			APIGroups: []string{"discovery.k8s.io"},
+			Resources: []string{"endpointslices"},
+			Verbs:     []string{"list", "watch"},
 		}},
 	})
 }
@@ -189,6 +193,7 @@ func (c *CoreDNS) deployment(ctx context.Context) error {
 					Labels: coreDNSLabels(),
 				},
 				Spec: v1.PodSpec{
+					DNSPolicy:          v1.DNSDefault,
 					PriorityClassName:  "system-cluster-critical",
 					ServiceAccountName: "coredns",
 					Containers: []v1.Container{{
