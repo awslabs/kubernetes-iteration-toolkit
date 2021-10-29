@@ -5,3 +5,10 @@ metadata:
 spec: 
   clusterName: example # Desired Cluster Name
   nodeCount: 1
+  subnetSelector:
+    kubernetes.io/cluster/kit-management-cluster: "*"
+  instanceTypes:
+    - c4.xlarge
+    - c5.xlarge
+    - c4.4xlarge
+    - c5.4xlarge

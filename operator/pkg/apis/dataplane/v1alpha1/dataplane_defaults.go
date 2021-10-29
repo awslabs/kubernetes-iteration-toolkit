@@ -24,4 +24,10 @@ func (c *DataPlane) SetDefaults(ctx context.Context) {
 
 // SetDefaults for the DataPlaneSpec, cascading to all subspecs
 func (s *DataPlaneSpec) SetDefaults(ctx context.Context) {
+	if s.AllocationStrategy == "" {
+		s.AllocationStrategy = "lowest-price"
+	}
+	if len(s.InstanceTypes) == 0 {
+		s.InstanceTypes = []string{"t2.xlarge", "t3.xlarge", "t3a.xlarge"}
+	}
 }
