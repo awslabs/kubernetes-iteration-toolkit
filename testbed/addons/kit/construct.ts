@@ -70,7 +70,7 @@ export class Kit extends cdk.Construct {
 
         new iam.CfnInstanceProfile(this, 'kit-instance-profile', {
             roles: [nodeRole.roleName],
-            instanceProfileName: `KitNodeInstanceProfile-${props.cluster.clusterName}`
+            instanceProfileName: 'KitNodeInstanceProfile'
         })
 
         // Install kit
