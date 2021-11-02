@@ -45,7 +45,7 @@ func NewController(ec2api *awsprovider.EC2, autoscaling *awsprovider.AutoScaling
 }
 
 func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	asg, err := c.getAutoScalingGroup(ctx, AutoScalingGroupNameFor(dataplane.Spec.ClusterName))
+	asg, err := c.getAutoScalingGroup(ctx, AutoScalingGroupNameFor(dataplane))
 	if err != nil {
 		return fmt.Errorf("getting auto scaling group for %v, %w", dataplane.Spec.ClusterName, err)
 	}
@@ -61,14 +61,14 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 		return fmt.Errorf("ASG %v deletion in progress", asg.AutoScalingGroupName)
 	}
 	if err := c.updateAutoScalingGroup(ctx, dataplane, asg); err != nil {
-		return fmt.Errorf("updating auto scaling group %v, %w", AutoScalingGroupNameFor(dataplane.Spec.ClusterName), err)
+		return fmt.Errorf("updating auto scaling group %v, %w", AutoScalingGroupNameFor(dataplane), err)
 	}
 	return nil
 }
 
 func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	if _, err := c.autoscaling.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
-		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
+		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane)),
 		ForceDelete:          ptr.Bool(true), // terminate all the nodes in the ASG
 	}); err != nil {
 		return fmt.Errorf("deleting auto scaling group, %w", err)
@@ -100,7 +100,7 @@ func (c *Controller) updateAutoScalingGroup(ctx context.Context, dataplane *v1al
 	}
 	zap.S().Infof("[%v] updating ASG %v", dataplane.Spec.ClusterName, *asg.AutoScalingGroupName)
 	_, err = c.autoscaling.UpdateAutoScalingGroupWithContext(ctx, &autoscaling.UpdateAutoScalingGroupInput{
-		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
+		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane)),
 		DesiredCapacity:      ptr.Int64(int64(dataplane.Spec.NodeCount)),
 		VPCZoneIdentifier:    ptr.String(strings.Join(subnets, ",")),
 		MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
@@ -121,7 +121,7 @@ func (c *Controller) createAutoScalingGroup(ctx context.Context, dataplane *v1al
 		return fmt.Errorf("failed to find private subnets for dataplane")
 	}
 	_, err = c.autoscaling.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
-		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane.Spec.ClusterName)),
+		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane)),
 		DesiredCapacity:      ptr.Int64(int64(dataplane.Spec.NodeCount)),
 		MaxSize:              ptr.Int64(int64(1000)),
 		MinSize:              ptr.Int64(int64(0)),
@@ -243,8 +243,8 @@ func (c *Controller) subnetsForInstances(ctx context.Context, instanceIDs []stri
 	return result, nil
 }
 
-func AutoScalingGroupNameFor(clusterName string) string {
-	return fmt.Sprintf("kit-%s-cluster-dataplane", clusterName)
+func AutoScalingGroupNameFor(dataplane *v1alpha1.DataPlane) string {
+	return fmt.Sprintf("kit/%s-cluster/%s", dataplane.Spec.ClusterName, dataplane.Name)
 }
 
 func generateAutoScalingTags(clusterName string) []*autoscaling.Tag {
