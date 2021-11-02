@@ -38,6 +38,23 @@ type DataPlaneList struct {
 }
 
 type DataPlaneSpec struct {
+	// ClusterName is used to connect the worker nodes to a control plane clusterName.
 	ClusterName string `json:"clusterName,omitempty"`
-	NodeCount   int    `json:"nodeCount,omitempty"`
+	// NodeCount is the desired number of worker nodes for this dataplane.
+	NodeCount int `json:"nodeCount,omitempty"`
+	// SubnetSelector lets user define label key and values for kit to select
+	// the subnets for worker nodes. It can contain key:value to select subnets
+	// with particular label, or a specific key:"*" to select all subnets with a
+	// specific key. If no selector is provided, worker nodes are
+	// provisioned in the same subnet as control plane nodes.
+	// +optional
+	SubnetSelector map[string]string `json:"subnetSelector,omitempty"`
+	// InstanceTypes is an optional field thats lets user specify the instance
+	// types for worker nodes, defaults to instance types "t2.xlarge", "t3.xlarge" or "t3a.xlarge"
+	// +optional
+	InstanceTypes []string `json:"instanceTypes,omitempty"`
+	// AllocationStrategy helps user define the strategy to provision worker nodes in EC2,
+	// defaults to "lowest-price"
+	// +optional
+	AllocationStrategy string `json:"allocationStrategy,omitempty"`
 }
