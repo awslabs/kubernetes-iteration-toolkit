@@ -244,7 +244,7 @@ func (c *Controller) subnetsForInstances(ctx context.Context, instanceIDs []stri
 }
 
 func AutoScalingGroupNameFor(dataplane *v1alpha1.DataPlane) string {
-	return fmt.Sprintf("kit-%s-cluster-%s", dataplane.Spec.ClusterName, dataplane.Name)
+	return fmt.Sprintf("kit/%s-cluster/%s", dataplane.Spec.ClusterName, dataplane.Name)
 }
 
 func generateAutoScalingTags(clusterName string) []*autoscaling.Tag {
