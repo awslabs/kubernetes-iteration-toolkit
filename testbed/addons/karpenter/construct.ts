@@ -62,7 +62,7 @@ export class Karpenter extends cdk.Construct {
         const chart = props.cluster.addHelmChart('karpenter', {
             chart: 'karpenter',
             release: 'karpenter',
-            version: 'v0.3.1',
+            version: 'v0.4.1',
             repository: 'https://awslabs.github.io/karpenter/charts',
             namespace: namespace,
             createNamespace: false,
@@ -77,21 +77,5 @@ export class Karpenter extends cdk.Construct {
             }
         })
         chart.node.addDependency(ns)
-
-        // Default Provisioner
-        props.cluster.addManifest("default-provisioner", {
-            apiVersion: 'karpenter.sh/v1alpha3',
-            kind: 'Provisioner',
-            metadata: {
-                name: 'default',
-            },
-            spec: {
-                cluster: {
-                    name: props.cluster.clusterName,
-                    endpoint: props.cluster.clusterEndpoint,
-                },
-                ttlSecondsAfterEmpty: 30,
-            }
-        }).node.addDependency(chart)
     }
 }
