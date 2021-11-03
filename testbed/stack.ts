@@ -12,7 +12,7 @@ export interface TestbedProps extends cdk.StackProps {
 
 export class Testbed extends cdk.Stack {
     constructor(scope: cdk.Construct, id: string="testbed", props: TestbedProps) {
-        super(scope, id, props)
+        super(scope, id)
 
         const vpc = new ec2.Vpc(this, id, {
             cidr: '10.0.0.0/16',
