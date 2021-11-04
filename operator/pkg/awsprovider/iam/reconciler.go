@@ -48,10 +48,6 @@ var (
 	}
 )
 
-func (c *Controller) ReconcileR(ctx context.Context, controlPlane *apis.ControlPlane) error {
-	return nil
-}
-
 func (c *Controller) Reconcile(ctx context.Context, controlPlane *apis.ControlPlane) error {
 	role, err := c.getRole(ctx, controlPlane)
 	if err != nil && !errors.IsIAMObjectDoNotExist(err) {

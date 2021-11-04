@@ -71,6 +71,10 @@ func (k *KubeProxy) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contro
 	return nil
 }
 
+func (k *KubeProxy) Finalize(_ context.Context, _ *v1alpha1.ControlPlane) (err error) {
+	return nil
+}
+
 func (k *KubeProxy) serviceAccount(ctx context.Context, _ *v1alpha1.ControlPlane) error {
 	return k.kubeClient.EnsurePatch(ctx, &v1.ServiceAccount{}, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{

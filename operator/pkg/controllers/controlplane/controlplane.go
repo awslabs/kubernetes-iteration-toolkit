@@ -20,14 +20,12 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
-	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/addons"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/results"
-	"github.com/awslabs/kit/operator/pkg/utils/reconciler"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -39,7 +37,7 @@ type controlPlane struct {
 }
 
 // NewController returns a controller for managing controlPlane components of the cluster
-func NewController(kubeClient client.Client, account awsprovider.AccountMetadata, iamProvider *iam.Controller) *controlPlane {
+func NewController(kubeClient client.Client, account awsprovider.AccountMetadata, iamProvider v1alpha1.ReconcileFinalize) *controlPlane {
 	return &controlPlane{
 		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
 		masterController: master.New(kubeprovider.New(kubeClient), account, iamProvider),
@@ -59,7 +57,7 @@ func (c *controlPlane) For() controllers.Object {
 
 // Reconcile will reconcile all the components running on the control plane
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
-	for _, resource := range []reconciler.Interface{
+	for _, resource := range []v1alpha1.ReconcileFinalize{
 		c.etcdController,
 		c.masterController,
 		c.addonsController,

@@ -59,6 +59,10 @@ func (c *CoreDNS) Reconcile(ctx context.Context, _ *v1alpha1.ControlPlane) error
 	return nil
 }
 
+func (c *CoreDNS) Finalize(_ context.Context, _ *v1alpha1.ControlPlane) (err error) {
+	return nil
+}
+
 func (c *CoreDNS) serviceAccount(ctx context.Context) error {
 	return c.kubeClient.EnsurePatch(ctx, &v1.ServiceAccount{}, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{

@@ -52,3 +52,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 	zap.S().Infof("[%v] etcd reconciled", controlPlane.ClusterName())
 	return nil
 }
+
+func (c *Controller) Finalize(_ context.Context, _ *v1alpha1.ControlPlane) (err error) {
+	return nil
+}

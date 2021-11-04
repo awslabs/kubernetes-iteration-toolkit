@@ -19,7 +19,6 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
-	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
@@ -32,11 +31,11 @@ type Controller struct {
 	kubeClient    *kubeprovider.Client
 	keypairs      *keypairs.Provider
 	kubeConfigs   *kubeconfigs.Provider
-	iamProvider   *iam.Controller
+	iamProvider   v1alpha1.ReconcileFinalize
 	cloudProvider awsprovider.AccountMetadata
 }
 
-func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamProvider *iam.Controller) *Controller {
+func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamProvider v1alpha1.ReconcileFinalize) *Controller {
 	return &Controller{
 		kubeClient:    kubeclient,
 		keypairs:      keypairs.Reconciler(kubeclient),

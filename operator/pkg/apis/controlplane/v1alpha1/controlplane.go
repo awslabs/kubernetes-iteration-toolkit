@@ -15,6 +15,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -81,4 +83,9 @@ type Instances struct {
 
 func (c *ControlPlane) ClusterName() string {
 	return c.Name
+}
+
+type ReconcileFinalize interface {
+	Reconcile(context.Context, *ControlPlane) error
+	Finalize(context.Context, *ControlPlane) error
 }
