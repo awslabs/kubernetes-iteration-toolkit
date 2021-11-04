@@ -52,27 +52,6 @@ export class Kit extends cdk.Construct {
             ],
         }))
 
-        // Node Role
-        const nodeRole = new iam.Role(this, 'kit-node-role', {
-            assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-            managedPolicies: [
-                iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEKSWorkerNodePolicy'),
-                iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'),
-                iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEKS_CNI_Policy'),
-                iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
-            ]
-        })
-
-        props.cluster.awsAuth.addRoleMapping(nodeRole, {
-            username: 'system:node:{{EC2PrivateDNSName}}',
-            groups: ['system:bootstrappers', 'system:nodes']
-        })
-
-        new iam.CfnInstanceProfile(this, 'kit-instance-profile', {
-            roles: [nodeRole.roleName],
-            instanceProfileName: 'KitNodeInstanceProfile'
-        })
-
         // Install kit
         const chart = props.cluster.addHelmChart('kit', {
             chart: 'kit-operator',
@@ -92,5 +71,27 @@ export class Kit extends cdk.Construct {
             }
         })
         chart.node.addDependency(ns)
+
+        //Karp Provisioner for kit
+        props.cluster.addManifest("default-provisioner", {
+            apiVersion: 'karpenter.sh/v1alpha5',
+            kind: 'Provisioner',
+            metadata: {
+                name: 'default',
+            },
+            spec: {
+                provider: {
+                    cluster: {
+                        name: props.cluster.clusterName,
+                        endpoint: props.cluster.clusterEndpoint,
+                    },
+                    subnetSelector: {
+                        "kit/hostcluster": `${props.cluster.clusterName}-controlplane`
+                    }
+                },
+                ttlSecondsAfterEmpty: 30,
+            }
+        })
+
     }
 }

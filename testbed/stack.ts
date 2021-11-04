@@ -11,7 +11,7 @@ export interface TestbedProps extends cdk.StackProps {
 }
 
 export class Testbed extends cdk.Stack {
-    constructor(scope: cdk.Construct, id: string="testbed", props: TestbedProps) {
+    constructor(scope: cdk.Construct, id: string = "testbed", props: TestbedProps) {
         super(scope, id, props)
 
         const vpc = new ec2.Vpc(this, id, {
@@ -30,6 +30,15 @@ export class Testbed extends cdk.Stack {
                 },
             ],
         });
+
+        //Tag pub subnets for KIT CP
+        const selection = vpc.selectSubnets({
+            subnetType: ec2.SubnetType.PUBLIC
+        });
+        selection.subnets.forEach(subnet => {
+            Tags.of(subnet).add('kit/hostcluster', `${id}-controlplane`)
+        })
+
         //ToDo: revisit once this is resolved - https://github.com/aws/aws-cdk/issues/5927
         // index<=8 will give us 9  /16 cidrs additionally to make a mega VPC.
         for (let index = 0; index <= 8; index++) {
@@ -38,19 +47,29 @@ export class Testbed extends cdk.Stack {
                 cidrBlock: `10.${index + 1}.0.0/16`
             });
             let privateSubnet = new ec2.PrivateSubnet(this, `${id}-private-subnet-${index}`, {
-                availabilityZone: cdk.Stack.of(this).availabilityZones[index%cdk.Stack.of(this).availabilityZones.length],
+                availabilityZone: cdk.Stack.of(this).availabilityZones[index % cdk.Stack.of(this).availabilityZones.length],
                 vpcId: vpc.vpcId,
                 cidrBlock: `10.${index + 1}.0.0/16`
             })
             privateSubnet.node.addDependency(additionalCidr);
+            //Tag pub subnets for KIT DP
+            Tags.of(privateSubnet).add('kit/hostcluster', `${id}-dataplane`)
+            let natSubnet = new ec2.PublicSubnet(this, `${id}-nat-subnet-${index}`, {
+                availabilityZone: cdk.Stack.of(this).availabilityZones[index % cdk.Stack.of(this).availabilityZones.length],
+                vpcId: vpc.vpcId,
+                cidrBlock: `10.0.64.${index * 16}/28`
+            })
+            //add igw route for nat subnets
+            let routeTableId = natSubnet.routeTable.routeTableId
+            new ec2.CfnRoute(this, 'publicIGWRoute' + index, {
+                routeTableId,
+                gatewayId: vpc.internetGatewayId,
+                destinationCidrBlock: "0.0.0.0/0"
+            })
 
             ec2.NatProvider.gateway().configureNat({
                 natSubnets: [
-                    new ec2.PublicSubnet(this, `${id}-nat-subnet-${index}`, {
-                        availabilityZone: cdk.Stack.of(this).availabilityZones[index%cdk.Stack.of(this).availabilityZones.length],
-                        vpcId: vpc.vpcId,
-                        cidrBlock: `10.0.64.${index*16}/28`
-                    })
+                    natSubnet
                 ],
                 privateSubnets: [
                     privateSubnet
@@ -58,6 +77,7 @@ export class Testbed extends cdk.Stack {
                 vpc: vpc
             })
         }
+
         const cluster = new eks.Cluster(this, 'cluster', {
             clusterName: id,
             vpc: vpc,
@@ -87,7 +107,6 @@ export class Testbed extends cdk.Stack {
                 ]
             }),
         })
-
         // service account used by tekton workflows.
         cluster.addServiceAccount('test-executor', { name: 'test-executor' })
             .role.addManagedPolicy({ managedPolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess' })
