@@ -1,36 +1,14 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Resources used by https://github.com/awslabs/kit/operator
+Parameters:
+  ClusterName:
+    Type: String
+    Description: "Substrate/host cluster name"
 Resources:
-  KitNodeInstanceProfile:
-    Type: "AWS::IAM::InstanceProfile"
-    Properties:
-      InstanceProfileName: "KitNodeInstanceProfile"
-      Path: "/"
-      Roles:
-        - Ref: "KitNodeRole"
-  KitNodeRole:
-    Type: "AWS::IAM::Role"
-    Properties:
-      RoleName: "KitNodeRole"
-      Path: /
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                !Sub "ec2.${AWS::URLSuffix}"
-            Action:
-              - "sts:AssumeRole"
-      ManagedPolicyArns:
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
   KitControllerPolicy:
     Type: "AWS::IAM::ManagedPolicy"
     Properties:
-      ManagedPolicyName: "KitControllerPolicy"
+      ManagedPolicyName: !Sub "KitControllerPolicy-${ClusterName}"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -49,6 +27,15 @@ Resources:
               - "autoscaling:DeleteAutoScalingGroup"
               - "autoscaling:UpdateAutoScalingGroup"
               - "autoscaling:SetDesiredCapacity"
+              - "iam:CreateRole"
+              - "iam:AddRoleToInstanceProfile"
+              - "iam:CreateInstanceProfile"
+              - "iam:AttachRolePolicy"
+              - "iam:RemoveRoleFromInstanceProfile"
+              - "iam:DeleteInstanceProfile"
+              - "iam:DetachRolePolicy"
+              - "iam:DeleteRole"
+              - "iam:TagRole"
               # Read Operations
               - "ec2:DescribeInstances"
               - "ec2:DescribeLaunchTemplates"
@@ -56,3 +43,5 @@ Resources:
               - "ec2:DescribeSubnets"
               - "ssm:GetParameter"
               - "autoscaling:DescribeAutoScalingGroups"
+              - "iam:GetRole"
+              - "iam:GetInstanceProfile"

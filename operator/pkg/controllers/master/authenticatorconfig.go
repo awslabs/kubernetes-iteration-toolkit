@@ -21,6 +21,7 @@ import (
 	"html/template"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"knative.dev/pkg/ptr"
 
@@ -37,10 +38,11 @@ func (c *Controller) reconcileAuthenticatorConfig(ctx context.Context, controlPl
 	if err != nil {
 		return fmt.Errorf("getting AWS account ID, %w", err)
 	}
-	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ ClusterName, Namespace, Group, AWSAccountID, PrivateDNS, SessionName string }{
+	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ ClusterName, Namespace, Group, KitNodeRole, AWSAccountID, PrivateDNS, SessionName string }{
 		ClusterName:  controlPlane.ClusterName(),
 		Namespace:    controlPlane.Namespace,
 		Group:        v1alpha1.SchemeGroupVersion.Group,
+		KitNodeRole:  iam.KitNodeRoleNameFor(controlPlane.ClusterName()),
 		AWSAccountID: awsAccountID,
 		PrivateDNS:   "{{EC2PrivateDNSName}}",
 		SessionName:  "{{SessionNameRaw}}",
@@ -165,7 +167,7 @@ data:
         - groups:
           - system:bootstrappers
           - system:nodes
-          rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/KitNodeRole
+          rolearn: arn:aws:iam::{{ .AWSAccountID }}:role/{{ .KitNodeRole }}
           username: system:node:{{ .PrivateDNS}}
         - groups:
           - system:bootstrappers

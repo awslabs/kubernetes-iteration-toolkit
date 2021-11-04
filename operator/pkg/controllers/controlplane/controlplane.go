@@ -20,6 +20,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/addons"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
@@ -38,10 +39,10 @@ type controlPlane struct {
 }
 
 // NewController returns a controller for managing controlPlane components of the cluster
-func NewController(kubeClient client.Client, account awsprovider.AccountMetadata) *controlPlane {
+func NewController(kubeClient client.Client, account awsprovider.AccountMetadata, iamProvider *iam.Controller) *controlPlane {
 	return &controlPlane{
 		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
-		masterController: master.New(kubeprovider.New(kubeClient), account),
+		masterController: master.New(kubeprovider.New(kubeClient), account, iamProvider),
 		addonsController: addons.New(kubeprovider.New(kubeClient)),
 	}
 }
@@ -70,6 +71,9 @@ func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object)
 	return results.Created, nil
 }
 
-func (c *controlPlane) Finalize(_ context.Context, _ controllers.Object) (*reconcile.Result, error) {
+func (c *controlPlane) Finalize(ctx context.Context, object controllers.Object) (*reconcile.Result, error) {
+	if err := c.masterController.Finalize(ctx, object.(*v1alpha1.ControlPlane)); err != nil {
+		return results.Failed, err
+	}
 	return results.Terminated, nil
 }

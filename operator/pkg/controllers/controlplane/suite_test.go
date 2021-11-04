@@ -55,7 +55,7 @@ var _ = BeforeSuite(func() {
 	env = environment.New()
 	Expect(env.Start(scheme.SubstrateCluster)).To(Succeed(), "Failed to start environment")
 	kubeClient = env.Client
-	controller = controlplane.NewController(kubeClient, &fakeAccountProvider{})
+	controller = controlplane.NewController(kubeClient, &fakeAccountProvider{}, nil)
 })
 
 var _ = AfterSuite(func() {

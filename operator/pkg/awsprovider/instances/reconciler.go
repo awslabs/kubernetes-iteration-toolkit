@@ -58,7 +58,7 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 	}
 	if asg.Status != nil && *asg.Status == "Delete in progress" {
 		// there are scenarios if you delete ASG and recreate quickly ASG might still be getting deleted
-		return fmt.Errorf("ASG %v deletion in progress", asg.AutoScalingGroupName)
+		return fmt.Errorf("ASG %v deletion in progress", ptr.StringValue(asg.AutoScalingGroupName))
 	}
 	if err := c.updateAutoScalingGroup(ctx, dataplane, asg); err != nil {
 		return fmt.Errorf("updating auto scaling group %v, %w", AutoScalingGroupNameFor(dataplane), err)

@@ -5,9 +5,11 @@ import (
 	"fmt"
 
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/controllers"
 	"github.com/awslabs/kit/operator/pkg/controllers/controlplane"
 	"github.com/awslabs/kit/operator/pkg/controllers/dataplane"
+	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/scheme"
 
 	"github.com/go-logr/zapr"
@@ -51,7 +53,11 @@ func main() {
 	})
 	session := awsprovider.NewSession()
 	err := manager.RegisterControllers(
-		controlplane.NewController(manager.GetClient(), &awsprovider.AccountInfo{Session: session}),
+		controlplane.NewController(manager.GetClient(),
+			&awsprovider.AccountInfo{Session: session},
+			iam.NewController(awsprovider.IAMClient(session),
+				kubeprovider.New(manager.GetClient())),
+		),
 		dataplane.NewController(manager.GetClient(), session),
 	).Start(controllerruntime.SetupSignalHandler())
 	if err != nil {
