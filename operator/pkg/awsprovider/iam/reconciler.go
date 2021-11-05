@@ -34,13 +34,13 @@ type Controller struct {
 	kubeClient *kubeprovider.Client
 }
 
-// NewController returns a controller for managing LaunchTemplates and ASG in AWS
+// NewController returns a controller for managing IAM resources in AWS
 func NewController(iam *awsprovider.IAM, client *kubeprovider.Client) *Controller {
 	return &Controller{iam: iam, kubeClient: client}
 }
 
 var (
-	desiredPolicies = []string{
+	kitNodeRolePolicies = []string{
 		"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
 		"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
 		"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
@@ -63,7 +63,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *apis.ControlPl
 	if err := role.addRoleToInstanceProfile(ctx, controlPlane); err != nil {
 		return fmt.Errorf("adding instance profile to role, %w", err)
 	}
-	for _, policy := range desiredPolicies {
+	for _, policy := range kitNodeRolePolicies {
 		if err := role.attachPolicy(ctx, policy, controlPlane.ClusterName()); err != nil {
 			return fmt.Errorf("attaching policies to role, %w", err)
 		}
@@ -87,7 +87,7 @@ func (c *Controller) Finalize(ctx context.Context, controlPlane *apis.ControlPla
 		return fmt.Errorf("deleting instance profile, %w", err)
 	}
 
-	for _, policy := range desiredPolicies {
+	for _, policy := range kitNodeRolePolicies {
 		if _, err = c.iam.DetachRolePolicyWithContext(ctx, &iam.DetachRolePolicyInput{
 			PolicyArn: aws.String(policy),
 			RoleName:  aws.String(KitNodeRoleNameFor(controlPlane.ClusterName())),
@@ -196,6 +196,7 @@ func generateRoleTags(clusterName string) []*iam.Tag {
 	}}
 }
 
+// KitNodeRole is assumed by the nodes provisioned by kit-operator for dataplane
 const assumeRolePolicyDocument = `{
 	"Version": "2012-10-17",
 	"Statement": [
