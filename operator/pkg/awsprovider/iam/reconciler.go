@@ -49,26 +49,31 @@ var (
 )
 
 func (c *Controller) Reconcile(ctx context.Context, controlPlane *apis.ControlPlane) error {
-	role, err := c.getRole(ctx, controlPlane)
+	role, err := c.getRole(ctx, KitNodeRoleNameFor(controlPlane.ClusterName()))
 	if err != nil && !errors.IsIAMObjectDoNotExist(err) {
 		return fmt.Errorf("getting IAM role for %v, %w", controlPlane.ClusterName(), err)
 	}
 	if role == nil {
-		role, err = c.createRole(ctx, controlPlane)
+		role, err = c.createRole(ctx, &iam.CreateRoleInput{
+			AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
+			Description:              aws.String("Role assumed by dataplane nodes created by KIT operated"),
+			RoleName:                 aws.String(KitNodeRoleNameFor(controlPlane.ClusterName())),
+			Tags:                     generateRoleTags(controlPlane.ClusterName()),
+		})
 		if err != nil {
 			return fmt.Errorf("creating IAM role for %v, %w", controlPlane.ClusterName(), err)
 		}
 		zap.S().Infof("[%s] Created IAM Role %v", controlPlane.ClusterName(), aws.StringValue(role.RoleName))
 	}
-	if err := role.addRoleToInstanceProfile(ctx, controlPlane); err != nil {
+	if err := role.addRoleToInstanceProfile(ctx, KitNodeRoleNameFor(controlPlane.ClusterName()),
+		KitNodeInstanceProfileNameFor(controlPlane.ClusterName())); err != nil {
 		return fmt.Errorf("adding instance profile to role, %w", err)
 	}
 	for _, policy := range kitNodeRolePolicies {
-		if err := role.attachPolicy(ctx, policy, controlPlane.ClusterName()); err != nil {
+		if err := role.attachPolicy(ctx, policy, KitNodeRoleNameFor(controlPlane.ClusterName())); err != nil {
 			return fmt.Errorf("attaching policies to role, %w", err)
 		}
 	}
-
 	return nil
 }
 
@@ -106,23 +111,18 @@ func (c *Controller) Finalize(ctx context.Context, controlPlane *apis.ControlPla
 	return nil
 }
 
-func (c *Controller) getRole(ctx context.Context, controlPlane *apis.ControlPlane) (*role, error) {
+func (c *Controller) getRole(ctx context.Context, roleName string) (*role, error) {
 	roleOutput, err := c.iam.GetRoleWithContext(ctx, &iam.GetRoleInput{
-		RoleName: aws.String(KitNodeRoleNameFor(controlPlane.ClusterName())),
+		RoleName: aws.String(roleName),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting iam role %v, %w", KitNodeRoleNameFor(controlPlane.ClusterName()), err)
+		return nil, fmt.Errorf("getting iam role %v, %w", roleName, err)
 	}
 	return &role{iam: c.iam, Role: roleOutput.Role}, nil
 }
 
-func (c *Controller) createRole(ctx context.Context, controlPlane *apis.ControlPlane) (*role, error) {
-	roleOutput, err := c.iam.CreateRole(&iam.CreateRoleInput{
-		AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
-		Description:              aws.String("Role assumed by dataplane nodes created by KIT operated"),
-		RoleName:                 aws.String(KitNodeRoleNameFor(controlPlane.ClusterName())),
-		Tags:                     generateRoleTags(controlPlane.ClusterName()),
-	})
+func (c *Controller) createRole(ctx context.Context, roleInput *iam.CreateRoleInput) (*role, error) {
+	roleOutput, err := c.iam.CreateRoleWithContext(ctx, roleInput)
 	return &role{iam: c.iam, Role: roleOutput.Role}, err
 }
 
@@ -131,8 +131,8 @@ type role struct {
 	*iam.Role
 }
 
-func (r *role) addRoleToInstanceProfile(ctx context.Context, controlPlane *apis.ControlPlane) error {
-	profile, err := createInstanceProfile(ctx, r.iam, KitNodeInstanceProfileNameFor(controlPlane.ClusterName()))
+func (r *role) addRoleToInstanceProfile(ctx context.Context, roleName, profileName string) error {
+	profile, err := createInstanceProfile(ctx, r.iam, profileName)
 	if err != nil {
 		return fmt.Errorf("creating instance profile, %w", err)
 	}
@@ -140,21 +140,21 @@ func (r *role) addRoleToInstanceProfile(ctx context.Context, controlPlane *apis.
 		return fmt.Errorf("instance profile is NIL")
 	}
 	for _, role := range profile.Roles {
-		if aws.StringValue(role.RoleName) == KitNodeRoleNameFor(controlPlane.ClusterName()) {
+		if aws.StringValue(role.RoleName) == roleName {
 			return nil
 		}
 	}
 	_, err = r.iam.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
-		InstanceProfileName: aws.String(KitNodeInstanceProfileNameFor(controlPlane.ClusterName())),
-		RoleName:            aws.String(KitNodeRoleNameFor(controlPlane.ClusterName())),
+		InstanceProfileName: aws.String(profileName),
+		RoleName:            aws.String(roleName),
 	})
 	return err
 }
 
-func (r *role) attachPolicy(ctx context.Context, policyARN, name string) error {
+func (r *role) attachPolicy(ctx context.Context, policyARN, roleName string) error {
 	_, err := r.iam.AttachRolePolicy(&iam.AttachRolePolicyInput{
 		PolicyArn: aws.String(policyARN),
-		RoleName:  aws.String(KitNodeRoleNameFor(name)),
+		RoleName:  aws.String(roleName),
 	})
 	if errors.IsIAMObjectAlreadyExist(err) {
 		return nil
@@ -162,13 +162,13 @@ func (r *role) attachPolicy(ctx context.Context, policyARN, name string) error {
 	return err
 }
 
-func createInstanceProfile(ctx context.Context, iamAPI *awsprovider.IAM, name string) (*iam.InstanceProfile, error) {
+func createInstanceProfile(ctx context.Context, iamAPI *awsprovider.IAM, profileName string) (*iam.InstanceProfile, error) {
 	profile, err := iamAPI.CreateInstanceProfileWithContext(ctx, &iam.CreateInstanceProfileInput{
-		InstanceProfileName: aws.String(name),
+		InstanceProfileName: aws.String(profileName),
 	})
 	if errors.IsIAMObjectAlreadyExist(err) {
 		output, err := iamAPI.GetInstanceProfileWithContext(ctx, &iam.GetInstanceProfileInput{
-			InstanceProfileName: aws.String(name),
+			InstanceProfileName: aws.String(profileName),
 		})
 		if err != nil {
 			return nil, err
