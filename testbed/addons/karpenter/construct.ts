@@ -77,5 +77,26 @@ export class Karpenter extends cdk.Construct {
             }
         })
         chart.node.addDependency(ns)
+
+        //Karp Provisioner for kit
+        props.cluster.addManifest("default-provisioner", {
+            apiVersion: 'karpenter.sh/v1alpha5',
+            kind: 'Provisioner',
+            metadata: {
+                name: 'default',
+            },
+            spec: {
+                provider: {
+                    cluster: {
+                        name: props.cluster.clusterName,
+                        endpoint: props.cluster.clusterEndpoint,
+                    },
+                    subnetSelector: {
+                        "kit/hostcluster": `${props.cluster.clusterName}-controlplane`
+                    }
+                },
+                ttlSecondsAfterEmpty: 30,
+            }
+        }).node.addDependency(chart)
     }
 }
