@@ -31,51 +31,23 @@ export class Testbed extends cdk.Stack {
             ],
         });
 
-        //Tag pub subnets for KIT CP
-        const selection = vpc.selectSubnets({
-            subnetType: ec2.SubnetType.PUBLIC
-        });
-        selection.subnets.forEach(subnet => {
-            Tags.of(subnet).add('kit/hostcluster', `${id}-controlplane`)
-        })
-
         //ToDo: revisit once this is resolved - https://github.com/aws/aws-cdk/issues/5927
-        // index<=8 will give us 9  /16 cidrs additionally to make a mega VPC.
+        //create private subnets for KIT operator CP nodes/pods in all AZs
+        for (let index = 0; index < cdk.Stack.of(this).availabilityZones.length; index++) {
+            //Also, pick up non overlapping cidrs with KIT operator DP nodes;
+            let privateSubnet = this.createPrivateSubnetForVPC(id, vpc, `10.${index + 20}.0.0/16`, cdk.Stack.of(this).availabilityZones[index])
+            //Tag private subnets for KIT CP
+            Tags.of(privateSubnet).add('kit/hostcluster', `${id}-controlplane`)
+            let natSubnet = this.createPublicSubnetForVPC(id, vpc, `10.0.80.${index * 16}/28`, cdk.Stack.of(this).availabilityZones[index])
+            this.configureNatProviderForPrivateSubnet(vpc, natSubnet, privateSubnet)
+        }
+        // index<=8 will give us 9  /16 cidrs additionally to make a mega VPC for DP nodes.
         for (let index = 0; index <= 8; index++) {
-            let additionalCidr = new ec2.CfnVPCCidrBlock(this, `${id}-cidr-${index}`, {
-                vpcId: vpc.vpcId,
-                cidrBlock: `10.${index + 1}.0.0/16`
-            });
-            let privateSubnet = new ec2.PrivateSubnet(this, `${id}-private-subnet-${index}`, {
-                availabilityZone: cdk.Stack.of(this).availabilityZones[index % cdk.Stack.of(this).availabilityZones.length],
-                vpcId: vpc.vpcId,
-                cidrBlock: `10.${index + 1}.0.0/16`
-            })
-            privateSubnet.node.addDependency(additionalCidr);
-            //Tag pub subnets for KIT DP
+            let privateSubnet = this.createPrivateSubnetForVPC(id, vpc, `10.${index + 1}.0.0/16`, cdk.Stack.of(this).availabilityZones[index % cdk.Stack.of(this).availabilityZones.length])
+            //Tag private subnets for KIT DP
             Tags.of(privateSubnet).add('kit/hostcluster', `${id}-dataplane`)
-            let natSubnet = new ec2.PublicSubnet(this, `${id}-nat-subnet-${index}`, {
-                availabilityZone: cdk.Stack.of(this).availabilityZones[index % cdk.Stack.of(this).availabilityZones.length],
-                vpcId: vpc.vpcId,
-                cidrBlock: `10.0.64.${index * 16}/28`
-            })
-            //add igw route for nat subnets
-            let routeTableId = natSubnet.routeTable.routeTableId
-            new ec2.CfnRoute(this, 'publicIGWRoute' + index, {
-                routeTableId,
-                gatewayId: vpc.internetGatewayId,
-                destinationCidrBlock: "0.0.0.0/0"
-            })
-
-            ec2.NatProvider.gateway().configureNat({
-                natSubnets: [
-                    natSubnet
-                ],
-                privateSubnets: [
-                    privateSubnet
-                ],
-                vpc: vpc
-            })
+            let natSubnet = this.createPublicSubnetForVPC(id, vpc, `10.0.64.${index * 16}/28`, cdk.Stack.of(this).availabilityZones[index % cdk.Stack.of(this).availabilityZones.length])
+            this.configureNatProviderForPrivateSubnet(vpc, natSubnet, privateSubnet)
         }
 
         const cluster = new eks.Cluster(this, 'cluster', {
@@ -115,5 +87,45 @@ export class Testbed extends cdk.Stack {
 
         // Tag all resources for discovery by Karpenter
         Tags.of(this).add(`kubernetes.io/cluster/${id}`, "owned")
+    }
+
+    createPrivateSubnetForVPC(id: string, vpc: ec2.Vpc, cidr: string, az: string): ec2.PrivateSubnet {
+        let additionalCidr = new ec2.CfnVPCCidrBlock(this, `${id}-cidr-${cidr}`, {
+            vpcId: vpc.vpcId,
+            cidrBlock: cidr
+        });
+        let privateSubnet = new ec2.PrivateSubnet(this, `${id}-private-subnet-${cidr}`, {
+            availabilityZone: az,
+            vpcId: vpc.vpcId,
+            cidrBlock: cidr
+        })
+        privateSubnet.node.addDependency(additionalCidr);
+        return privateSubnet
+    }
+    createPublicSubnetForVPC(id: string, vpc: ec2.Vpc, cidr: string, az: string): ec2.PublicSubnet {
+        let publicSubnet = new ec2.PublicSubnet(this, `${id}-nat-subnet-${cidr}`, {
+            availabilityZone: az,
+            vpcId: vpc.vpcId,
+            cidrBlock: cidr
+        })
+        //add igw route for nat subnets
+        let routeTableId = publicSubnet.routeTable.routeTableId
+        new ec2.CfnRoute(this, `publicIGWRoute-${cidr}`, {
+            routeTableId,
+            gatewayId: vpc.internetGatewayId,
+            destinationCidrBlock: "0.0.0.0/0"
+        })
+        return publicSubnet
+    }
+    configureNatProviderForPrivateSubnet(vpc: ec2.Vpc, natSubnet: ec2.PublicSubnet, privateSubnet: ec2.PrivateSubnet): void {
+        ec2.NatProvider.gateway().configureNat({
+            natSubnets: [
+                natSubnet
+            ],
+            privateSubnets: [
+                privateSubnet
+            ],
+            vpc: vpc
+        })
     }
 }
