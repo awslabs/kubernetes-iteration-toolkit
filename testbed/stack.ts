@@ -21,12 +21,12 @@ export class Testbed extends cdk.Stack {
                 {
                     name: 'pub-subnet-1',
                     subnetType: ec2.SubnetType.PUBLIC,
-                    cidrMask: 28,
+                    cidrMask: 24,
                 },
                 {
                     name: 'priv-subnet-1',
                     subnetType: ec2.SubnetType.PRIVATE_WITH_NAT,
-                    cidrMask: 28,
+                    cidrMask: 24,
                 },
             ],
         });
