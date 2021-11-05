@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 )
@@ -81,6 +82,14 @@ type AutoScaling struct {
 
 func AutoScalingClient(sess *session.Session) *AutoScaling {
 	return &AutoScaling{AutoScaling: autoscaling.New(sess)}
+}
+
+type IAM struct {
+	*iam.IAM
+}
+
+func IAMClient(sess *session.Session) *IAM {
+	return &IAM{IAM: iam.New(sess)}
 }
 
 type AccountMetadata interface {

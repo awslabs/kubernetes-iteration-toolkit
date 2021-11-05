@@ -41,13 +41,24 @@ export class Kit extends cdk.Construct {
                         "autoscaling:DeleteAutoScalingGroup",
                         "autoscaling:UpdateAutoScalingGroup",
                         "autoscaling:SetDesiredCapacity",
+                        "iam:CreateRole",
+                        "iam:AddRoleToInstanceProfile",
+                        "iam:CreateInstanceProfile",
+                        "iam:AttachRolePolicy",
+                        "iam:RemoveRoleFromInstanceProfile",
+                        "iam:DeleteInstanceProfile",
+                        "iam:DetachRolePolicy",
+                        "iam:DeleteRole",
+                        "iam:TagRole",
                         //Read Operations
                         "ec2:DescribeInstances",
                         "ec2:DescribeLaunchTemplates",
                         "ec2:DescribeLaunchTemplateVersions",
                         "ec2:DescribeSubnets",
                         "ssm:GetParameter",
-                        "autoscaling:DescribeAutoScalingGroups"]
+                        "autoscaling:DescribeAutoScalingGroups",
+                        "iam:GetRole",
+                        "iam:GetInstanceProfile"]
                 }),
             ],
         }))
@@ -56,6 +67,7 @@ export class Kit extends cdk.Construct {
         const chart = props.cluster.addHelmChart('kit', {
             chart: 'kit-operator',
             release: 'kit-operator',
+            version: '0.0.2',
             repository: 'https://awslabs.github.io/kubernetes-iteration-toolkit/',
             namespace: namespace,
             createNamespace: false,

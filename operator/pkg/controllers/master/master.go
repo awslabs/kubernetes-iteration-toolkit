@@ -31,14 +31,16 @@ type Controller struct {
 	kubeClient    *kubeprovider.Client
 	keypairs      *keypairs.Provider
 	kubeConfigs   *kubeconfigs.Provider
+	iamProvider   v1alpha1.ReconcileFinalize
 	cloudProvider awsprovider.AccountMetadata
 }
 
-func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata) *Controller {
+func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamProvider v1alpha1.ReconcileFinalize) *Controller {
 	return &Controller{
 		kubeClient:    kubeclient,
 		keypairs:      keypairs.Reconciler(kubeclient),
 		kubeConfigs:   kubeconfigs.Reconciler(kubeclient),
+		iamProvider:   iamProvider,
 		cloudProvider: account,
 	}
 }
@@ -56,6 +58,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileScheduler,
 		c.reconcileAuthenticatorConfig,
 		c.reconcileAuthenticatorDaemonSet,
+		c.iamProvider.Reconcile,
 	} {
 		if err := reconcile(ctx, controlPlane); err != nil {
 			return err
@@ -63,6 +66,10 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 	}
 	zap.S().Infof("[%v] control plane reconciled", controlPlane.ClusterName())
 	return nil
+}
+
+func (c *Controller) Finalize(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	return c.iamProvider.Finalize(ctx, controlPlane)
 }
 
 // Karpenter only created nodes for API server pods, as KCM and scheduler pods

@@ -30,7 +30,8 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
   aws cloudformation deploy  \
   --template-file docs/kit.cloudformation.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --stack-name kitControllerPolicy
+  --stack-name kitControllerPolicy \
+  --parameter-overrides ClusterName=${SUBSTRATE_CLUSTER_NAME}
 ```
 
 #### Associate the policy we just created to the kit-controller service account 
@@ -40,7 +41,7 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
     --name kit-controller \
     --namespace kit \
     --cluster ${SUBSTRATE_CLUSTER_NAME} \
-    --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy \
+    --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy-${SUBSTRATE_CLUSTER_NAME} \
     --approve \
     --override-existing-serviceaccounts \
     --region=${AWS_REGION}

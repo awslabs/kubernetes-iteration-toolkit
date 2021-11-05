@@ -24,7 +24,6 @@ import (
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/reconciler"
 	"github.com/awslabs/kit/operator/pkg/utils/scheme"
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	"go.uber.org/zap"
@@ -50,7 +49,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		return err
 	}
 	// reconcile addons to the guest cluster
-	for _, resource := range []reconciler.Interface{
+	for _, resource := range []v1alpha1.ReconcileFinalize{
 		KubeProxyController(guestClusterClient, c.substrateClient),
 		CoreDNSController(guestClusterClient),
 	} {
@@ -92,4 +91,8 @@ func (c *Controller) createKubeClient(ctx context.Context, nn types.NamespacedNa
 		return nil, fmt.Errorf("creating kubeclient for new cluster, %w", err)
 	}
 	return kubeprovider.New(newClient), nil
+}
+
+func (c *Controller) Finalize(_ context.Context, _ *v1alpha1.ControlPlane) (err error) {
+	return nil
 }

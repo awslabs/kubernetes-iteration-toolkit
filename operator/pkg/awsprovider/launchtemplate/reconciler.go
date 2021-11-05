@@ -25,6 +25,7 @@ import (
 	cpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
+	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/securitygroup"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/errors"
@@ -39,6 +40,8 @@ import (
 
 const (
 	TagKeyNameForAWSResources = "kit.k8s.sh/cluster-name"
+	// TODO https://github.com/awslabs/kubernetes-iteration-toolkit/issues/61
+	dnsClusterIP = "10.100.0.10"
 )
 
 type Controller struct {
@@ -55,7 +58,7 @@ func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM, client *kubepr
 func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	// get launch template
 	templates, err := c.getLaunchTemplates(ctx, dataplane.Spec.ClusterName)
-	if err != nil {
+	if err != nil && !errors.IsLaunchTemplateDoNotExist(err) {
 		return fmt.Errorf("getting launch template, %w", err)
 	}
 	if !existingTemplateMatchesDesired(templates, dataplane.Spec.ClusterName) { // TODO check if existing LT is same as desired LT
@@ -120,12 +123,12 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 			InstanceType: ptr.String("t2.xlarge"), // TODO get this from dataplane spec
 			ImageId:      ptr.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				Name: aws.String(fmt.Sprintf("KitNodeInstanceProfile")),
+				Name: aws.String(iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)),
 			},
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
 			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
 			UserData: ptr.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
-				dataplane.Spec.ClusterName, v1alpha1.SchemeGroupVersion.Group, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
+				dataplane.Spec.ClusterName, v1alpha1.SchemeGroupVersion.Group, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
 		},
 		LaunchTemplateName: ptr.String(TemplateName(dataplane.Spec.ClusterName)),
 		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),
@@ -160,7 +163,7 @@ func (c *Controller) desiredKubernetesVersion(ctx context.Context, dataplane *v1
 
 func (c *Controller) getLaunchTemplates(ctx context.Context, clusterName string) ([]*ec2.LaunchTemplate, error) {
 	output, err := c.ec2api.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{
-		Filters: ec2FilterFor(clusterName),
+		LaunchTemplateNames: []*string{ptr.String(TemplateName(clusterName))},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing launch template, %w", err)
@@ -173,18 +176,11 @@ func (c *Controller) getLaunchTemplates(ctx context.Context, clusterName string)
 
 func existingTemplateMatchesDesired(templates []*ec2.LaunchTemplate, clusterName string) bool {
 	for _, template := range templates {
-		if *template.LaunchTemplateName == TemplateName(clusterName) {
+		if aws.StringValue(template.LaunchTemplateName) == TemplateName(clusterName) {
 			return true
 		}
 	}
 	return false
-}
-
-func ec2FilterFor(clusterName string) []*ec2.Filter {
-	return []*ec2.Filter{{
-		Name:   ptr.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
-		Values: []*string{ptr.String(clusterName)},
-	}}
 }
 
 func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {
@@ -195,7 +191,7 @@ func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {
 			Value: ptr.String(clusterName),
 		}, {
 			Key:   ptr.String("Name"),
-			Value: ptr.String(fmt.Sprintf("%s-%s", clusterName, svcName)),
+			Value: ptr.String(TemplateName(clusterName)),
 		}, {
 			Key:   ptr.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterName)),
 			Value: ptr.String("owned"),
@@ -212,6 +208,7 @@ var (
 #!/bin/bash
 yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
 /etc/eks/bootstrap.sh %s.%s \
+    --dns-cluster-ip %s \
 	--kubelet-extra-args '--node-labels=kit.sh/provisioned=true' \
 	--b64-cluster-ca %s \
 	--apiserver-endpoint https://%s`

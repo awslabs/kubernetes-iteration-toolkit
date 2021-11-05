@@ -46,6 +46,12 @@ type fakeAccountProvider struct{}
 func (f *fakeAccountProvider) ID() (string, error) {
 	return "fakeAccountID", nil
 }
+
+type fakeIAMProvider struct{}
+
+func (f *fakeIAMProvider) Reconcile(_ context.Context, _ *v1alpha1.ControlPlane) error { return nil }
+func (f *fakeIAMProvider) Finalize(_ context.Context, _ *v1alpha1.ControlPlane) error  { return nil }
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "ControlPlane")
@@ -55,7 +61,7 @@ var _ = BeforeSuite(func() {
 	env = environment.New()
 	Expect(env.Start(scheme.SubstrateCluster)).To(Succeed(), "Failed to start environment")
 	kubeClient = env.Client
-	controller = controlplane.NewController(kubeClient, &fakeAccountProvider{})
+	controller = controlplane.NewController(kubeClient, &fakeAccountProvider{}, &fakeIAMProvider{})
 })
 
 var _ = AfterSuite(func() {

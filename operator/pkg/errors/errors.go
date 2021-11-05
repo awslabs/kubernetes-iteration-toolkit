@@ -20,6 +20,7 @@ import (
 	"syscall"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/iam"
 	kubeerrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -52,4 +53,14 @@ func IsConnectionRefused(err error) bool {
 func IsLaunchTemplateDoNotExist(err error) bool {
 	awsErr := awserr.Error(nil)
 	return errors.As(err, &awsErr) && awsErr.Code() == "InvalidLaunchTemplateName.NotFoundException"
+}
+
+func IsIAMObjectDoNotExist(err error) bool {
+	awsErr := awserr.Error(nil)
+	return errors.As(err, &awsErr) && awsErr.Code() == iam.ErrCodeNoSuchEntityException
+}
+
+func IsIAMObjectAlreadyExist(err error) bool {
+	awsErr := awserr.Error(nil)
+	return errors.As(err, &awsErr) && awsErr.Code() == iam.ErrCodeEntityAlreadyExistsException
 }
