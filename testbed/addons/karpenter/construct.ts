@@ -87,6 +87,7 @@ export class Karpenter extends cdk.Construct {
             },
             spec: {
                 provider: {
+                    instanceProfile: `KarpenterNodeInstanceProfile-${props.cluster.clusterName}`,
                     cluster: {
                         name: props.cluster.clusterName,
                         endpoint: props.cluster.clusterEndpoint,
