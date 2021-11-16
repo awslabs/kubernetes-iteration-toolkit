@@ -74,8 +74,10 @@ func apiserverPortName(clusterName string) string {
 	return fmt.Sprintf("%s-port", ServiceNameFor(clusterName))
 }
 
+// service name length needs to be <63 for DNS names
+// https://github.com/awslabs/kubernetes-iteration-toolkit/issues/70
 func ServiceNameFor(clusterName string) string {
-	return fmt.Sprintf("%s-controlplane-endpoint", clusterName)
+	return fmt.Sprintf("%s-cp", clusterName)
 }
 
 func labelsFor(clusterName string) map[string]string {
