@@ -116,7 +116,7 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 				Ebs: &ec2.LaunchTemplateEbsBlockDeviceRequest{
 					DeleteOnTermination: ptr.Bool(true),
 					Iops:                ptr.Int64(3000),
-					VolumeSize:          ptr.Int64(40),
+					VolumeSize:          ptr.Int64(20),
 					VolumeType:          ptr.String("gp3"),
 				}},
 			},
