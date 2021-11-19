@@ -65,7 +65,7 @@ Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kube
   metadata:
     name: ${GUEST_CLUSTER_NAME} # Desired Cluster name
   spec: {}
-  EOF
+EOF
 ```
 
 2. Get the admin KUBECONFIG for the guest cluster from the substrate cluster
@@ -84,7 +84,7 @@ Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kube
 
 4. Provision worker nodes for the guest cluster
 
-```
+```bash
   cat <<EOF | kubectl apply -f -
   apiVersion: kit.k8s.sh/v1alpha1
   kind: DataPlane
@@ -93,7 +93,7 @@ Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kube
   spec: 
     clusterName: ${GUEST_CLUSTER_NAME} # Associated Cluster name
     nodeCount: 1
-  EOF
+EOF
 ```
 
 > TODO add instructions to be able to configure control plane parameters.
