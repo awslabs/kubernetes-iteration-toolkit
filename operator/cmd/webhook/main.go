@@ -18,7 +18,9 @@ import (
 	"context"
 	"flag"
 
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	cpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	dpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
@@ -28,12 +30,14 @@ import (
 	"knative.dev/pkg/system"
 	"knative.dev/pkg/webhook"
 	"knative.dev/pkg/webhook/certificates"
+	"knative.dev/pkg/webhook/resourcesemantics"
 	"knative.dev/pkg/webhook/resourcesemantics/defaulting"
 	"knative.dev/pkg/webhook/resourcesemantics/validation"
 )
 
 var (
-	options = Options{}
+	options      = Options{}
+	kitResources = map[schema.GroupVersionKind]resourcesemantics.GenericCRD{}
 )
 
 type Options struct {
@@ -45,6 +49,12 @@ func main() {
 	flag.Parse()
 
 	config := injection.ParseAndGetRESTConfigOrDie()
+
+	// merge all kit resource handlers
+	kitResources = cpv1alpha1.Resources
+	for gvk, resource := range dpv1alpha1.Resources {
+		kitResources[gvk] = resource
+	}
 
 	// Controllers and webhook
 	sharedmain.MainWithConfig(
@@ -63,9 +73,9 @@ func main() {
 
 func NewCRDDefaultingWebhook(ctx context.Context, w configmap.Watcher) *controller.Impl {
 	return defaulting.NewAdmissionController(ctx,
-		"defaulting.webhook.controlplane.kit.k8s.sh",
+		"defaulting.webhook.kit.k8s.sh",
 		"/default-resource",
-		v1alpha1.Resources,
+		kitResources,
 		InjectContext,
 		true,
 	)
@@ -73,9 +83,9 @@ func NewCRDDefaultingWebhook(ctx context.Context, w configmap.Watcher) *controll
 
 func NewCRDValidationWebhook(ctx context.Context, w configmap.Watcher) *controller.Impl {
 	return validation.NewAdmissionController(ctx,
-		"validation.webhook.controlplane.kit.k8s.sh",
+		"validation.webhook.kit.k8s.sh",
 		"/validate-resource",
-		v1alpha1.Resources,
+		kitResources,
 		InjectContext,
 		true,
 	)
