@@ -67,6 +67,14 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 }
 
 func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
+	asg, err := c.getAutoScalingGroup(ctx, AutoScalingGroupNameFor(dataplane))
+	if err != nil {
+		return err
+	}
+	// ASG is already gone
+	if asg == nil {
+		return nil
+	}
 	if _, err := c.autoscaling.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
 		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane)),
 		ForceDelete:          ptr.Bool(true), // terminate all the nodes in the ASG

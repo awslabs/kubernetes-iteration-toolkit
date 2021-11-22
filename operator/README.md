@@ -71,7 +71,7 @@ EOF
 2. Get the admin KUBECONFIG for the guest cluster from the substrate cluster
 
 ```bash
-  kubectl get secret example-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
+  kubectl get secret ${GUEST_CLUSTER_NAME}-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
 ```
 > NOTE: It takes about 3-4 minutes for the cluster control plane to be available and healthy
 

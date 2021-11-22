@@ -9,7 +9,7 @@ WITH_RELEASE_REPO = KO_DOCKER_REPO=$(RELEASE_REPO)
 KIT_NAMESPACE ?= kit
 CONTAINER_IMAGE_REGISTRY ?= 
 ## Extra helm options
-HELM_OPTS ?=
+HELM_OPTS ?= --set serviceAccount.create=false
 
 help: ## Display help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -47,14 +47,16 @@ licenses: ## Verifies dependency licenses and requires GITHUB_TOKEN to be set
 	golicense hack/license-config.hcl bin/operator
 
 apply: ## Apply the controller into your ~/.kube/config cluster
-	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/
-	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/controller
-	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit ko apply --bare -f config/webhook
+	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit helm template --include-crds kit charts/kit-operator --namespace $(KIT_NAMESPACE) \
+		$(HELM_OPTS) \
+		--set controller.image=ko://github.com/awslabs/kit/operator/cmd/controller \
+		--set webhook.image=ko://github.com/awslabs/kit/operator/cmd/webhook \
+		| $(WITH_GOFLAGS) ko apply -B -f -
     
 delete: ## Delete the controller from your ~/.kube/config cluster
-	kubectl delete -f config
-	kubectl delete -f config/webhook
-	kubectl delete -f config/controller
+	helm template kit charts/kit-operator --namespace $(KIT_NAMESPACE) \
+		$(HELM_OPTS) \
+		| kubectl delete -f -
 
 codegen: ## Generate code. Must be run if changes are made to ./pkg/apis/...
 	hack/codegen.sh
