@@ -38,7 +38,8 @@ func (c *Controller) reconcileAuthenticatorConfig(ctx context.Context, controlPl
 	if err != nil {
 		return fmt.Errorf("getting AWS account ID, %w", err)
 	}
-	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ ClusterName, Namespace, Group, KitNodeRole, AWSAccountID, PrivateDNS, SessionName string }{
+	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ Name, ClusterName, Namespace, Group, KitNodeRole, AWSAccountID, PrivateDNS, SessionName string }{
+		Name:         AuthenticatorConfigMapName(controlPlane.ClusterName()),
 		ClusterName:  controlPlane.ClusterName(),
 		Namespace:    controlPlane.Namespace,
 		Group:        v1alpha1.SchemeGroupVersion.Group,
@@ -61,7 +62,7 @@ func (c *Controller) reconcileAuthenticatorDaemonSet(ctx context.Context, contro
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
 		&appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "aws-iam-authenticator",
+				Name:      AuthenticatorDaemonSetName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
 				Labels:    authenticatorLabels(),
 			},
@@ -121,7 +122,7 @@ func (c *Controller) reconcileAuthenticatorDaemonSet(ctx context.Context, contro
 							Name: "config",
 							VolumeSource: v1.VolumeSource{
 								ConfigMap: &v1.ConfigMapVolumeSource{
-									LocalObjectReference: v1.LocalObjectReference{Name: "aws-iam-authenticator"},
+									LocalObjectReference: v1.LocalObjectReference{Name: AuthenticatorConfigMapName(controlPlane.ClusterName())},
 								},
 							},
 						}, {
@@ -157,7 +158,7 @@ var (
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: aws-iam-authenticator
+  name: {{ .Name }}
   namespace: {{ .Namespace }}
 data:
   config.yaml: |
@@ -189,4 +190,12 @@ func ParseTemplate(strtmpl string, obj interface{}) ([]byte, error) {
 		return nil, fmt.Errorf("error when executing template, %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+func AuthenticatorDaemonSetName(clusterName string) string {
+	return fmt.Sprintf("%s-authenticator", clusterName)
+}
+
+func AuthenticatorConfigMapName(clusterName string) string {
+	return fmt.Sprintf("%s-auth-config", clusterName)
 }
