@@ -182,11 +182,11 @@ func createInstanceProfile(ctx context.Context, iamAPI *awsprovider.IAM, profile
 }
 
 func KitNodeRoleNameFor(clusterName string) string {
-	return fmt.Sprintf("KitDataplaneNodes-%s-cluster", clusterName)
+	return fmt.Sprintf("KitDPRole-%s", clusterName)
 }
 
 func KitNodeInstanceProfileNameFor(clusterName string) string {
-	return fmt.Sprintf("KitDataplaneNodesProfile-%s-cluster", clusterName)
+	return fmt.Sprintf("KitDP-%s", clusterName)
 }
 
 func generateRoleTags(clusterName string) []*iam.Tag {
