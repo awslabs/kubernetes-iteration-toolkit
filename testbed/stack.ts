@@ -63,7 +63,6 @@ export class Testbed extends cdk.Stack {
             version: eks.KubernetesVersion.V1_19,
             defaultCapacity: 0,
         })
-
         cluster.addNodegroupCapacity('node-group', {
             nodegroupName: 'default',
             subnets: vpc.selectSubnets({
@@ -80,9 +79,12 @@ export class Testbed extends cdk.Stack {
             }),
         })
         // service account used by tekton workflows.
-        cluster.addServiceAccount('test-executor', { name: 'test-executor' })
-            .role.addManagedPolicy({ managedPolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess' })
-
+        let sa = cluster.addServiceAccount('test-executor', { name: 'test-executor' })
+        sa.role.addManagedPolicy({ managedPolicyArn: 'arn:aws:iam::aws:policy/AdministratorAccess' })
+        cluster.awsAuth.addRoleMapping(sa.role, {
+            username: sa.role.roleName,
+            groups: ['system:masters']
+        })
         new Addons(this, `${id}-addons`, { cluster: cluster, repositories: props.repositories })
 
         // Tag all resources for discovery by Karpenter

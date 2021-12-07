@@ -9,6 +9,9 @@ spec:
     - name: source
     - name: results
   params:
+  - name: host-cluster-name
+    description: The name of the Host cluster on which you spin up KIT Guest cluster.
+    default: "testbed"
   - name: cluster-name
     description: The name of the kit cluster you want to spin.
   - name: host-cluster-region
@@ -35,9 +38,9 @@ spec:
   - name: scheduler-qps
     default: "20"
     description: Kubernetes-Scheduler QPS setting
-  - name: node-count
+  - name: node_count
     default: "1000"
-    description: desired node count for Dataplane.
+    description: desired node count for Dataplane, min is 1000 to create DP nodes.
   - name: giturl
     description: "git url to clone the package"
     default: https://github.com/kubernetes/perf-tests.git
@@ -57,6 +60,8 @@ spec:
     taskRef:
       name: kit-cluster-create
     params:
+      - name: host-cluster-name
+        value: '$(params.host-cluster-name)'   
       - name: cluster-name
         value: '$(params.cluster-name)'
       - name: host-cluster-region
@@ -75,8 +80,8 @@ spec:
         value: '$(params.kcm-qps)' 
       - name: scheduler-qps
         value: '$(params.scheduler-qps)'
-      - name: node-count
-        value: '$(params.node-count)'      
+      - name: node_count
+        value: '$(params.node_count)'      
     workspaces:
       - name: config    
         workspace: config
@@ -96,7 +101,7 @@ spec:
       - name: results-bucket
         value: '$(params.results-bucket)'
       - name: nodes
-        value: '$(params.node-count)'
+        value: '$(params.node_count)'
     workspaces:
       - name: source
         workspace: source
@@ -104,10 +109,12 @@ spec:
         workspace: config
       - name: results
         workspace: results
+  finally:      
   - name: teardown
-    runAfter: [generate]
     taskRef:
       name: kit-cluster-teardown
     params:
+      - name: host-cluster-name
+        value: '$(params.host-cluster-name)'        
       - name: cluster-name
         value: '$(params.cluster-name)'

@@ -13,12 +13,17 @@ spec:
   - name: region
     default: us-west-2
     description: The region where the EKS/host cluster is in.
+  - name: host-cluster-name
+    description: The name of the Host cluster on which you spin up KIT Guest cluster.
+    default: "testbed"
   steps:
   - name: delete-cluster
     image: amazon/aws-cli
     script: |
+      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
       kubectl version
-      aws eks update-kubeconfig --name testbed --region $(params.region)
+      aws eks update-kubeconfig --name $(params.host-cluster-name) --region $(params.region)
       kubectl config current-context 
       #delete kit controlplane spec and dataplane spec crds
-      kubectl delete ControlPlane --name $(params.cluster-name)
+      kubectl delete controlplane $(params.cluster-name)

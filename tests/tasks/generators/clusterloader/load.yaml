@@ -42,13 +42,16 @@ spec:
       MEDIUM_STATEFUL_SETS_PER_NAMESPACE: 0
       # we are not testing PVS at this point
       CL2_ENABLE_PVS: false
+      PROMETHEUS_SCRAPE_APISERVER_ONLY: true
       PROMETHEUS_SCRAPE_KUBE_PROXY: false
       ENABLE_SYSTEM_POD_METRICS: false
       NODE_MODE: master 
       EOL
+      cat $(workspaces.source.path)/overrides.yaml
+      cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
   - name: validate-cluster
     image: amazon/aws-cli
-    workingDir: $(workspaces.source.path)
+    workingDir: $(workspaces.config.path)
     script: |
       mkdir -p /root/.kube/
       cp $(workspaces.config.path)/kubeconfig /root/.kube/config
@@ -63,19 +66,19 @@ spec:
       # end
   - name: run-loadtest
     image: 197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:76e3fd7
-    command: ["./clusterloader"]
-    args: 
-    - --kubeconfig=$(workspaces.config.path)/kubeconfig
-    - --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
-    - --testoverrides=$(workspaces.source.path)/overrides.yaml
-    - --nodes=$(params.nodes) 
-    - --provider=eks 
-    - --report-dir=$(workspaces.results.path)
-    - --alsologtostderr
-    env:
-    - name: ENABLE_EXEC_SERVICE
-      value: "false"
+    script: |
+      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$(workspaces.config.path)/kubeconfig --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr
+      #To run the next step regardless of success/failure of the test
+      TEST_EXIT_CODE=$?
+      if [ $TEST_EXIT_CODE != 0 ]; then
+        exit 0
+      fi
+    timeout: 30000s
   - name: upload-results
     image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
-    command: ["aws s3 cp . s3://$(params.results-bucket)/  --recursive "]
+    script: |
+      aws sts get-caller-identity
+      # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
+      ls -larth
+      aws s3 cp . s3://$(params.results-bucket)/  --recursive
