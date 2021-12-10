@@ -63,7 +63,7 @@ export class Karpenter extends cdk.Construct {
             chart: 'karpenter',
             release: 'karpenter',
             version: 'v0.4.1',
-            repository: 'https://awslabs.github.io/karpenter/charts',
+            repository: 'https://charts.karpenter.sh',
             namespace: namespace,
             createNamespace: false,
             values: {
