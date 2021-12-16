@@ -6,7 +6,7 @@ dev: verify test ## Run all steps in the developer loop
 test: ## Run tests
 	ginkgo -r
 
-verify: ## Verify code. Includes dependencies, linting, formatting, etc
+verify: codegen ## Verify code. Includes dependencies, linting, formatting, etc
 	go mod tidy
 	go mod download
 	go vet ./...
@@ -15,5 +15,11 @@ verify: ## Verify code. Includes dependencies, linting, formatting, etc
 	@git diff --quiet ||\
 		{ echo "New file modification detected in the Git working tree. Please check in before commit.";\
 		exit 1;}
+
+codegen: ## Generate code. Must be run if changes are made to ./pkg/apis/...
+	controller-gen \
+		object:headerFile="hack/boilerplate.go.txt" \
+		paths="./pkg/..."
+	hack/boilerplate.sh
 
 .PHONY: help dev test verify
