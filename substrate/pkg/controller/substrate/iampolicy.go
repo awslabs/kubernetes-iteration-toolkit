@@ -1,14 +1,29 @@
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package substrate
 
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -30,62 +45,37 @@ type iamPolicy struct {
 
 // Create will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with substrate.Status
-func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	// assume role already exists in IAM so we skip checking for role in IAM
-	// check policy exists on the role
-	output, err := i.getRolePolicy(ctx, policyName(substrate.Name), roleName(substrate.Name))
-	if err != nil && !iamResourceNotFound(err) {
-		return fmt.Errorf("getting role policy, %w", err)
-	}
-	if !policyFoundMatchesDesired(ctx, output, substrateNodePolicy) {
-		// Policy is not found or doesn't match the desired policy
-		if _, err := i.iamClient.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
-			RoleName:       aws.String(roleName(substrate.Name)),
-			PolicyName:     aws.String(policyName(substrate.Name)),
-			PolicyDocument: aws.String(substrateNodePolicy),
-		}); err != nil {
-			return fmt.Errorf("adding policy to role, %w", err)
+func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if _, err := i.iamClient.GetRoleWithContext(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName(substrate.Name))}); err != nil {
+		if err.(awserr.Error).Code() == iam.ErrCodeNoSuchEntityException {
+			return reconcile.Result{Requeue: true}, nil
 		}
-		logging.FromContext(ctx).Infof("Successfully added policy %v to role %v", policyName(substrate.Name), roleName(substrate.Name))
-		return nil
+		return reconcile.Result{}, fmt.Errorf("getting role, %w", err)
 	}
-	return nil
+	if _, err := i.iamClient.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
+		RoleName:       aws.String(roleName(substrate.Name)),
+		PolicyName:     aws.String(policyName(substrate.Name)),
+		PolicyDocument: aws.String(substrateNodePolicy),
+	}); err != nil {
+		return reconcile.Result{}, fmt.Errorf("adding policy to role, %w", err)
+	}
+	logging.FromContext(ctx).Infof("Ensured policy %s for %s", policyName(substrate.Name), roleName(substrate.Name))
+	return reconcile.Result{}, nil
 }
 
 // Delete deletes the resource from AWS
-func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if _, err := i.iamClient.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
 		RoleName:   aws.String(roleName(substrate.Name)),
 		PolicyName: aws.String(policyName(substrate.Name)),
-	}); err != nil && !iamResourceNotFound(err) {
-		logging.FromContext(ctx).Errorf("Failed to delete role policy, %v", err)
-		return err
-	}
-	logging.FromContext(ctx).Infof("Successfully removed policy %s from role %s\n", policyName(substrate.Name), roleName(substrate.Name))
-	return nil
-}
-
-func (i *iamPolicy) getRolePolicy(ctx context.Context, policy, role string) (*iam.GetRolePolicyOutput, error) {
-	output, err := i.iamClient.GetRolePolicyWithContext(ctx, &iam.GetRolePolicyInput{
-		PolicyName: aws.String(policy),
-		RoleName:   aws.String(role),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return output, nil
-}
-
-func policyFoundMatchesDesired(ctx context.Context, output *iam.GetRolePolicyOutput, expectedPolicy string) bool {
-	if output != nil {
-		decodedPolicyDoc, err := url.QueryUnescape(*output.PolicyDocument)
-		if err != nil {
-			logging.FromContext(ctx).Errorf("Failed to decode policy document, %v", err)
-			return false
+	}); err != nil {
+		if err.(awserr.Error).Code() == iam.ErrCodeNoSuchEntityException {
+			return reconcile.Result{}, nil
 		}
-		return decodedPolicyDoc == expectedPolicy
+		return reconcile.Result{}, fmt.Errorf("removing policy from role, %w", err)
 	}
-	return false
+	logging.FromContext(ctx).Infof("Deleted policy %s from role %s", policyName(substrate.Name), roleName(substrate.Name))
+	return reconcile.Result{}, nil
 }
 
 func policyName(identifier string) string {

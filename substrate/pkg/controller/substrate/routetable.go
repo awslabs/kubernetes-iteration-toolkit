@@ -17,154 +17,74 @@ package substrate
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type routeTable struct {
 	ec2Client *ec2.EC2
 }
 
-// Name returns the name of the controller
-func (r *routeTable) resourceName() string {
-	return "route-table"
+func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if substrate.Status.VPCID == nil {
+		return reconcile.Result{Requeue: true}, nil
+	}
+	publicRouteTable, err := r.ensure(ctx, substrate, publicTableName(substrate.Name))
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	substrate.Status.PublicRouteTableID = publicRouteTable.RouteTableId
+	privateRouteTable, err := r.ensure(ctx, substrate, privateTableName(substrate.Name))
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	substrate.Status.PrivateRouteTableID = privateRouteTable.RouteTableId
+	return reconcile.Result{}, nil
 }
 
-// Reconcile will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with the substrate.Status
-func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	// Verify VPCID exists
-	if substrate.Status.VPCID == nil ||
-		substrate.Status.InternetGatewayID == nil ||
-		substrate.Status.NatGatewayID == nil {
-		return fmt.Errorf("vpc / IGW / NATGW ID not found for %v", substrate.Name)
-	}
-	routeTables, err := r.getRouteTables(ctx, substrate.Name)
-	if err != nil {
-		return fmt.Errorf("getting route tables %w", err)
-	}
-	// TODO create only the missing route table
-	if len(routeTables) < 2 {
-		if err := r.createRouteTables(ctx, substrate); err != nil {
-			return err
-		}
-		logging.FromContext(ctx).Infof("Successfully created route table for cluster %v", substrate.Name)
-		return nil
-	}
-	substrate.Status.PrivateRouteTableID = aws.String(parseTableID(routeTables, privateTableName(substrate.Name)))
-	substrate.Status.PublicRouteTableID = aws.String(parseTableID(routeTables, publicTableName(substrate.Name)))
-	return nil
-}
-
-// Finalize deletes the resource from AWS
-func (r *routeTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	if err := r.deleteRouteTable(ctx, substrate); err != nil {
-		return err
-	}
-	substrate.Status.PrivateRouteTableID = nil
-	substrate.Status.PublicRouteTableID = nil
-	return nil
-}
-
-func (r *routeTable) createRouteTables(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	// create private route table
-	id, err := r.createTableWithRoute(ctx, *substrate.Status.VPCID, substrate.Name,
-		privateTableName(substrate.Name), &ec2.CreateRouteInput{
-			DestinationCidrBlock: aws.String("0.0.0.0/0"),
-			NatGatewayId:         substrate.Status.NatGatewayID,
-		})
-	if err != nil {
-		return fmt.Errorf("creating private route table, %w", err)
-	}
-	substrate.Status.PrivateRouteTableID = aws.String(id)
-	// create public route table
-	id, err = r.createTableWithRoute(ctx, *substrate.Status.VPCID, substrate.Name,
-		publicTableName(substrate.Name), &ec2.CreateRouteInput{
-			DestinationCidrBlock: aws.String("0.0.0.0/0"),
-			GatewayId:            substrate.Status.InternetGatewayID,
-		})
-	if err != nil {
-		return fmt.Errorf("creating public route table, %w", err)
-	}
-	substrate.Status.PublicRouteTableID = aws.String(id)
-	return nil
-}
-
-func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID, identifier, tableName string, route *ec2.CreateRouteInput) (string, error) {
-	routeTable, err := r.ec2Client.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
-		VpcId:             aws.String(vpcID),
-		TagSpecifications: generateEC2TagsWithName(r.resourceName(), identifier, tableName),
-	})
-	if err != nil {
-		return "", fmt.Errorf("creating route table, %w", err)
-	}
-	route.RouteTableId = routeTable.RouteTable.RouteTableId
-	if _, err := r.ec2Client.CreateRouteWithContext(ctx, route); err != nil {
-		return *routeTable.RouteTable.RouteTableId, fmt.Errorf("adding route to the table, %w", err)
-	}
-	return *routeTable.RouteTable.RouteTableId, nil
-}
-
-func (r *routeTable) deleteRouteTable(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	routeTableIDS, err := r.getRouteTableIDs(ctx, substrate.Name)
-	if err != nil {
-		return fmt.Errorf("getting route tables for %v, %w", substrate.Name, err)
-	}
-	for _, routeTableID := range routeTableIDS {
-		if _, err := r.ec2Client.DeleteRouteTableWithContext(ctx, &ec2.DeleteRouteTableInput{
-			RouteTableId: aws.String(routeTableID),
-		}); err != nil {
-			return fmt.Errorf("deleting route table %w", err)
-		}
-	}
-	return nil
-}
-func (r *routeTable) getRouteTableIDs(ctx context.Context, identifier string) ([]string, error) {
-	routeTables, err := r.getRouteTables(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-	ids := []string{}
-	for _, table := range routeTables {
-		ids = append(ids, *table.RouteTableId)
-	}
-	return ids, nil
-}
-
-// get all the route tables with the given identifier
-func (r *routeTable) getRouteTables(ctx context.Context, identifier string) ([]*ec2.RouteTable, error) {
-	output, err := r.ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
-		Filters: ec2FilterFor(identifier),
-	})
+func (r *routeTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name string) (*ec2.RouteTable, error) {
+	describeRouteTablesOutput, err := r.ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: filtersFor(substrate.Name, name)})
 	if err != nil {
 		return nil, fmt.Errorf("describing route tables, %w", err)
 	}
-	if output == nil || len(output.RouteTables) == 0 {
-		return nil, nil
+	if len(describeRouteTablesOutput.RouteTables) > 0 {
+		logging.FromContext(ctx).Infof("Found route table %s", name)
+		return describeRouteTablesOutput.RouteTables[0], nil
 	}
-	return output.RouteTables, nil
+	createRouteTableOutput, err := r.ec2Client.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
+		VpcId:             substrate.Status.VPCID,
+		TagSpecifications: tagsFor(ec2.ResourceTypeRouteTable, substrate.Name, name),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating route table, %w", err)
+	}
+	logging.FromContext(ctx).Infof("Created route table %s", name)
+	return createRouteTableOutput.RouteTable, nil
 }
 
-func parseTableID(tables []*ec2.RouteTable, name string) string {
-	for _, table := range tables {
-		if strings.EqualFold(tableName(table), name) {
-			return *table.RouteTableId
-		}
+func (r *routeTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeRouteTablesOutput, err := r.ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: filtersFor(substrate.Name)})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("describing route tables, %w", err)
 	}
-	return ""
-}
-
-func tableName(table *ec2.RouteTable) string {
-	for _, tag := range table.Tags {
-		if *tag.Key == "Name" {
-			return *tag.Value
-		}
+	if len(describeRouteTablesOutput.RouteTables) == 0 {
+		return reconcile.Result{}, nil
 	}
-	return ""
+	for _, routeTable := range describeRouteTablesOutput.RouteTables {
+		if _, err := r.ec2Client.DeleteRouteTableWithContext(ctx, &ec2.DeleteRouteTableInput{RouteTableId: routeTable.RouteTableId}); err != nil {
+			if err.(awserr.Error).Code() == "DependencyViolation" {
+				return reconcile.Result{Requeue: true}, nil
+			}
+			return reconcile.Result{}, fmt.Errorf("deleting route table, %w", err)
+		}
+		logging.FromContext(ctx).Infof("Deleted route table %s", aws.StringValue(routeTable.RouteTableId))
+	}
+	return reconcile.Result{}, nil
 }
 
 func privateTableName(identifier string) string {

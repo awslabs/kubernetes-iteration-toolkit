@@ -19,115 +19,97 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type internetGateway struct {
 	ec2Client *ec2.EC2
-	vpc       *vpc
 }
 
-// Name returns the name of the controller
-func (i *internetGateway) resourceName() string {
-	return "internet-gateway"
-}
-
-// Reconcile will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with the substrate.Status
-func (i *internetGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	if substrate.Status.VPCID == nil {
-		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
+func (i *internetGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if substrate.Status.VPCID == nil || substrate.Status.PublicRouteTableID == nil {
+		return reconcile.Result{Requeue: true}, nil
 	}
-	// Check if the internet gateway exists
-	igw, err := i.getInternetGateway(ctx, substrate.Name)
+	internetGateway, err := i.ensure(ctx, substrate)
 	if err != nil {
-		return fmt.Errorf("getting internet-gateway, %w", err)
+		return reconcile.Result{}, err
 	}
-	// Create an internet-gateway if required
-	if igw == nil || aws.StringValue(igw.InternetGatewayId) == "" {
-		if igw, err = i.createInternetGateway(ctx, substrate.Name); err != nil {
-			return fmt.Errorf("creating internet-gateway, %w", err)
+	if _, err := i.ec2Client.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{InternetGatewayId: internetGateway.InternetGatewayId, VpcId: substrate.Status.VPCID}); err != nil {
+		if err.(awserr.Error).Code() == "Resource.AlreadyAssociated" {
+			logging.FromContext(ctx).Infof("Found internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.VPCID))
+		} else {
+			return reconcile.Result{}, fmt.Errorf("attaching internet gateway, %w", err)
 		}
 	} else {
-		logging.FromContext(ctx).Debugf("Successfully discovered internet-gateway %v for cluster %v", *igw.InternetGatewayId, substrate.Name)
+		logging.FromContext(ctx).Infof("Created internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.VPCID))
 	}
-	substrate.Status.InternetGatewayID = igw.InternetGatewayId
-	// Check igw is attached to the desired VPC ID
-	if len(igw.Attachments) == 0 || *igw.Attachments[0].VpcId != *substrate.Status.VPCID {
-		if err := i.attachInternetGWToVPC(ctx, *igw.InternetGatewayId, *substrate.Status.VPCID); err != nil {
-			return fmt.Errorf("attaching internet-gateway, %w", err)
-		}
-	}
-	return nil
-}
-
-// Finalize deletes the resource from AWS
-func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	vpc, err := i.vpc.getVPC(ctx, substrate.Name)
-	if err != nil {
-		return fmt.Errorf("getting vpc %w", err)
-	}
-	// Get the internet gateway ID for the control plane
-	igw, err := i.getInternetGateway(ctx, substrate.Name)
-	if err != nil {
-		return err
-	}
-	if igw != nil && aws.StringValue(igw.InternetGatewayId) != "" {
-		// Detach Internet Gateway from VPC
-		if _, err := i.ec2Client.DetachInternetGatewayWithContext(
-			ctx, &ec2.DetachInternetGatewayInput{
-				InternetGatewayId: igw.InternetGatewayId,
-				VpcId:             aws.String(*vpc.VpcId),
-			}); err != nil {
-			return fmt.Errorf("detaching internet-gateway from VPC, %w", err)
-		}
-		// Delete Internet Gateway
-		if _, err := i.ec2Client.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
-			InternetGatewayId: igw.InternetGatewayId,
-		}); err != nil {
-			return fmt.Errorf("deleting internet-gateway, %w", err)
-		}
-		logging.FromContext(ctx).Infof("Successfully deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, substrate.Name)
-	}
-	return nil
-}
-
-func (i *internetGateway) createInternetGateway(ctx context.Context, identifier string) (*ec2.InternetGateway, error) {
-	output, err := i.ec2Client.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
-		TagSpecifications: generateEC2Tags(i.resourceName(), identifier),
-	})
-	if err != nil {
-		return nil, err
-	}
-	logging.FromContext(ctx).Infof("Successfully created internet-gateway %v for cluster %v", *output.InternetGateway.InternetGatewayId, identifier)
-	return output.InternetGateway, nil
-}
-
-func (i *internetGateway) attachInternetGWToVPC(ctx context.Context, igwID, vpcID string) error {
-	if _, err := i.ec2Client.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{
-		InternetGatewayId: aws.String(igwID),
-		VpcId:             aws.String(vpcID),
+	if _, err := i.ec2Client.CreateRouteWithContext(ctx, &ec2.CreateRouteInput{
+		RouteTableId:         substrate.Status.PublicRouteTableID,
+		DestinationCidrBlock: aws.String("0.0.0.0/0"),
+		GatewayId:            internetGateway.InternetGatewayId,
 	}); err != nil {
-		return err
+		return reconcile.Result{}, fmt.Errorf("creating route for internet gateway, %w", err)
+	} else {
+		logging.FromContext(ctx).Infof("Ensured route for internet gateway %s", aws.StringValue(internetGateway.InternetGatewayId))
 	}
-	logging.FromContext(ctx).Infof("Successfully attached internet-gateway %s to VPC ID %s", igwID, vpcID)
-	return nil
+	return reconcile.Result{}, nil
 }
 
-func (i *internetGateway) getInternetGateway(ctx context.Context, identifier string) (*ec2.InternetGateway, error) {
-	output, err := i.ec2Client.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
-		Filters: ec2FilterFor(identifier),
+func (i *internetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.InternetGateway, error) {
+	descrbeInternetGatewaysOutput, err := i.ec2Client.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: filtersFor(substrate.Name, substrate.Name)})
+	if err != nil {
+		return nil, fmt.Errorf("describing internet gateways, %w", err)
+	}
+	if len(descrbeInternetGatewaysOutput.InternetGateways) > 0 {
+		logging.FromContext(ctx).Infof("Found internet gateway %s", substrate.Name)
+		return descrbeInternetGatewaysOutput.InternetGateways[0], nil
+	}
+	createInternetGatewayOutput, err := i.ec2Client.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
+		TagSpecifications: tagsFor(ec2.ResourceTypeInternetGateway, substrate.Name, substrate.Name),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("describing internet-gateway, %w", err)
+		return nil, fmt.Errorf("creating internet gateway, %w", err)
 	}
-	if len(output.InternetGateways) == 0 {
-		return nil, nil
+	logging.FromContext(ctx).Infof("Created internet gateway %s", substrate.Name)
+	return createInternetGatewayOutput.InternetGateway, nil
+}
+
+func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeVpcsOutput, err := i.ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: filtersFor(substrate.Name)})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
-	if len(output.InternetGateways) > 1 {
-		return nil, fmt.Errorf("expected to find one internet-gateway, but found %d", len(output.InternetGateways))
+	if len(describeVpcsOutput.Vpcs) == 0 {
+		return reconcile.Result{}, nil
 	}
-	return output.InternetGateways[0], nil
+	describeInternetGatewaysOutput, err := i.ec2Client.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: filtersFor(substrate.Name)})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("describing internet gateways, %w", err)
+	}
+	if len(describeInternetGatewaysOutput.InternetGateways) == 0 {
+		return reconcile.Result{}, nil
+	}
+	if _, err := i.ec2Client.DetachInternetGatewayWithContext(ctx, &ec2.DetachInternetGatewayInput{
+		VpcId: describeVpcsOutput.Vpcs[0].VpcId, InternetGatewayId: describeInternetGatewaysOutput.InternetGateways[0].InternetGatewayId,
+	}); err != nil {
+		if err.(awserr.Error).Code() == "DependencyViolation" {
+			return reconcile.Result{Requeue: true}, nil
+		}
+		if err.(awserr.Error).Code() != "Gateway.NotAttached" {
+			return reconcile.Result{}, fmt.Errorf("detaching internet gateway, %w", err)
+		}
+	} else {
+		logging.FromContext(ctx).Infof("Deleted internet gateway %s attachent to %s", aws.StringValue(describeVpcsOutput.Vpcs[0].VpcId), aws.StringValue(describeInternetGatewaysOutput.InternetGateways[0].InternetGatewayId))
+	}
+	if _, err := i.ec2Client.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
+		InternetGatewayId: describeInternetGatewaysOutput.InternetGateways[0].InternetGatewayId,
+	}); err != nil {
+		return reconcile.Result{}, fmt.Errorf("deleting internet gateway, %w", err)
+	}
+	logging.FromContext(ctx).Infof("Deleted internet gateway %s", aws.StringValue(describeInternetGatewaysOutput.InternetGateways[0].InternetGatewayId))
+	return reconcile.Result{}, nil
 }

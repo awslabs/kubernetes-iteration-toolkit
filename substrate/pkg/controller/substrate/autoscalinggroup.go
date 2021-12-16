@@ -1,3 +1,17 @@
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package substrate
 
 import (
@@ -9,92 +23,70 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type autoScalingGroup struct {
 	ec2Client         *ec2.EC2
 	autoscalingClient *autoscaling.AutoScaling
-	subnet            *subnet
 }
 
-func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	existingASG, err := a.getAutoScalingGroup(ctx, substrate.Name)
-	if err != nil {
-		return fmt.Errorf("getting autoscaling groups, %w", err)
+func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if len(substrate.Status.PublicSubnetIDs) == 0 {
+		return reconcile.Result{Requeue: true}, nil
 	}
-	// If doesn't match or doesn't exists
-	if existingASG == nil {
-		if err := a.createAutoScalingGroup(ctx, substrate); err != nil {
-			return fmt.Errorf("creating autoscaling groups, %w", err)
-		}
-		logging.FromContext(ctx).Infof("Successfully created autoscaling group %v", scalingGroupName(substrate.Name))
-		return nil
-	}
-	logging.FromContext(ctx).Debugf("Successfully discovered autoscaling group %v", scalingGroupName(substrate.Name))
-	return nil
-}
-
-func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	existingASG, err := a.getAutoScalingGroup(ctx, substrate.Name)
-	if err != nil {
-		return fmt.Errorf("getting autoscaling groups, %w", err)
-	}
-	if existingASG != nil && aws.StringValue(existingASG.Status) != "Delete in progress" {
-		if _, err := a.autoscalingClient.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
-			AutoScalingGroupName: existingASG.AutoScalingGroupName,
-			ForceDelete:          aws.Bool(true),
-		}); err != nil {
-			return fmt.Errorf("deleting autoscaling group, %w", err)
-		}
-		logging.FromContext(ctx).Infof("Successfully deleted auto-scaling-group %v", *existingASG.AutoScalingGroupName)
-	}
-	return nil
-}
-
-func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	publicSubnets, err := a.subnet.publicSubnetIDs(ctx, substrate.Name)
-	if err != nil {
-		return err
-	}
-	if len(publicSubnets) == 0 {
-		return fmt.Errorf("public subnets not found")
-	}
-	if _, err := a.autoscalingClient.CreateAutoScalingGroup(&autoscaling.CreateAutoScalingGroupInput{
-		AutoScalingGroupName: aws.String(scalingGroupName(substrate.Name)),
-		DesiredCapacity:      aws.Int64(1),
-		MaxSize:              aws.Int64(1),
-		MinSize:              aws.Int64(1),
-		LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-			LaunchTemplateName: aws.String(launchTemplateName(substrate.Name)),
-		},
-		VPCZoneIdentifier: aws.String(strings.Join(publicSubnets, ",")),
-		Tags:              generateAutoScalingTags(substrate.Name, scalingGroupName(substrate.Name)),
+	if _, err := a.autoscalingClient.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
+		AutoScalingGroupName: aws.String(autoScalingGroupName(substrate.Name)),
+		DesiredCapacity:      aws.Int64(1), MaxSize: aws.Int64(1), MinSize: aws.Int64(1),
+		LaunchTemplate:    &autoscaling.LaunchTemplateSpecification{LaunchTemplateName: aws.String(launchTemplateName(substrate.Name))},
+		VPCZoneIdentifier: aws.String(strings.Join(substrate.Status.PublicSubnetIDs, ",")),
+		Tags: []*autoscaling.Tag{{
+			Key:               aws.String(OwnerTagKey),
+			Value:             aws.String(substrate.Name),
+			PropagateAtLaunch: aws.Bool(true),
+		}, {
+			Key:               aws.String("Name"),
+			Value:             aws.String(autoScalingGroupName(substrate.Name)),
+			PropagateAtLaunch: aws.Bool(true),
+		}},
 	}); err != nil {
-		if err.(awserr.Error).Code() != autoscaling.ErrCodeAlreadyExistsFault {
-			return fmt.Errorf("creating autoscaling group, %w", err)
+		if err.(awserr.Error).Code() == "ValidationError" { // It can take a few seconds for the instance profile to propagate to the ASG service.
+			return reconcile.Result{Requeue: true}, nil
 		}
+		if err.(awserr.Error).Code() != autoscaling.ErrCodeAlreadyExistsFault {
+			return reconcile.Result{}, fmt.Errorf("creating autoscaling group, %w", err)
+		}
+		logging.FromContext(ctx).Infof("Found auto scaling group %s", autoScalingGroupName(substrate.Name))
+	} else {
+		logging.FromContext(ctx).Infof("Created auto scaling group %s", autoScalingGroupName(substrate.Name))
 	}
-	return nil
+	return reconcile.Result{}, nil
 }
 
-func (a *autoScalingGroup) getAutoScalingGroup(ctx context.Context, identifier string) (*autoscaling.Group, error) {
-	output, err := a.autoscalingClient.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
-		AutoScalingGroupNames: aws.StringSlice([]string{scalingGroupName(identifier)}),
+func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	autoscalingGroupsOutput, err := a.autoscalingClient.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
+		AutoScalingGroupNames: aws.StringSlice([]string{autoScalingGroupName(substrate.Name)}),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting autoscaling group, %w", err)
+		return reconcile.Result{}, fmt.Errorf("describing auto scaling groups, %w", err)
 	}
-	if len(output.AutoScalingGroups) == 0 {
-		return nil, nil
+	for _, group := range autoscalingGroupsOutput.AutoScalingGroups {
+		if aws.StringValue(group.Status) == "Delete in progress" {
+			continue
+		}
+		if _, err := a.autoscalingClient.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
+			AutoScalingGroupName: group.AutoScalingGroupName,
+			ForceDelete:          aws.Bool(true),
+		}); err != nil {
+			return reconcile.Result{}, fmt.Errorf("deleting autoscaling group, %w", err)
+		}
+		logging.FromContext(ctx).Infof("Deleted auto scaling group %s", autoScalingGroupName(substrate.Name))
 	}
-	if len(output.AutoScalingGroups) > 1 {
-		return nil, fmt.Errorf("expected asg count one found asgs %d", len(output.AutoScalingGroups))
-	}
-	return output.AutoScalingGroups[0], nil
+	return reconcile.Result{}, nil
 }
 
-func scalingGroupName(identifier string) string {
+func autoScalingGroupName(identifier string) string {
 	return fmt.Sprintf("substrate-nodes-for-%s", identifier)
 }
