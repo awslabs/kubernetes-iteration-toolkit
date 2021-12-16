@@ -1,0 +1,35 @@
+package substrate
+
+import (
+	"context"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+)
+
+// type routeTable struct {
+// 	ec2api *EC2
+// }
+
+// func (r *routeTable) resourceName() string {
+// 	return "route-table"
+// }
+
+// func (r *routeTable) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+
+// 	for _,
+// 	return nil
+
+// }
+
+// func (r *routeTable) createTable(ctx context.Context, vpcID, tableName, identifier string) (string, error) {
+// 	routeTable, err := r.ec2api.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
+// 		VpcId:             aws.String(vpcID),
+// 		TagSpecifications: generateEC2Tags(r.resourceName(), identifier),
+// 	})
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	return *routeTable.RouteTable.RouteTableId, nil
+// }
