@@ -67,7 +67,7 @@ export class Kit extends cdk.Construct {
         const chart = props.cluster.addHelmChart('kit', {
             chart: 'kit-operator',
             release: 'kit-operator',
-            version: '0.0.2',
+            version: '0.0.4',
             repository: 'https://awslabs.github.io/kubernetes-iteration-toolkit/',
             namespace: namespace,
             createNamespace: false,

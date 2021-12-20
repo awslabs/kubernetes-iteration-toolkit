@@ -9,6 +9,9 @@ spec:
     This Task can be used to create an KIT cluster in an AWS account and write a kubeconfig to a desired location that
     can be used by other tasks (in a context with kubectl) to make requests to the cluster.
   params:
+  - name: host-cluster-name
+    description: The name of the Host cluster on which you spin up KIT Guest cluster.
+    default: "testbed"
   - name: cluster-name
     description: The name of the KIT cluster you want to spin.
   - name: host-cluster-region
@@ -35,7 +38,7 @@ spec:
   - name: scheduler-qps
     default: "20"
     description: Kubernetes-Scheduler QPS setting
-  - name: node-count
+  - name: node_count
     default: "1000"
     description: desired node count for Dataplane.
   workspaces:
@@ -49,7 +52,7 @@ spec:
       curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
       kubectl version
-      aws eks update-kubeconfig --name testbed --region $(params.host-cluster-region)
+      aws eks update-kubeconfig --name $(params.host-cluster-name) --region $(params.host-cluster-region)
       kubectl config current-context
       #Provision a control plane for the guest cluster
       cat > "$(workspaces.config.path)/cp.yaml" <<EOL
@@ -58,7 +61,7 @@ spec:
       metadata:
         name: $(params.cluster-name) # Desired Cluster Name
       spec:
-        kubernetesVersion: $(params.version)
+        kubernetesVersion: "$(params.version)"
         master:
           apiServer:
             spec:
@@ -81,25 +84,58 @@ spec:
               - name: scheduler
                 args:
                   - --kube-api-qps=$(params.scheduler-qps)
+        etcd:
+          spec:
+            nodeSelector: 
+              node.kubernetes.io/instance-type: $(params.cp-instance-type)
       EOL
+      aws sts get-caller-identity
+      #validate 
+      kubectl get pods -A
       kubectl create -f $(workspaces.config.path)/cp.yaml
-
-      cat > "$(workspaces.config.path)/dp.yaml" <<EOL
+      nodes=$(params.node_count)
+      asgs=$((nodes/1000))
+      asg_name=$(params.cluster-name)-nodes
+      create_dp()
+      {
+      cat > "$(workspaces.config.path)/dp$1"."yaml"<<EOL
       apiVersion: kit.k8s.sh/v1alpha1
       kind: DataPlane
       metadata:
-        name: $(params.cluster-name)-nodes 
+        name: "$asg_name-$1"
       spec: 
         clusterName: $(params.cluster-name) # Desired Cluster Name
-        nodeCount: $(params.node-count)
+        nodeCount: $2
+        subnetSelector:
+          kit/hostcluster: "$(params.host-cluster-name)-dataplane"
+        allocationStrategy: "flexible"
+        instanceTypes: #defaulting to nitro-instances for now
+          - m5.2xlarge
+          - m5.4xlarge
+          - m4.2xlarge
+          - m4.4xlarge
       EOL
-
       #Provision a dataplane plane for the guest cluster
-      kubectl create -f $(workspaces.config.path)/dp.yaml
-
+      ls -larth $(workspaces.config.path)
+      kubectl create -f "$(workspaces.config.path)/dp$1"."yaml"
+      }
+      for i in $(seq 1 $asgs)
+      do
+      #max number of nodes KIT operators allows per ASG
+      create_dp $i 1000 
+      done
+      remaining_nodes=$((nodes%1000))
+      create_dp 0 $remaining_nodes
+      # sleep for kude-admin config secret for kit guest cluster to appear
+      sleep 30
       #Get the admin KUBECONFIG for the guest cluster from the substrate cluster
       kubectl get secret $(params.cluster-name)-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > $(workspaces.config.path)/kubeconfig
+      # wait for NLB APIServer endpoint to be available
+      sleep 300
       #Deploy CNI plugin to the guest cluster for the nodes to be ready.
       #Todo: CNI installation only works for `us-west-2`, yet to decide how to tackle other regions.
       kubectl --kubeconfig=$(workspaces.config.path)/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/v1.9/aws-k8s-cni.yaml
-      sleep 300
+      sleep 60
+      kubectl --kubeconfig=$(workspaces.config.path)/kubeconfig get pods -A 
+      # for nodes to become ready 
+      sleep $((nodes/6))

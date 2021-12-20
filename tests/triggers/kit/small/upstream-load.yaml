@@ -31,7 +31,7 @@ spec:
       bindings:
       - ref: kit-small-upstream-load
       template:
-        ref: kit-small-upstream-load 
+        ref: kit-small-upstream-load
 ---
 apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
@@ -44,18 +44,25 @@ spec:
     metadata:
       generateName: kit-small-upstream-load-
     spec:
+      timeout: "9h0m0s"
       pipelineRef:
-        name: loadtest
+        name: kitloadtest
       serviceAccountName: test-executor
       workspaces:
       - name: source
         emptyDir: {}
       - name: config
-        emptyDir: {}
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
       - name: results
         emptyDir: {}
       params:
       - name: cluster-name
-        value: "kit-small-upstream-load-$(context.pipelineRun.uid)"
+        value: "s$(context.pipelineRun.uid)"  #it's prefixed with 's' to identify cluster size is small.
       - name: results-bucket
-        value: "kit-scalability-dev/$(date +'%Y/%m/%d/%HH/%mm)/$(context.pipelineRun.uid)"
+        value: "kit-scalability/s$(context.pipelineRun.uid)"

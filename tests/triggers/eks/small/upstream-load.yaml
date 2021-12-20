@@ -4,7 +4,7 @@ kind: CronJob
 metadata:
   name: eks-small-upstream-load
 spec:
-  schedule: "0 8 * * *"
+  schedule: "0 0 1 * *"
   jobTemplate:
     spec:
       template:
@@ -58,4 +58,4 @@ spec:
       - name: cluster-name
         value: "eks-small-upstream-load-$(context.pipelineRun.uid)"
       - name: results-bucket
-        value: "eks-scalability-dev/$(date +'%Y/%m/%d/%HH/%mm)/$(context.pipelineRun.uid)"
+        value: "eks-scalability-dev/$(context.pipelineRun.uid)"
