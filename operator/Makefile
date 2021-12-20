@@ -47,11 +47,11 @@ licenses: ## Verifies dependency licenses and requires GITHUB_TOKEN to be set
 	golicense hack/license-config.hcl bin/operator
 
 apply: ## Apply the controller into your ~/.kube/config cluster
-	KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit helm template --include-crds kit charts/kit-operator --namespace $(KIT_NAMESPACE) \
+	helm template --include-crds kit charts/kit-operator --namespace $(KIT_NAMESPACE) \
 		$(HELM_OPTS) \
 		--set controller.image=ko://github.com/awslabs/kit/operator/cmd/controller \
 		--set webhook.image=ko://github.com/awslabs/kit/operator/cmd/webhook \
-		| $(WITH_GOFLAGS) ko apply -B -f -
+		| KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit $(WITH_GOFLAGS) ko apply --bare -f -
     
 delete: ## Delete the controller from your ~/.kube/config cluster
 	helm template kit charts/kit-operator --namespace $(KIT_NAMESPACE) \
