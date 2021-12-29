@@ -14,11 +14,6 @@ type routeTableAssociation struct {
 }
 
 func (r *routeTableAssociation) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	// identifier := ""
-	// routeTables, err := getRouteTables(ctx, r.ec2api, identifier)
-	// if err != nil {
-	// 	return fmt.Errorf("getting route tables for %v, %w", identifier, err)
-	// }
 	if substrate.Status.PrivateRouteTableID == nil && substrate.Status.PublicRouteTableID == nil {
 		return fmt.Errorf("route tables not found")
 	}
@@ -30,25 +25,6 @@ func (r *routeTableAssociation) Provision(ctx context.Context, substrate *v1alph
 	if err := r.associateSubnetsToTable(ctx, *substrate.Status.PublicRouteTableID, substrate.Status.PublicSubnetIDs); err != nil {
 		return fmt.Errorf("associating public route table and subnets, %w", err)
 	}
-
-	// for _, routeTable := range routeTables {
-	// 	subnetIDs := []string{}
-	// 	switch tableName(routeTable.Tags) {
-	// 	case privateTableName(identifier):
-	// 		subnetIDs, err = privateSubnetIDs(ctx, r.ec2api, identifier)
-	// 	case publicTableName(identifier):
-	// 		subnetIDs, err = publicSubnetIDs(ctx, r.ec2api, identifier)
-	// 	}
-	// 	remaining := []string{}
-	// 	for _, subnet := range subnetIDs {
-	// 		if !isSubnetAssociated(routeTable.Associations, subnet) {
-	// 			remaining = append(remaining, subnet)
-	// 		}
-	// 	}
-	// 	if err := r.associateSubnetsToTable(ctx, *routeTable.RouteTableId, remaining); err != nil {
-	// 		return err
-	// 	}
-	// }
 	return nil
 }
 
@@ -66,24 +42,23 @@ func (r *routeTableAssociation) associateSubnetsToTable(ctx context.Context, tab
 	return nil
 }
 
-func (r *routeTableAssociation) Deprovision(ctx context.Context, _ *v1alpha1.Substrate) error {
+// Before deleting the route tables we first need to disassociate routes from
+// it. If we try to delete route table before removing routes from it, we get
+// the DependencyViolation: routeTable has dependencies and cannot be deleted.
+func (r *routeTableAssociation) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	// Since the substrate status is not populated with the table IDs we need to get it directly from AWS API
+	tables, err := getRouteTables(ctx, r.ec2api, substrate.Name)
+	if err != nil {
+		return err
+	}
+	for _, table := range tables {
+		for _, association := range table.Associations {
+			if _, err := r.ec2api.DisassociateRouteTableWithContext(ctx, &ec2.DisassociateRouteTableInput{
+				AssociationId: association.RouteTableAssociationId,
+			}); err != nil {
+				return fmt.Errorf("disassociating private route table and subnets, %w", err)
+			}
+		}
+	}
 	return nil
 }
-
-// func tableName(tags []*ec2.Tag) string {
-// 	for _, tag := range tags {
-// 		if aws.StringValue(tag.Key) == "Name" {
-// 			return aws.StringValue(tag.Value)
-// 		}
-// 	}
-// 	return ""
-// }
-
-// func isSubnetAssociated(associations []*ec2.RouteTableAssociation, subnetID string) bool {
-// 	for _, association := range associations {
-// 		if aws.StringValue(association.SubnetId) == subnetID {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }

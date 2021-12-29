@@ -17,6 +17,7 @@ package substrate
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -47,17 +48,20 @@ func (r *routeTable) Provision(ctx context.Context, substrate *v1alpha1.Substrat
 		substrate.Status.NatGatewayID == nil {
 		return fmt.Errorf("vpc / IGW / NATGW ID not found for %v", substrate.Name)
 	}
-	routeTables, err := getRouteTableIDs(ctx, r.ec2api, substrate.Name)
+	routeTables, err := getRouteTables(ctx, r.ec2api, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting route tables %w", err)
 	}
 	// TODO create only the missing route table
-	if len(routeTables) != 2 {
+	if len(routeTables) < 2 {
 		if err := r.createRouteTables(ctx, substrate); err != nil {
 			return err
 		}
+		zap.S().Infof("Successfully created route table for cluster %v", substrate.Name)
+		return nil
 	}
-	zap.S().Infof("Successfully created route table for cluster %v", substrate.Name)
+	substrate.Status.PrivateRouteTableID = aws.String(parseTableID(routeTables, privateTableName(substrate.Name)))
+	substrate.Status.PublicRouteTableID = aws.String(parseTableID(routeTables, publicTableName(substrate.Name)))
 	return nil
 }
 
@@ -148,6 +152,24 @@ func getRouteTables(ctx context.Context, ec2api *EC2, identifier string) ([]*ec2
 		return nil, nil
 	}
 	return output.RouteTables, nil
+}
+
+func parseTableID(tables []*ec2.RouteTable, name string) string {
+	for _, table := range tables {
+		if strings.EqualFold(tableName(table), name) {
+			return *table.RouteTableId
+		}
+	}
+	return ""
+}
+
+func tableName(table *ec2.RouteTable) string {
+	for _, tag := range table.Tags {
+		if *tag.Key == "Name" {
+			return *tag.Value
+		}
+	}
+	return ""
 }
 
 func privateTableName(identifier string) string {

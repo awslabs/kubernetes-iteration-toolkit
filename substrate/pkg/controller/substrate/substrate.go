@@ -35,6 +35,7 @@ func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 		&subnet{ec2api: ec2Client},
 		&natGateway{ec2api: ec2Client},
 		&routeTable{ec2api: ec2Client},
+		&routeTableAssociation{ec2api: ec2Client},
 	} {
 		if err := resource.Provision(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create resource, %w", err)
@@ -49,6 +50,7 @@ func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 func Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	ec2Client := EC2Client(NewSession())
 	for _, resource := range []AWSResource{
+		&routeTableAssociation{ec2api: ec2Client},
 		&routeTable{ec2api: ec2Client},
 		&natGateway{ec2api: ec2Client},
 		// need to wait for NAT Gw to be deleted for the associated subnet to be cleaned up
