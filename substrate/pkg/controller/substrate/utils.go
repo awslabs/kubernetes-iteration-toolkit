@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/iam"
 )
@@ -37,6 +38,18 @@ func generateEC2TagsWithName(svcName, identifier, name string) []*ec2.TagSpecifi
 			Key:   aws.String("Name"),
 			Value: aws.String(name),
 		}},
+	}}
+}
+
+func generateAutoScalingTags(identifier, name string) []*autoscaling.Tag {
+	return []*autoscaling.Tag{{
+		Key:               aws.String(TagKeyNameForAWSResources),
+		Value:             aws.String(identifier),
+		PropagateAtLaunch: aws.Bool(true),
+	}, {
+		Key:               aws.String("Name"),
+		Value:             aws.String(name),
+		PropagateAtLaunch: aws.Bool(true),
 	}}
 }
 

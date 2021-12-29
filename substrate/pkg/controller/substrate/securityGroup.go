@@ -88,50 +88,17 @@ func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID string) e
 			ToPort:     aws.Int64(443),
 			IpProtocol: aws.String("tcp"),
 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+		}, {
+			FromPort:   aws.Int64(22),
+			ToPort:     aws.Int64(22),
+			IpProtocol: aws.String("tcp"),
+			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
 		}},
 	}); err != nil {
 		return err
 	}
 	return nil
 }
-
-// func (s *securityGroup) createIngressInputFor(securitygroupID string) (*ec2.AuthorizeSecurityGroupIngressInput, error) {
-// 	return &ec2.AuthorizeSecurityGroupIngressInput{
-// 		GroupId: aws.String(securitygroupID),
-// 		IpPermissions: []*ec2.IpPermission{{
-// 			ToPort:     aws.Int64(443),
-// 			IpProtocol: aws.String("tcp"),
-// 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
-// 		}},
-// 	}, nil
-// 	// switch groupSpec.GroupName {
-// 	// case v1alpha1.GroupName(groupSpec.ClusterName, v1alpha1.MasterInstances):
-// 	// 	return &ec2.AuthorizeSecurityGroupIngressInput{
-// 	// 		GroupId:       aws.String(securitygroupID),
-// 	// 		IpPermissions: permissions,
-// 	// 	}, nil
-// 	// case v1alpha1.GroupName(groupSpec.ClusterName, v1alpha1.ETCDInstances):
-// 	// 	return &ec2.AuthorizeSecurityGroupIngressInput{
-// 	// 		GroupId: aws.String(securitygroupID),
-// 	// 		IpPermissions: []*ec2.IpPermission{{
-// 	// 			FromPort:   aws.Int64(2379),
-// 	// 			ToPort:     aws.Int64(2380),
-// 	// 			IpProtocol: aws.String("tcp"),
-// 	// 			UserIdGroupPairs: []*ec2.UserIdGroupPair{{
-// 	// 				GroupId: aws.String(securitygroupID),
-// 	// 			}},
-// 	// 		}, {
-// 	// 			FromPort:   aws.Int64(2379),
-// 	// 			ToPort:     aws.Int64(2379),
-// 	// 			IpProtocol: aws.String("tcp"),
-// 	// 			UserIdGroupPairs: []*ec2.UserIdGroupPair{{
-// 	// 				GroupId: aws.String(masterGroupID),
-// 	// 			}},
-// 	// 		}},
-// 	// 	}, nil
-// 	// }
-// 	// return nil, nil
-// }
 
 func getSecurityGroups(ctx context.Context, ec2api *EC2, identifier string) (*ec2.SecurityGroup, error) {
 	output, err := ec2api.DescribeSecurityGroups(
