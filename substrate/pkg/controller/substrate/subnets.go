@@ -3,6 +3,7 @@ package substrate
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -12,8 +13,8 @@ import (
 
 var (
 	azs            = []string{"us-west-2a", "us-west-2b", "us-west-2c"}
-	privateSubnets = []string{"10.1.0.0/24", "10.2.0.0/24", "10.3.0.0/24"}
-	publicSubnets  = []string{"10.100.0.0/24", "10.101.0.0/24", "10.102.0.0/24"}
+	privateSubnets = []string{"10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"}
+	publicSubnets  = []string{"10.0.100.0/24", "10.0.101.0/24", "10.0.102.0/24"}
 )
 
 type subnet struct {
@@ -25,37 +26,68 @@ func (s *subnet) resourceName() string {
 }
 
 func (s *subnet) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	identifier := ""
-	// for all AZs, provision a pivate and a public subnet
-	vpc, err := getVPC(ctx, s.ec2api, identifier)
+	if substrate.Status.VPCID == nil {
+		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
+	}
+	subnets, err := getSubnets(ctx, s.ec2api, substrate.Name)
 	if err != nil {
-		return fmt.Errorf("getting VPC %w", err)
+		return err
 	}
-	if vpc == nil {
-		// return fmt.Errorf("vpc does not exist %v, %w", identifier, errors.WaitingForSubResources)
-	}
-	for _, az := range azs {
-		for _, privateSubnet := range privateSubnets {
-			if _, err := s.create(ctx, *vpc.VpcId, az, privateSubnet, identifier); err != nil {
+	for i, az := range azs {
+		subnetID := ""
+		// check is private subnet exists in this AZ
+		subnet, ok := subnetExists(subnets, fmt.Sprintf("%s-private-%d", substrate.Name, i), az)
+		if !ok {
+			// create private subnet in this AZ
+			subnetID, err = s.create(ctx, substrate, az, privateSubnets[i], fmt.Sprintf("%s-private-%d", substrate.Name, i))
+			if err != nil {
 				return fmt.Errorf("provisioning private subnet, %w", err)
 			}
+		} else {
+			subnetID = *subnet.SubnetId
 		}
-		for _, publicSubnet := range publicSubnets {
-			subnetID, err := s.create(ctx, *vpc.VpcId, az, publicSubnet, identifier)
+		substrate.Status.PrivateSubnetIDs = append(substrate.Status.PrivateSubnetIDs, subnetID)
+
+		// check is public subnet exists in this AZ
+		subnet, ok = subnetExists(subnets, fmt.Sprintf("%s-public-%d", substrate.Name, i), az)
+		if !ok {
+			// create public subnet in this AZ
+			subnetID, err = s.create(ctx, substrate, az, publicSubnets[i], fmt.Sprintf("%s-public-%d", substrate.Name, i))
 			if err != nil {
 				return fmt.Errorf("provisioning public subnet, %w", err)
 			}
 			if err := s.markSubnetPublic(ctx, subnetID); err != nil {
 				return err
 			}
+		} else {
+			subnetID = *subnet.SubnetId
 		}
+		substrate.Status.PublicSubnetIDs = append(substrate.Status.PublicSubnetIDs, subnetID)
 	}
 	return nil
 }
 
+func subnetExists(existingSubnets []*ec2.Subnet, name, az string) (*ec2.Subnet, bool) {
+	for _, existingSubnet := range existingSubnets {
+		if strings.EqualFold(aws.StringValue(existingSubnet.AvailabilityZone), az) &&
+			strings.EqualFold(subnetName(existingSubnet), name) {
+			return existingSubnet, true
+		}
+	}
+	return nil, false
+}
+
+func subnetName(subnet *ec2.Subnet) string {
+	for _, tag := range subnet.Tags {
+		if aws.StringValue(tag.Key) == "Name" {
+			return aws.StringValue(tag.Value)
+		}
+	}
+	return ""
+}
+
 func (s *subnet) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	identifier := ""
-	subnets, err := getSubnets(ctx, s.ec2api, identifier)
+	subnets, err := getSubnets(ctx, s.ec2api, substrate.Name)
 	if err != nil {
 		return err
 	}
@@ -63,17 +95,19 @@ func (s *subnet) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate)
 		if err := s.deleteSubnets(ctx, subnets); err != nil {
 			return err
 		}
-		zap.S().Infof("Successfully deleted Subnets for %v", identifier)
+		zap.S().Infof("Successfully deleted Subnets for %v", substrate.Name)
 	}
+	substrate.Status.PrivateSubnetIDs = nil
+	substrate.Status.PublicSubnetIDs = nil
 	return nil
 }
 
-func (s *subnet) create(ctx context.Context, vpcID, az, subnetCIDR, identifier string) (string, error) {
+func (s *subnet) create(ctx context.Context, substrate *v1alpha1.Substrate, az, subnetCIDR, subnetName string) (string, error) {
 	output, err := s.ec2api.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
 		AvailabilityZone:  aws.String(az),
 		CidrBlock:         aws.String(subnetCIDR),
-		VpcId:             aws.String(vpcID),
-		TagSpecifications: generateEC2Tags(s.resourceName(), identifier),
+		VpcId:             aws.String(*substrate.Status.VPCID),
+		TagSpecifications: generateEC2TagsWithName(s.resourceName(), substrate.Name, subnetName),
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating subnet, %w", err)
@@ -105,9 +139,9 @@ func (s *subnet) deleteSubnets(ctx context.Context, subnets []*ec2.Subnet) error
 	return nil
 }
 
-func getSubnets(ctx context.Context, ec2api *EC2, clusterName string) ([]*ec2.Subnet, error) {
+func getSubnets(ctx context.Context, ec2api *EC2, identifier string) ([]*ec2.Subnet, error) {
 	input := &ec2.DescribeSubnetsInput{
-		Filters: ec2FilterFor(clusterName),
+		Filters: ec2FilterFor(identifier),
 	}
 	output, err := ec2api.DescribeSubnetsWithContext(ctx, input)
 	if err != nil {
@@ -116,8 +150,8 @@ func getSubnets(ctx context.Context, ec2api *EC2, clusterName string) ([]*ec2.Su
 	return output.Subnets, nil
 }
 
-func getPrivateSubnetIDs(ctx context.Context, ec2api *EC2, clusterName string) ([]string, error) {
-	subnets, err := getSubnets(ctx, ec2api, clusterName)
+func privateSubnetIDs(ctx context.Context, ec2api *EC2, identifier string) ([]string, error) {
+	subnets, err := getSubnets(ctx, ec2api, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +165,8 @@ func getPrivateSubnetIDs(ctx context.Context, ec2api *EC2, clusterName string) (
 	return result, nil
 }
 
-func getPublicSubnetIDs(ctx context.Context, ec2api *EC2, clusterName string) ([]string, error) {
-	subnets, err := getSubnets(ctx, ec2api, clusterName)
+func publicSubnetIDs(ctx context.Context, ec2api *EC2, identifier string) ([]string, error) {
+	subnets, err := getSubnets(ctx, ec2api, identifier)
 	if err != nil {
 		return nil, err
 	}

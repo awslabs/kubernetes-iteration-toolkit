@@ -19,20 +19,27 @@ func (e *elasticIP) resourceName() string {
 }
 
 func (e *elasticIP) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	identifier := ""
-	output, err := e.ec2api.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
-		TagSpecifications: generateEC2Tags(e.resourceName(), identifier),
-	})
+	eip, err := getElasticIP(ctx, e.ec2api, substrate.Name)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting elastic IP, %w", err)
 	}
-	zap.S().Infof("Successfully created elastic-ip %v for cluster %v", *output.AllocationId, identifier)
+	if eip == nil || aws.StringValue(eip.AllocationId) == "" {
+		output, err := e.ec2api.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
+			TagSpecifications: generateEC2Tags(e.resourceName(), substrate.Name),
+		})
+		if err != nil {
+			return fmt.Errorf("allocating elastic IP for %v, %w", substrate.Name, err)
+		}
+		zap.S().Infof("Successfully created elastic-ip %v for cluster %v", *output.AllocationId, substrate.Name)
+		substrate.Status.ElasticIPID = output.AllocationId
+		return nil
+	}
+	substrate.Status.ElasticIPID = eip.AllocationId
 	return nil
 }
 
 func (e *elasticIP) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	identifier := ""
-	eip, err := getElasticIP(ctx, e.ec2api, identifier)
+	eip, err := getElasticIP(ctx, e.ec2api, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting elastic IP, %w", err)
 	}
@@ -44,7 +51,8 @@ func (e *elasticIP) Deprovision(ctx context.Context, substrate *v1alpha1.Substra
 	}); err != nil {
 		return fmt.Errorf("failed to release elastic IP, %w", err)
 	}
-	zap.S().Infof("Successfully deleted elastic-ip %v for cluster %v", *eip.AllocationId, identifier)
+	zap.S().Infof("Successfully deleted elastic-ip %v for cluster %v", *eip.AllocationId, substrate.Name)
+	substrate.Status.ElasticIPID = nil
 	return nil
 }
 

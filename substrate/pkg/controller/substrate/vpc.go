@@ -7,10 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-)
-
-const (
-	vpcCIDR = "10.0.0.0/16"
+	"go.uber.org/zap"
 )
 
 type vpc struct {
@@ -21,20 +18,32 @@ func (v *vpc) resourceName() string {
 	return "vpc"
 }
 
-func (v *vpc) Provision(ctx context.Context, substrate *v1alpha1.Substrate) (string, error) {
-	identifier := ""
-	result, err := v.ec2api.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock:         aws.String(vpcCIDR), // TODO remove hardcoded value
-		TagSpecifications: generateEC2Tags(v.resourceName(), identifier),
-	})
+func (v *vpc) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	vpc, err := getVPC(ctx, v.ec2api, substrate.Name)
 	if err != nil {
-		return "", fmt.Errorf("creating VPC, %w", err)
+		return err
 	}
-	return *result.Vpc.VpcId, err
+	// vpc doesn't exist create VPC
+	vpcID := ""
+	if vpc == nil || *vpc.VpcId == "" {
+		result, err := v.ec2api.CreateVpc(&ec2.CreateVpcInput{
+			CidrBlock:         aws.String(substrate.Spec.VPC.CIDR),
+			TagSpecifications: generateEC2Tags(v.resourceName(), substrate.Name),
+		})
+		if err != nil {
+			return fmt.Errorf("creating VPC, %w", err)
+		}
+		zap.S().Infof("Created VPC %v ID %v", substrate.Name, *result.Vpc.VpcId)
+		vpcID = *result.Vpc.VpcId
+	} else {
+		vpcID = *vpc.VpcId
+	}
+	substrate.Status.VPCID = aws.String(vpcID)
+	return err
 }
 
-func (v *vpc) Deprovision(ctx context.Context, identifier string) error {
-	vpc, err := getVPC(ctx, v.ec2api, identifier)
+func (v *vpc) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	vpc, err := getVPC(ctx, v.ec2api, substrate.Name)
 	if err != nil {
 		return err
 	}
