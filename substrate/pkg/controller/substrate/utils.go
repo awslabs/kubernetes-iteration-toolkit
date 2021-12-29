@@ -1,10 +1,13 @@
 package substrate
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/iam"
 )
 
 const (
@@ -42,4 +45,13 @@ func ec2FilterFor(identifier string) []*ec2.Filter {
 		Name:   aws.String(fmt.Sprintf("tag:%s", TagKeyNameForAWSResources)),
 		Values: []*string{aws.String(identifier)},
 	}}
+}
+
+func iamResourceNotFound(err error) bool {
+	if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+		if aerr.Code() == iam.ErrCodeNoSuchEntityException {
+			return true
+		}
+	}
+	return false
 }

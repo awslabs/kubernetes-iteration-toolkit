@@ -53,7 +53,7 @@ func withRegion(sess *session.Session) *session.Session {
 
 // withUserAgent adds a kit specific user-agent string to AWS session
 func withUserAgent(sess *session.Session) *session.Session {
-	userAgent := fmt.Sprintf("kit.sh")
+	userAgent := "kit.sh"
 	sess.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler(userAgent))
 	return sess
 }
