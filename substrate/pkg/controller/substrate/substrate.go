@@ -40,6 +40,7 @@ func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 		&iamRole{iam: iamClient},
 		&iamPolicy{iam: iamClient},
 		&iamProfile{iam: iamClient},
+		&securityGroup{ec2api: ec2Client},
 	} {
 		if err := resource.Provision(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create resource, %w", err)
@@ -63,6 +64,7 @@ func Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
 		// need to wait for all public subnets to be cleaned before IGW can be cleaned up
 		&internetGateway{ec2api: ec2Client},
 		&elasticIP{ec2api: ec2Client},
+		&securityGroup{ec2api: ec2Client},
 		&vpc{ec2api: ec2Client},
 		&iamProfile{iam: iamClient},
 		&iamPolicy{iam: iamClient},

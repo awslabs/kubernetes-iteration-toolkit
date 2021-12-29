@@ -13,12 +13,13 @@ type SubstrateSpec struct {
 }
 
 type SubstrateStatus struct {
-	VPCID               *string  `json:"vpcId,omitempty"`
+	VPCID               *string  `json:"vpcID,omitempty"`
 	InternetGatewayID   *string  `json:"internetGatewayID,omitempty"`
 	ElasticIPID         *string  `json:"elasticIPID,omitempty"`
 	NatGatewayID        *string  `json:"natGatewayID,omitempty"`
 	PrivateRouteTableID *string  `json:"privateRouteTableID,omitempty"`
 	PublicRouteTableID  *string  `json:"publicRouteTableID,omitempty"`
+	SecurityGroupID     *string  `json:"securityGroupID,omitempty"`
 	PrivateSubnetIDs    []string `json:"privateSubnetIDs,omitempty"`
 	PublicSubnetIDs     []string `json:"publicSubnetIDs,omitempty"`
 }
