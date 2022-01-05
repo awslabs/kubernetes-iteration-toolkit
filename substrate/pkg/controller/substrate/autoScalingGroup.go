@@ -46,6 +46,11 @@ func (a *autoScalingGroup) Deprovision(ctx context.Context, substrate *v1alpha1.
 			return fmt.Errorf("deleting autoscaling group, %w", err)
 		}
 		zap.S().Infof("Successfully deleted auto-scaling-group %v", *existingASG.AutoScalingGroupName)
+		if err := a.autoscalingAPI.WaitUntilGroupNotExistsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
+			AutoScalingGroupNames: []*string{existingASG.AutoScalingGroupName},
+		}); err != nil {
+			return fmt.Errorf("waiting for autoscaling group to be deleted, %w", err)
+		}
 	}
 	return nil
 }

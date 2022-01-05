@@ -77,7 +77,7 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, substrate *v1
 				}},
 			},
 			KeyName:      aws.String("eks-dev-stack-key-pair"),
-			InstanceType: aws.String("t2.large"),
+			InstanceType: aws.String("t2.micro"),
 			ImageId:      aws.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
 				Name: aws.String(profileName(substrate.Name)),
@@ -125,14 +125,12 @@ const (
 	userData = `#!/bin/bash
 sudo swapoff -a
 sudo yum install -y docker
-sudo yum install -y conntrack-tools
-cat <<EOF | sudo tee /etc/docker/daemon.json
-{
-  "exec-opts": ["native.cgroupdriver=systemd"]
-}
-EOF
-
 sudo systemctl enable docker
 sudo systemctl daemon-reload
-sudo systemctl restart docker`
+sudo systemctl restart docker
+
+# install k3d
+curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+export PATH=$PATH:/usr/local/bin
+k3d cluster create substrate --api-port 0.0.0.0:443`
 )

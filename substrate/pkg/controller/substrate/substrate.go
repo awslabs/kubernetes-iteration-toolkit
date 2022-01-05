@@ -40,11 +40,11 @@ func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 		&internetGateway{ec2api: ec2Client},
 		&subnet{ec2api: ec2Client},
 		&securityGroup{ec2api: ec2Client},
-		&launchTemplate{ec2api: ec2Client, ssm: ssmClient},
-		&autoScalingGroup{ec2api: ec2Client, autoscalingAPI: autoScalingClient},
 		&natGateway{ec2api: ec2Client},
 		&routeTable{ec2api: ec2Client},
 		&routeTableAssociation{ec2api: ec2Client},
+		&launchTemplate{ec2api: ec2Client, ssm: ssmClient},
+		&autoScalingGroup{ec2api: ec2Client, autoscalingAPI: autoScalingClient},
 	} {
 		if err := resource.Provision(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create resource, %w", err)
