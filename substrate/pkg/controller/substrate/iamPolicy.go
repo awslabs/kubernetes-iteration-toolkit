@@ -33,9 +33,9 @@ func NewIAMPolicyController(iam *IAM) *iamPolicy {
 	return &iamPolicy{iam: iam}
 }
 
-// Provision will check if the resource exists is AWS if it does sync status,
+// Create will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with substrate.Status
-func (i *iamPolicy) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// assume role already exists in IAM so we skip checking for role in IAM
 	// check policy exists on the role
 	output, err := i.getRolePolicy(ctx, policyName(substrate.Name), roleName(substrate.Name))
@@ -57,8 +57,8 @@ func (i *iamPolicy) Provision(ctx context.Context, substrate *v1alpha1.Substrate
 	return nil
 }
 
-// Deprovision deletes the resource from AWS
-func (i *iamPolicy) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+// Delete deletes the resource from AWS
+func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if _, err := i.iam.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
 		RoleName:   aws.String(roleName(substrate.Name)),
 		PolicyName: aws.String(policyName(substrate.Name)),

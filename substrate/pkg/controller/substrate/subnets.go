@@ -25,7 +25,7 @@ func (s *subnet) resourceName() string {
 	return "subnet"
 }
 
-func (s *subnet) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (s *subnet) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if substrate.Status.VPCID == nil {
 		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
 	}
@@ -86,7 +86,7 @@ func subnetName(subnet *ec2.Subnet) string {
 	return ""
 }
 
-func (s *subnet) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (s *subnet) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	subnets, err := getSubnets(ctx, s.ec2api, substrate.Name)
 	if err != nil {
 		return err

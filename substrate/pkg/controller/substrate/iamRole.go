@@ -32,9 +32,9 @@ var assumeRolePolicyDocument = `{
 	]
 }`
 
-// Provision will check if the resource exists is AWS if it does sync status,
+// Create will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the substrate.Status
-func (i *iamRole) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (i *iamRole) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// check if the role exists
 	role, err := i.getRole(ctx, substrate.Name)
 	if err != nil {
@@ -57,7 +57,7 @@ func (i *iamRole) Provision(ctx context.Context, substrate *v1alpha1.Substrate) 
 }
 
 // Finalize deletes the resource from AWS
-func (i *iamRole) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (i *iamRole) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// check if the role exists
 	role, err := i.getRole(ctx, substrate.Name)
 	if err != nil {

@@ -23,7 +23,7 @@ func (s *securityGroup) resourceName() string {
 	return "security-group"
 }
 
-func (s *securityGroup) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if substrate.Status.VPCID == nil {
 		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
 	}
@@ -53,7 +53,7 @@ func (s *securityGroup) Provision(ctx context.Context, substrate *v1alpha1.Subst
 }
 
 // Finalize deletes the resource from AWS
-func (s *securityGroup) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (s *securityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	existingGroup, err := getSecurityGroups(ctx, s.ec2api, substrate.Name)
 	if err != nil {
 		return err

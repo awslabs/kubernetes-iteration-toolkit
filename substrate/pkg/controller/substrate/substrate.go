@@ -17,6 +17,11 @@ type Controller struct {
 	// dependencies
 }
 
+type Resource interface {
+	Create(context.Context, *v1alpha1.Substrate) error
+	Delete(context.Context, *v1alpha1.Substrate) error
+}
+
 func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	return nil
 }
@@ -31,7 +36,7 @@ func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	ssmClient := SSMClient(NewSession())
 	autoScalingClient := AutoScalingClient(NewSession())
 	start := time.Now()
-	for _, resource := range []AWSResource{
+	for _, resource := range []Resource{
 		&iamRole{iam: iamClient},
 		&iamPolicy{iam: iamClient},
 		&iamProfile{iam: iamClient},
@@ -46,7 +51,7 @@ func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 		&launchTemplate{ec2api: ec2Client, ssm: ssmClient},
 		&autoScalingGroup{ec2api: ec2Client, autoscalingAPI: autoScalingClient},
 	} {
-		if err := resource.Provision(ctx, substrate); err != nil {
+		if err := resource.Create(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create resource, %w", err)
 		}
 	}
@@ -60,7 +65,7 @@ func Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	ec2Client := EC2Client(NewSession())
 	iamClient := IAMClient(NewSession())
 	autoScalingClient := AutoScalingClient(NewSession())
-	for _, resource := range []AWSResource{
+	for _, resource := range []Resource{
 		&autoScalingGroup{ec2api: ec2Client, autoscalingAPI: autoScalingClient},
 		&launchTemplate{ec2api: ec2Client},
 		&routeTableAssociation{ec2api: ec2Client},
@@ -77,16 +82,11 @@ func Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
 		&iamPolicy{iam: iamClient},
 		&iamRole{iam: iamClient},
 	} {
-		if err := resource.Deprovision(ctx, substrate); err != nil {
+		if err := resource.Delete(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create a resource, %w", err)
 		}
 	}
 	zap.S().Infof("Successfully created all the resources")
 	// create the kubeconfig file for this substrate cluster
 	return nil
-}
-
-type AWSResource interface {
-	Provision(context.Context, *v1alpha1.Substrate) error
-	Deprovision(context.Context, *v1alpha1.Substrate) error
 }

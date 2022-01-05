@@ -13,7 +13,7 @@ type routeTableAssociation struct {
 	ec2api *EC2
 }
 
-func (r *routeTableAssociation) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (r *routeTableAssociation) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if substrate.Status.PrivateRouteTableID == nil && substrate.Status.PublicRouteTableID == nil {
 		return fmt.Errorf("route tables not found")
 	}
@@ -45,7 +45,7 @@ func (r *routeTableAssociation) associateSubnetsToTable(ctx context.Context, tab
 // Before deleting the route tables we first need to disassociate routes from
 // it. If we try to delete route table before removing routes from it, we get
 // the DependencyViolation: routeTable has dependencies and cannot be deleted.
-func (r *routeTableAssociation) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (r *routeTableAssociation) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// Since the substrate status is not populated with the table IDs we need to get it directly from AWS API
 	tables, err := getRouteTables(ctx, r.ec2api, substrate.Name)
 	if err != nil {

@@ -40,7 +40,7 @@ func (i *internetGateway) resourceName() string {
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the substrate.Status
-func (i *internetGateway) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (i *internetGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if substrate.Status.VPCID == nil {
 		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
 	}
@@ -68,7 +68,7 @@ func (i *internetGateway) Provision(ctx context.Context, substrate *v1alpha1.Sub
 }
 
 // Finalize deletes the resource from AWS
-func (i *internetGateway) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	vpc, err := getVPC(ctx, i.ec2api, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting vpc %w", err)

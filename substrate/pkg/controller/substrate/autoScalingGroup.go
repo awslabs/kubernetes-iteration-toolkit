@@ -16,7 +16,7 @@ type autoScalingGroup struct {
 	autoscalingAPI *AutoScaling
 }
 
-func (a *autoScalingGroup) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	existingASG, err := a.getAutoScalingGroup(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting autoscaling groups, %w", err)
@@ -33,7 +33,7 @@ func (a *autoScalingGroup) Provision(ctx context.Context, substrate *v1alpha1.Su
 	return nil
 }
 
-func (a *autoScalingGroup) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	existingASG, err := a.getAutoScalingGroup(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting autoscaling groups, %w", err)
@@ -46,11 +46,6 @@ func (a *autoScalingGroup) Deprovision(ctx context.Context, substrate *v1alpha1.
 			return fmt.Errorf("deleting autoscaling group, %w", err)
 		}
 		zap.S().Infof("Successfully deleted auto-scaling-group %v", *existingASG.AutoScalingGroupName)
-		if err := a.autoscalingAPI.WaitUntilGroupNotExistsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
-			AutoScalingGroupNames: []*string{existingASG.AutoScalingGroupName},
-		}); err != nil {
-			return fmt.Errorf("waiting for autoscaling group to be deleted, %w", err)
-		}
 	}
 	return nil
 }

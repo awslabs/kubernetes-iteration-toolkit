@@ -21,7 +21,7 @@ type launchTemplate struct {
 func (l *launchTemplate) resourceName() string {
 	return "launch-template"
 }
-func (l *launchTemplate) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if substrate.Status.SecurityGroupID == nil {
 		return fmt.Errorf("SecurityGroup ID not found for %v", substrate.Name)
 	}
@@ -40,7 +40,7 @@ func (l *launchTemplate) Provision(ctx context.Context, substrate *v1alpha1.Subs
 	return nil
 }
 
-func (l *launchTemplate) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	templates, err := getLaunchTemplates(ctx, l.ec2api, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting launch template, %w", err)
@@ -77,7 +77,7 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, substrate *v1
 				}},
 			},
 			KeyName:      aws.String("eks-dev-stack-key-pair"),
-			InstanceType: aws.String("t2.micro"),
+			InstanceType: aws.String("t2.large"),
 			ImageId:      aws.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
 				Name: aws.String(profileName(substrate.Name)),
@@ -125,12 +125,14 @@ const (
 	userData = `#!/bin/bash
 sudo swapoff -a
 sudo yum install -y docker
+sudo yum install -y conntrack-tools
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+  "exec-opts": ["native.cgroupdriver=systemd"]
+}
+EOF
+
 sudo systemctl enable docker
 sudo systemctl daemon-reload
-sudo systemctl restart docker
-
-# install k3d
-curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
-export PATH=$PATH:/usr/local/bin
-k3d cluster create substrate --api-port 0.0.0.0:443`
+sudo systemctl restart docker`
 )

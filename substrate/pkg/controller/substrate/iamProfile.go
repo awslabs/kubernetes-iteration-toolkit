@@ -19,9 +19,9 @@ func NewIAMProfileController(iam *IAM) *iamProfile {
 	return &iamProfile{iam: iam}
 }
 
-// Provision will check if the resource exists is AWS if it does sync status,
+// Create will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with substrate.Status
-func (i *iamProfile) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	profile, err := i.getInstanceProfile(ctx, profileName(substrate.Name))
 	if err != nil {
 		return fmt.Errorf("getting instance profile, %w", err)
@@ -51,8 +51,8 @@ func (i *iamProfile) Provision(ctx context.Context, substrate *v1alpha1.Substrat
 	return nil
 }
 
-// Deprovision deletes the resource from AWS
-func (i *iamProfile) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+// Delete deletes the resource from AWS
+func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// Remove role from profile
 	if _, err := i.iam.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName(substrate.Name)),

@@ -41,7 +41,7 @@ func (r *routeTable) resourceName() string {
 
 // Reconcile will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the substrate.Status
-func (r *routeTable) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// Verify VPCID exists
 	if substrate.Status.VPCID == nil ||
 		substrate.Status.InternetGatewayID == nil ||
@@ -66,7 +66,7 @@ func (r *routeTable) Provision(ctx context.Context, substrate *v1alpha1.Substrat
 }
 
 // Finalize deletes the resource from AWS
-func (r *routeTable) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (r *routeTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if err := r.deleteRouteTable(ctx, substrate); err != nil {
 		return err
 	}

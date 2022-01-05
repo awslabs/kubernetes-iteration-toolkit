@@ -18,7 +18,7 @@ func (v *vpc) resourceName() string {
 	return "vpc"
 }
 
-func (v *vpc) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	vpc, err := getVPC(ctx, v.ec2api, substrate.Name)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func (v *vpc) Provision(ctx context.Context, substrate *v1alpha1.Substrate) erro
 	return err
 }
 
-func (v *vpc) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	vpc, err := getVPC(ctx, v.ec2api, substrate.Name)
 	if err != nil {
 		return err

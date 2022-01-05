@@ -18,7 +18,7 @@ func (e *elasticIP) resourceName() string {
 	return "elastic-ip"
 }
 
-func (e *elasticIP) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (e *elasticIP) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	eip, err := getElasticIP(ctx, e.ec2api, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting elastic IP, %w", err)
@@ -38,7 +38,7 @@ func (e *elasticIP) Provision(ctx context.Context, substrate *v1alpha1.Substrate
 	return nil
 }
 
-func (e *elasticIP) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (e *elasticIP) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	eip, err := getElasticIP(ctx, e.ec2api, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting elastic IP, %w", err)

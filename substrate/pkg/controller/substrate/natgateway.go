@@ -19,7 +19,7 @@ func (n *natGateway) resourceName() string {
 	return "natgateway"
 }
 
-func (n *natGateway) Provision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (n *natGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// Get elastic IP ID
 	if substrate.Status.ElasticIPID == nil {
 		return fmt.Errorf("elastic IP allocation ID not found for %v", substrate.Name)
@@ -62,7 +62,7 @@ func (n *natGateway) Provision(ctx context.Context, substrate *v1alpha1.Substrat
 	return nil
 }
 
-func (n *natGateway) Deprovision(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (n *natGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	natGW, err := n.getActiveNatGateway(ctx, substrate.Name)
 	if err != nil {
 		return err
