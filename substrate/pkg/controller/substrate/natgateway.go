@@ -12,7 +12,7 @@ import (
 )
 
 type natGateway struct {
-	ec2api *EC2
+	ec2Client *ec2.EC2
 }
 
 func (n *natGateway) resourceName() string {
@@ -34,7 +34,7 @@ func (n *natGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	}
 	if natGW == nil || *natGW.NatGatewayId == "" {
 		// Create NAT Gateway
-		output, err := n.ec2api.CreateNatGatewayWithContext(ctx, &ec2.CreateNatGatewayInput{
+		output, err := n.ec2Client.CreateNatGatewayWithContext(ctx, &ec2.CreateNatGatewayInput{
 			AllocationId:      substrate.Status.ElasticIPID,
 			SubnetId:          aws.String(substrate.Status.PublicSubnetIDs[0]),
 			TagSpecifications: generateEC2Tags(n.resourceName(), substrate.Name),
@@ -48,7 +48,7 @@ func (n *natGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		// it fails saying no NAT GW exists with this ID, although its in pending state.
 		func() {
 			zap.S().Infof("Waiting for nat-gateway %v to be available for cluster %v", *output.NatGateway.NatGatewayId, substrate.Name)
-			if err := n.ec2api.WaitUntilNatGatewayAvailableWithContext(ctx, &ec2.DescribeNatGatewaysInput{
+			if err := n.ec2Client.WaitUntilNatGatewayAvailableWithContext(ctx, &ec2.DescribeNatGatewaysInput{
 				NatGatewayIds: []*string{output.NatGateway.NatGatewayId},
 			}); err != nil {
 				zap.S().Errorf("waiting for NAT GW %s to be available for %v", *output.NatGateway.NatGatewayId, substrate.Name)
@@ -70,7 +70,7 @@ func (n *natGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 	if natGW == nil || *natGW.NatGatewayId == "" {
 		return nil
 	}
-	if _, err := n.ec2api.DeleteNatGatewayWithContext(ctx, &ec2.DeleteNatGatewayInput{
+	if _, err := n.ec2Client.DeleteNatGatewayWithContext(ctx, &ec2.DeleteNatGatewayInput{
 		NatGatewayId: natGW.NatGatewayId,
 	}); err != nil {
 		return fmt.Errorf("creating NAT GW %s for %v", *natGW.NatGatewayId, substrate.Name)
@@ -79,7 +79,7 @@ func (n *natGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 	maxTry := 20
 	for maxTry > 0 {
 		time.Sleep(5 * time.Second)
-		deleted, err := isNatGWDeleted(ctx, n.ec2api, substrate.Name)
+		deleted, err := n.isNatGWDeleted(ctx, substrate.Name)
 		if err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func (n *natGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 }
 
 func (n *natGateway) getActiveNatGateway(ctx context.Context, identifier string) (*ec2.NatGateway, error) {
-	natGWs, err := getNatGateway(ctx, n.ec2api, identifier)
+	natGWs, err := n.getNatGateway(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -114,8 +114,8 @@ func (n *natGateway) getActiveNatGateway(ctx context.Context, identifier string)
 
 // When we get NAT GWs from EC2 there can be multiple NAT GWs returned with deleted state,
 // So we need to make sure all of them are in deleted state when cleaning up.
-func isNatGWDeleted(ctx context.Context, ec2api *EC2, identifier string) (bool, error) {
-	natGWs, err := getNatGateway(ctx, ec2api, identifier)
+func (n *natGateway) isNatGWDeleted(ctx context.Context, identifier string) (bool, error) {
+	natGWs, err := n.getNatGateway(ctx, identifier)
 	if err != nil {
 		return false, err
 	}
@@ -129,8 +129,8 @@ func isNatGWDeleted(ctx context.Context, ec2api *EC2, identifier string) (bool, 
 	return result, nil
 }
 
-func getNatGateway(ctx context.Context, ec2api *EC2, identifier string) ([]*ec2.NatGateway, error) {
-	output, err := ec2api.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{
+func (n *natGateway) getNatGateway(ctx context.Context, identifier string) ([]*ec2.NatGateway, error) {
+	output, err := n.ec2Client.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{
 		Filter: ec2FilterFor(identifier),
 	})
 	if err != nil {

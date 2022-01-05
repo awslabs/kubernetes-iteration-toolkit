@@ -11,12 +11,7 @@ import (
 )
 
 type iamProfile struct {
-	iam *IAM
-}
-
-// NewIAMProfileController returns a controller for managing IAM instance profile in AWS
-func NewIAMProfileController(iam *IAM) *iamProfile {
-	return &iamProfile{iam: iam}
+	iamClient *iam.IAM
 }
 
 // Create will check if the resource exists is AWS if it does sync status,
@@ -28,7 +23,7 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	}
 	if profile == nil {
 		// Create profile in IAM
-		result, err := i.iam.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
+		result, err := i.iamClient.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName(substrate.Name)),
 		})
 		if err != nil {
@@ -40,7 +35,7 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 
 	// Add roles to the Instance Profile
 	if !rolesContains(profile, roleName(substrate.Name)) {
-		if _, err := i.iam.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
+		if _, err := i.iamClient.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
 			InstanceProfileName: aws.String(profileName(substrate.Name)),
 			RoleName:            aws.String(roleName(substrate.Name)),
 		}); err != nil {
@@ -54,14 +49,14 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 // Delete deletes the resource from AWS
 func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// Remove role from profile
-	if _, err := i.iam.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
+	if _, err := i.iamClient.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName(substrate.Name)),
 		RoleName:            aws.String(roleName(substrate.Name)),
 	}); err != nil {
 		return err
 	}
 	// Delete the profile
-	if _, err := i.iam.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
+	if _, err := i.iamClient.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName(substrate.Name)),
 	}); err != nil {
 		return err
@@ -70,7 +65,7 @@ func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 }
 
 func (i *iamProfile) getInstanceProfile(ctx context.Context, profileName string) (*iam.InstanceProfile, error) {
-	output, err := i.iam.GetInstanceProfileWithContext(ctx, &iam.GetInstanceProfileInput{
+	output, err := i.iamClient.GetInstanceProfileWithContext(ctx, &iam.GetInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName),
 	})
 	if iamResourceNotFound(err) {

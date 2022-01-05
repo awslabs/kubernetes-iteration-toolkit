@@ -25,12 +25,8 @@ import (
 )
 
 type internetGateway struct {
-	ec2api *EC2
-}
-
-// NewInternetGWController returns a controller for managing internet-gateway in AWS
-func NewInternetGWController(ec2api *EC2) *internetGateway {
-	return &internetGateway{ec2api: ec2api}
+	ec2Client *ec2.EC2
+	vpc       *vpc
 }
 
 // Name returns the name of the controller
@@ -69,7 +65,7 @@ func (i *internetGateway) Create(ctx context.Context, substrate *v1alpha1.Substr
 
 // Finalize deletes the resource from AWS
 func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	vpc, err := getVPC(ctx, i.ec2api, substrate.Name)
+	vpc, err := i.vpc.getVPC(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting vpc %w", err)
 	}
@@ -80,7 +76,7 @@ func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substr
 	}
 	if igw != nil && aws.StringValue(igw.InternetGatewayId) != "" {
 		// Detach Internet Gateway from VPC
-		if _, err := i.ec2api.DetachInternetGatewayWithContext(
+		if _, err := i.ec2Client.DetachInternetGatewayWithContext(
 			ctx, &ec2.DetachInternetGatewayInput{
 				InternetGatewayId: igw.InternetGatewayId,
 				VpcId:             aws.String(*vpc.VpcId),
@@ -88,7 +84,7 @@ func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substr
 			return fmt.Errorf("detaching internet-gateway from VPC, %w", err)
 		}
 		// Delete Internet Gateway
-		if _, err := i.ec2api.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
+		if _, err := i.ec2Client.DeleteInternetGatewayWithContext(ctx, &ec2.DeleteInternetGatewayInput{
 			InternetGatewayId: igw.InternetGatewayId,
 		}); err != nil {
 			return fmt.Errorf("deleting internet-gateway, %w", err)
@@ -99,7 +95,7 @@ func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substr
 }
 
 func (i *internetGateway) createInternetGateway(ctx context.Context, identifier string) (*ec2.InternetGateway, error) {
-	output, err := i.ec2api.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
+	output, err := i.ec2Client.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
 		TagSpecifications: generateEC2Tags(i.resourceName(), identifier),
 	})
 	if err != nil {
@@ -110,7 +106,7 @@ func (i *internetGateway) createInternetGateway(ctx context.Context, identifier 
 }
 
 func (i *internetGateway) attachInternetGWToVPC(ctx context.Context, igwID, vpcID string) error {
-	if _, err := i.ec2api.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{
+	if _, err := i.ec2Client.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{
 		InternetGatewayId: aws.String(igwID),
 		VpcId:             aws.String(vpcID),
 	}); err != nil {
@@ -121,11 +117,7 @@ func (i *internetGateway) attachInternetGWToVPC(ctx context.Context, igwID, vpcI
 }
 
 func (i *internetGateway) getInternetGateway(ctx context.Context, identifier string) (*ec2.InternetGateway, error) {
-	return getInternetGateway(ctx, i.ec2api, identifier)
-}
-
-func getInternetGateway(ctx context.Context, ec2api *EC2, identifier string) (*ec2.InternetGateway, error) {
-	output, err := ec2api.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
+	output, err := i.ec2Client.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
 		Filters: ec2FilterFor(identifier),
 	})
 	if err != nil {

@@ -10,7 +10,8 @@ import (
 )
 
 type routeTableAssociation struct {
-	ec2api *EC2
+	ec2Client  *ec2.EC2
+	routeTable *routeTable
 }
 
 func (r *routeTableAssociation) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
@@ -30,7 +31,7 @@ func (r *routeTableAssociation) Create(ctx context.Context, substrate *v1alpha1.
 
 func (r *routeTableAssociation) associateSubnetsToTable(ctx context.Context, tableID string, subnets []string) error {
 	for _, subnet := range subnets {
-		_, err := r.ec2api.AssociateRouteTableWithContext(ctx, &ec2.AssociateRouteTableInput{
+		_, err := r.ec2Client.AssociateRouteTableWithContext(ctx, &ec2.AssociateRouteTableInput{
 			RouteTableId: aws.String(tableID),
 			SubnetId:     aws.String(subnet),
 		})
@@ -47,13 +48,13 @@ func (r *routeTableAssociation) associateSubnetsToTable(ctx context.Context, tab
 // the DependencyViolation: routeTable has dependencies and cannot be deleted.
 func (r *routeTableAssociation) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// Since the substrate status is not populated with the table IDs we need to get it directly from AWS API
-	tables, err := getRouteTables(ctx, r.ec2api, substrate.Name)
+	tables, err := r.routeTable.getRouteTables(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
 	for _, table := range tables {
 		for _, association := range table.Associations {
-			if _, err := r.ec2api.DisassociateRouteTableWithContext(ctx, &ec2.DisassociateRouteTableInput{
+			if _, err := r.ec2Client.DisassociateRouteTableWithContext(ctx, &ec2.DisassociateRouteTableInput{
 				AssociationId: association.RouteTableAssociationId,
 			}); err != nil {
 				return fmt.Errorf("disassociating private route table and subnets, %w", err)

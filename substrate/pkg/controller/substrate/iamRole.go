@@ -11,12 +11,7 @@ import (
 )
 
 type iamRole struct {
-	iam *IAM
-}
-
-// NewIAMRoleController returns a controller for managing elasticIPs in AWS
-func NewIAMRoleController(iam *IAM) *iamRole {
-	return &iamRole{iam: iam}
+	iamClient *iam.IAM
 }
 
 var assumeRolePolicyDocument = `{
@@ -42,7 +37,7 @@ func (i *iamRole) Create(ctx context.Context, substrate *v1alpha1.Substrate) err
 	}
 	if role == nil {
 		// create role in IAM
-		_, err := i.iam.CreateRole(&iam.CreateRoleInput{
+		_, err := i.iamClient.CreateRole(&iam.CreateRoleInput{
 			AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
 			RoleName:                 aws.String(roleName(substrate.Name)),
 		})
@@ -66,7 +61,7 @@ func (i *iamRole) Delete(ctx context.Context, substrate *v1alpha1.Substrate) err
 	if role == nil {
 		return nil
 	}
-	if _, err := i.iam.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
+	if _, err := i.iamClient.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
 		RoleName: aws.String(roleName(substrate.Name)),
 	}); err != nil {
 		return err
@@ -76,11 +71,7 @@ func (i *iamRole) Delete(ctx context.Context, substrate *v1alpha1.Substrate) err
 }
 
 func (i *iamRole) getRole(ctx context.Context, identifier string) (*iam.GetRoleOutput, error) {
-	return getRole(ctx, i.iam, identifier)
-}
-
-func getRole(ctx context.Context, iamApi *IAM, identifier string) (*iam.GetRoleOutput, error) {
-	role, err := iamApi.GetRoleWithContext(ctx, &iam.GetRoleInput{
+	role, err := i.iamClient.GetRoleWithContext(ctx, &iam.GetRoleInput{
 		RoleName: aws.String(roleName(identifier)),
 	})
 	if err != nil && iamResourceNotFound(err) {

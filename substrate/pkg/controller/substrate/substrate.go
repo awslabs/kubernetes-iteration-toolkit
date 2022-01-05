@@ -5,16 +5,56 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
 	"go.uber.org/zap"
 )
 
+func NewSession() *session.Session {
+	sess := session.Must(session.NewSession(&aws.Config{STSRegionalEndpoint: endpoints.RegionalSTSEndpoint}))
+	sess.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("kit.sh"))
+	return sess
+}
+
 func NewController(ctx context.Context) *Controller {
-	return &Controller{}
+	session := NewSession()
+	ec2Client := ec2.New(session)
+	iamClient := iam.New(session)
+	ssmClient := ssm.New(session)
+	autoscalingClient := autoscaling.New(session)
+
+	routeTable := &routeTable{ec2Client}
+	vpc := &vpc{ec2Client}
+	subnet := &subnet{ec2Client}
+
+	return &Controller{
+		Resources: []Resource{
+			&iamRole{iamClient},
+			&iamPolicy{iamClient},
+			&iamProfile{iamClient},
+			vpc,
+			&elasticIP{ec2Client},
+			&internetGateway{ec2Client, vpc},
+			subnet,
+			&securityGroup{ec2Client},
+			&natGateway{ec2Client},
+			routeTable,
+			&routeTableAssociation{ec2Client, routeTable},
+			&launchTemplate{ec2Client, ssmClient},
+			&autoScalingGroup{ec2Client, autoscalingClient, subnet},
+		},
+	}
 }
 
 type Controller struct {
-	// dependencies
+	Resources []Resource
 }
 
 type Resource interface {
@@ -23,34 +63,8 @@ type Resource interface {
 }
 
 func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	return nil
-}
-
-func (c *Controller) Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	return nil
-}
-
-func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	ec2Client := EC2Client(NewSession())
-	iamClient := IAMClient(NewSession())
-	ssmClient := SSMClient(NewSession())
-	autoScalingClient := AutoScalingClient(NewSession())
 	start := time.Now()
-	for _, resource := range []Resource{
-		&iamRole{iam: iamClient},
-		&iamPolicy{iam: iamClient},
-		&iamProfile{iam: iamClient},
-		&vpc{ec2api: ec2Client},
-		&elasticIP{ec2api: ec2Client},
-		&internetGateway{ec2api: ec2Client},
-		&subnet{ec2api: ec2Client},
-		&securityGroup{ec2api: ec2Client},
-		&natGateway{ec2api: ec2Client},
-		&routeTable{ec2api: ec2Client},
-		&routeTableAssociation{ec2api: ec2Client},
-		&launchTemplate{ec2api: ec2Client, ssm: ssmClient},
-		&autoScalingGroup{ec2api: ec2Client, autoscalingAPI: autoScalingClient},
-	} {
+	for _, resource := range c.Resources {
 		if err := resource.Create(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create resource, %w", err)
 		}
@@ -61,27 +75,8 @@ func Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	return nil
 }
 
-func Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	ec2Client := EC2Client(NewSession())
-	iamClient := IAMClient(NewSession())
-	autoScalingClient := AutoScalingClient(NewSession())
-	for _, resource := range []Resource{
-		&autoScalingGroup{ec2api: ec2Client, autoscalingAPI: autoScalingClient},
-		&launchTemplate{ec2api: ec2Client},
-		&routeTableAssociation{ec2api: ec2Client},
-		&routeTable{ec2api: ec2Client},
-		&natGateway{ec2api: ec2Client},
-		// need to wait for NAT Gw to be deleted for the associated subnet to be cleaned up
-		&subnet{ec2api: ec2Client},
-		// need to wait for all public subnets to be cleaned before IGW can be cleaned up
-		&internetGateway{ec2api: ec2Client},
-		&elasticIP{ec2api: ec2Client},
-		&securityGroup{ec2api: ec2Client},
-		&vpc{ec2api: ec2Client},
-		&iamProfile{iam: iamClient},
-		&iamPolicy{iam: iamClient},
-		&iamRole{iam: iamClient},
-	} {
+func (c *Controller) Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	for _, resource := range c.Resources {
 		if err := resource.Delete(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create a resource, %w", err)
 		}

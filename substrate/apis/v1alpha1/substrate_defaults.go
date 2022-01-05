@@ -2,11 +2,6 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
-	"strings"
-
-	"github.com/Pallinder/go-randomdata"
-	"github.com/ellistarn/slang/pkg/env"
 
 	"knative.dev/pkg/ptr"
 )
@@ -18,12 +13,13 @@ func (s *Substrate) SetDefaults(ctx context.Context) {
 	}
 }
 
-func (s *Substrate) defaultName() {
-	if s.Name != "" {
-		return
-	}
-	if s.GenerateName != "" {
-		s.GenerateName = env.WithDefaultString("USER", strings.ToLower(randomdata.SillyName()))
-	}
-	s.Name = fmt.Sprintf("%s-%s", s.GenerateName, strings.ToLower(randomdata.SillyName()))
-}
+// UNUSED
+// func (s *Substrate) defaultName() {
+// 	if s.Name != "" {
+// 		return
+// 	}
+// 	if s.GenerateName != "" {
+// 		s.GenerateName = env.WithDefaultString("USER", strings.ToLower(randomdata.SillyName()))
+// 	}
+// 	s.Name = fmt.Sprintf("%s-%s", s.GenerateName, strings.ToLower(randomdata.SillyName()))
+// }

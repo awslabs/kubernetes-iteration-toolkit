@@ -11,7 +11,7 @@ import (
 )
 
 type elasticIP struct {
-	ec2api *EC2
+	ec2Client *ec2.EC2
 }
 
 func (e *elasticIP) resourceName() string {
@@ -19,12 +19,12 @@ func (e *elasticIP) resourceName() string {
 }
 
 func (e *elasticIP) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	eip, err := getElasticIP(ctx, e.ec2api, substrate.Name)
+	eip, err := e.get(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting elastic IP, %w", err)
 	}
 	if eip == nil || aws.StringValue(eip.AllocationId) == "" {
-		output, err := e.ec2api.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
+		output, err := e.ec2Client.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
 			TagSpecifications: generateEC2Tags(e.resourceName(), substrate.Name),
 		})
 		if err != nil {
@@ -39,14 +39,14 @@ func (e *elasticIP) Create(ctx context.Context, substrate *v1alpha1.Substrate) e
 }
 
 func (e *elasticIP) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	eip, err := getElasticIP(ctx, e.ec2api, substrate.Name)
+	eip, err := e.get(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting elastic IP, %w", err)
 	}
 	if eip == nil || aws.StringValue(eip.AllocationId) == "" {
 		return nil
 	}
-	if _, err := e.ec2api.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{
+	if _, err := e.ec2Client.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{
 		AllocationId: eip.AllocationId,
 	}); err != nil {
 		return fmt.Errorf("failed to release elastic IP, %w", err)
@@ -56,8 +56,8 @@ func (e *elasticIP) Delete(ctx context.Context, substrate *v1alpha1.Substrate) e
 	return nil
 }
 
-func getElasticIP(ctx context.Context, ec2api *EC2, identifier string) (*ec2.Address, error) {
-	output, err := ec2api.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{
+func (e *elasticIP) get(ctx context.Context, identifier string) (*ec2.Address, error) {
+	output, err := e.ec2Client.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{
 		Filters: ec2FilterFor(identifier),
 	})
 	if err != nil {
