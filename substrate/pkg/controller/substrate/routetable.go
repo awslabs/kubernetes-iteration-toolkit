@@ -26,12 +26,7 @@ import (
 )
 
 type routeTable struct {
-	ec2api *EC2
-}
-
-// NewRouteTableController returns a controller for managing route tables in AWS
-func NewRouteTableController(ec2api *EC2) *routeTable {
-	return &routeTable{ec2api: ec2api}
+	ec2Client *ec2.EC2
 }
 
 // Name returns the name of the controller
@@ -48,7 +43,7 @@ func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		substrate.Status.NatGatewayID == nil {
 		return fmt.Errorf("vpc / IGW / NATGW ID not found for %v", substrate.Name)
 	}
-	routeTables, err := getRouteTables(ctx, r.ec2api, substrate.Name)
+	routeTables, err := r.getRouteTables(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting route tables %w", err)
 	}
@@ -100,7 +95,7 @@ func (r *routeTable) createRouteTables(ctx context.Context, substrate *v1alpha1.
 }
 
 func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID, identifier, tableName string, route *ec2.CreateRouteInput) (string, error) {
-	routeTable, err := r.ec2api.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
+	routeTable, err := r.ec2Client.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
 		VpcId:             aws.String(vpcID),
 		TagSpecifications: generateEC2TagsWithName(r.resourceName(), identifier, tableName),
 	})
@@ -108,19 +103,19 @@ func (r *routeTable) createTableWithRoute(ctx context.Context, vpcID, identifier
 		return "", fmt.Errorf("creating route table, %w", err)
 	}
 	route.RouteTableId = routeTable.RouteTable.RouteTableId
-	if _, err := r.ec2api.CreateRouteWithContext(ctx, route); err != nil {
+	if _, err := r.ec2Client.CreateRouteWithContext(ctx, route); err != nil {
 		return *routeTable.RouteTable.RouteTableId, fmt.Errorf("adding route to the table, %w", err)
 	}
 	return *routeTable.RouteTable.RouteTableId, nil
 }
 
 func (r *routeTable) deleteRouteTable(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	routeTableIDS, err := getRouteTableIDs(ctx, r.ec2api, substrate.Name)
+	routeTableIDS, err := r.getRouteTableIDs(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting route tables for %v, %w", substrate.Name, err)
 	}
 	for _, routeTableID := range routeTableIDS {
-		if _, err := r.ec2api.DeleteRouteTableWithContext(ctx, &ec2.DeleteRouteTableInput{
+		if _, err := r.ec2Client.DeleteRouteTableWithContext(ctx, &ec2.DeleteRouteTableInput{
 			RouteTableId: aws.String(routeTableID),
 		}); err != nil {
 			return fmt.Errorf("deleting route table %w", err)
@@ -128,8 +123,8 @@ func (r *routeTable) deleteRouteTable(ctx context.Context, substrate *v1alpha1.S
 	}
 	return nil
 }
-func getRouteTableIDs(ctx context.Context, ec2api *EC2, identifier string) ([]string, error) {
-	routeTables, err := getRouteTables(ctx, ec2api, identifier)
+func (r *routeTable) getRouteTableIDs(ctx context.Context, identifier string) ([]string, error) {
+	routeTables, err := r.getRouteTables(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -141,8 +136,8 @@ func getRouteTableIDs(ctx context.Context, ec2api *EC2, identifier string) ([]st
 }
 
 // get all the route tables with the given identifier
-func getRouteTables(ctx context.Context, ec2api *EC2, identifier string) ([]*ec2.RouteTable, error) {
-	output, err := ec2api.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
+func (r *routeTable) getRouteTables(ctx context.Context, identifier string) ([]*ec2.RouteTable, error) {
+	output, err := r.ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: ec2FilterFor(identifier),
 	})
 	if err != nil {

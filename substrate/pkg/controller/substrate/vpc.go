@@ -11,7 +11,7 @@ import (
 )
 
 type vpc struct {
-	ec2api *EC2
+	ec2Client *ec2.EC2
 }
 
 func (v *vpc) resourceName() string {
@@ -19,14 +19,14 @@ func (v *vpc) resourceName() string {
 }
 
 func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	vpc, err := getVPC(ctx, v.ec2api, substrate.Name)
+	vpc, err := v.getVPC(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
 	// vpc doesn't exist create VPC
 	vpcID := ""
 	if vpc == nil || *vpc.VpcId == "" {
-		result, err := v.ec2api.CreateVpc(&ec2.CreateVpcInput{
+		result, err := v.ec2Client.CreateVpc(&ec2.CreateVpcInput{
 			CidrBlock:         aws.String(substrate.Spec.VPC.CIDR),
 			TagSpecifications: generateEC2Tags(v.resourceName(), substrate.Name),
 		})
@@ -43,7 +43,7 @@ func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 }
 
 func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	vpc, err := getVPC(ctx, v.ec2api, substrate.Name)
+	vpc, err := v.getVPC(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	if vpc == nil || *vpc.VpcId == "" {
 		return nil
 	}
-	if _, err := v.ec2api.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{
+	if _, err := v.ec2Client.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{
 		VpcId: vpc.VpcId,
 	}); err != nil {
 		return fmt.Errorf("deleting vpc, %w", err)
@@ -59,11 +59,11 @@ func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	return nil
 }
 
-func getVPC(ctx context.Context, ec2api *EC2, identifier string) (*ec2.Vpc, error) {
+func (v *vpc) getVPC(ctx context.Context, identifier string) (*ec2.Vpc, error) {
 	input := &ec2.DescribeVpcsInput{
 		Filters: ec2FilterFor(identifier),
 	}
-	output, err := ec2api.DescribeVpcsWithContext(ctx, input)
+	output, err := v.ec2Client.DescribeVpcsWithContext(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("describing VPC for %v, err: %w", identifier, err)
 	}

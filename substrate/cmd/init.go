@@ -24,7 +24,6 @@ func Init(cmd *cobra.Command, args []string) {
 	// 	file := os.Stdin
 	// }
 
-
 	_ = File(cmd.Context())
 
 	// b1 := make([]byte, 5)

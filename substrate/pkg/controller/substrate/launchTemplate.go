@@ -13,8 +13,8 @@ import (
 )
 
 type launchTemplate struct {
-	ec2api *EC2
-	ssm    *SSM
+	ec2Client *ec2.EC2
+	ssmClient *ssm.SSM
 }
 
 // Name returns the name of the controller
@@ -25,7 +25,7 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 	if substrate.Status.SecurityGroupID == nil {
 		return fmt.Errorf("SecurityGroup ID not found for %v", substrate.Name)
 	}
-	templates, err := getLaunchTemplates(ctx, l.ec2api, substrate.Name)
+	templates, err := l.getLaunchTemplates(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting launch template, %w", err)
 	}
@@ -41,12 +41,12 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 }
 
 func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	templates, err := getLaunchTemplates(ctx, l.ec2api, substrate.Name)
+	templates, err := l.getLaunchTemplates(ctx, substrate.Name)
 	if err != nil {
 		return fmt.Errorf("getting launch template, %w", err)
 	}
 	for _, template := range templates {
-		_, err := l.ec2api.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
+		_, err := l.ec2Client.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{
 			LaunchTemplateName: template.LaunchTemplateName,
 		})
 		if err != nil {
@@ -58,14 +58,14 @@ func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substra
 }
 
 func (l *launchTemplate) createLaunchTemplate(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.CreateLaunchTemplateOutput, error) {
-	paramOutput, err := l.ssm.GetParameterWithContext(ctx, &ssm.GetParameterInput{
+	paramOutput, err := l.ssmClient.GetParameterWithContext(ctx, &ssm.GetParameterInput{
 		Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("getting ssm parameter, %w", err)
 	}
 	amiID := *paramOutput.Parameter.Value
-	output, err := l.ec2api.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
+	output, err := l.ec2Client.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
 			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{{
 				DeviceName: aws.String("/dev/xvda"),
@@ -76,7 +76,6 @@ func (l *launchTemplate) createLaunchTemplate(ctx context.Context, substrate *v1
 					VolumeType:          aws.String("gp3"),
 				}},
 			},
-			KeyName:      aws.String("eks-dev-stack-key-pair"),
 			InstanceType: aws.String("t2.large"),
 			ImageId:      aws.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
@@ -104,8 +103,8 @@ func existingTemplateMatchesDesired(templates []*ec2.LaunchTemplate, templateNam
 	return false
 }
 
-func getLaunchTemplates(ctx context.Context, ec2api *EC2, identifier string) ([]*ec2.LaunchTemplate, error) {
-	output, err := ec2api.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{
+func (l *launchTemplate) getLaunchTemplates(ctx context.Context, identifier string) ([]*ec2.LaunchTemplate, error) {
+	output, err := l.ec2Client.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{
 		Filters: ec2FilterFor(identifier),
 	})
 	if err != nil {

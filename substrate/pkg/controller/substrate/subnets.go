@@ -18,7 +18,7 @@ var (
 )
 
 type subnet struct {
-	ec2api *EC2
+	ec2Client *ec2.EC2
 }
 
 func (s *subnet) resourceName() string {
@@ -29,7 +29,7 @@ func (s *subnet) Create(ctx context.Context, substrate *v1alpha1.Substrate) erro
 	if substrate.Status.VPCID == nil {
 		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
 	}
-	subnets, err := getSubnets(ctx, s.ec2api, substrate.Name)
+	subnets, err := s.getSubnets(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func subnetName(subnet *ec2.Subnet) string {
 }
 
 func (s *subnet) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	subnets, err := getSubnets(ctx, s.ec2api, substrate.Name)
+	subnets, err := s.getSubnets(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (s *subnet) Delete(ctx context.Context, substrate *v1alpha1.Substrate) erro
 }
 
 func (s *subnet) create(ctx context.Context, substrate *v1alpha1.Substrate, az, subnetCIDR, subnetName string) (string, error) {
-	output, err := s.ec2api.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
+	output, err := s.ec2Client.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
 		AvailabilityZone:  aws.String(az),
 		CidrBlock:         aws.String(subnetCIDR),
 		VpcId:             aws.String(*substrate.Status.VPCID),
@@ -122,7 +122,7 @@ func (s *subnet) markSubnetPublic(ctx context.Context, subnetID string) error {
 		},
 		SubnetId: aws.String(subnetID),
 	}
-	if _, err := s.ec2api.ModifySubnetAttribute(attributeInput); err != nil {
+	if _, err := s.ec2Client.ModifySubnetAttribute(attributeInput); err != nil {
 		return fmt.Errorf("modifying subnet attributes, %w", err)
 	}
 	return nil
@@ -130,7 +130,7 @@ func (s *subnet) markSubnetPublic(ctx context.Context, subnetID string) error {
 
 func (s *subnet) deleteSubnets(ctx context.Context, subnets []*ec2.Subnet) error {
 	for _, subnet := range subnets {
-		if _, err := s.ec2api.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
+		if _, err := s.ec2Client.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{
 			SubnetId: subnet.SubnetId,
 		}); err != nil {
 			return fmt.Errorf("deleting subnet, %w", err)
@@ -139,34 +139,35 @@ func (s *subnet) deleteSubnets(ctx context.Context, subnets []*ec2.Subnet) error
 	return nil
 }
 
-func getSubnets(ctx context.Context, ec2api *EC2, identifier string) ([]*ec2.Subnet, error) {
+func (s *subnet) getSubnets(ctx context.Context, identifier string) ([]*ec2.Subnet, error) {
 	input := &ec2.DescribeSubnetsInput{
 		Filters: ec2FilterFor(identifier),
 	}
-	output, err := ec2api.DescribeSubnetsWithContext(ctx, input)
+	output, err := s.ec2Client.DescribeSubnetsWithContext(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("describing subnet, %w", err)
 	}
 	return output.Subnets, nil
 }
 
-func privateSubnetIDs(ctx context.Context, ec2api *EC2, identifier string) ([]string, error) {
-	subnets, err := getSubnets(ctx, ec2api, identifier)
-	if err != nil {
-		return nil, err
-	}
-	result := []string{}
-	for _, subnet := range subnets {
-		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
-			continue
-		}
-		result = append(result, *subnet.SubnetId)
-	}
-	return result, nil
-}
+// UNUSED
+// func (s *subnet) privateSubnetIDs(ctx context.Context, identifier string) ([]string, error) {
+// 	subnets, err := s.getSubnets(ctx, identifier)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	result := []string{}
+// 	for _, subnet := range subnets {
+// 		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
+// 			continue
+// 		}
+// 		result = append(result, *subnet.SubnetId)
+// 	}
+// 	return result, nil
+// }
 
-func publicSubnetIDs(ctx context.Context, ec2api *EC2, identifier string) ([]string, error) {
-	subnets, err := getSubnets(ctx, ec2api, identifier)
+func (s *subnet) publicSubnetIDs(ctx context.Context, identifier string) ([]string, error) {
+	subnets, err := s.getSubnets(ctx, identifier)
 	if err != nil {
 		return nil, err
 	}

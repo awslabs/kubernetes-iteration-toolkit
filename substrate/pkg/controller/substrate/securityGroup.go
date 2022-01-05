@@ -11,12 +11,7 @@ import (
 )
 
 type securityGroup struct {
-	ec2api *EC2
-}
-
-// NewSecurityGroupController returns a controller for managing security-group in AWS
-func NewSecurityGroupController(ec2api *EC2) *securityGroup {
-	return &securityGroup{ec2api: ec2api}
+	ec2Client *ec2.EC2
 }
 
 func (s *securityGroup) resourceName() string {
@@ -27,7 +22,7 @@ func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 	if substrate.Status.VPCID == nil {
 		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
 	}
-	existingGroup, err := getSecurityGroups(ctx, s.ec2api, substrate.Name)
+	existingGroup, err := s.getSecurityGroups(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
@@ -54,11 +49,11 @@ func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 
 // Finalize deletes the resource from AWS
 func (s *securityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	existingGroup, err := getSecurityGroups(ctx, s.ec2api, substrate.Name)
+	existingGroup, err := s.getSecurityGroups(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
-	if _, err := s.ec2api.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
+	if _, err := s.ec2Client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
 		GroupId: existingGroup.GroupId,
 	}); err != nil {
 		return fmt.Errorf("deleting security group, %w", err)
@@ -68,7 +63,7 @@ func (s *securityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrat
 }
 
 func (s *securityGroup) createFor(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.CreateSecurityGroupOutput, error) {
-	result, err := s.ec2api.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
+	result, err := s.ec2Client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
 		Description:       aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
 		GroupName:         aws.String(groupName(substrate.Name)),
 		VpcId:             aws.String(*substrate.Status.VPCID),
@@ -81,7 +76,7 @@ func (s *securityGroup) createFor(ctx context.Context, substrate *v1alpha1.Subst
 }
 
 func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID string) error {
-	if _, err := s.ec2api.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
+	if _, err := s.ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: aws.String(groupID),
 		IpPermissions: []*ec2.IpPermission{{
 			FromPort:   aws.Int64(443),
@@ -100,8 +95,8 @@ func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID string) e
 	return nil
 }
 
-func getSecurityGroups(ctx context.Context, ec2api *EC2, identifier string) (*ec2.SecurityGroup, error) {
-	output, err := ec2api.DescribeSecurityGroups(
+func (s *securityGroup) getSecurityGroups(ctx context.Context, identifier string) (*ec2.SecurityGroup, error) {
+	output, err := s.ec2Client.DescribeSecurityGroups(
 		&ec2.DescribeSecurityGroupsInput{
 			Filters: ec2FilterFor(identifier),
 		},

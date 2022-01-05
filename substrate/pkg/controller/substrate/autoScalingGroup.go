@@ -6,14 +6,17 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
 	"go.uber.org/zap"
 )
 
 type autoScalingGroup struct {
-	ec2api         *EC2
-	autoscalingAPI *AutoScaling
+	ec2Client         *ec2.EC2
+	autoscalingClient *autoscaling.AutoScaling
+	subnet            *subnet
 }
 
 func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
@@ -39,7 +42,7 @@ func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Subst
 		return fmt.Errorf("getting autoscaling groups, %w", err)
 	}
 	if existingASG != nil && aws.StringValue(existingASG.Status) != "Delete in progress" {
-		if _, err := a.autoscalingAPI.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
+		if _, err := a.autoscalingClient.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
 			AutoScalingGroupName: existingASG.AutoScalingGroupName,
 			ForceDelete:          aws.Bool(true),
 		}); err != nil {
@@ -51,14 +54,14 @@ func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Subst
 }
 
 func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	publicSubnets, err := publicSubnetIDs(ctx, a.ec2api, substrate.Name)
+	publicSubnets, err := a.subnet.publicSubnetIDs(ctx, substrate.Name)
 	if err != nil {
 		return err
 	}
 	if len(publicSubnets) == 0 {
 		return fmt.Errorf("public subnets not found")
 	}
-	input := &autoscaling.CreateAutoScalingGroupInput{
+	if _, err := a.autoscalingClient.CreateAutoScalingGroup(&autoscaling.CreateAutoScalingGroupInput{
 		AutoScalingGroupName: aws.String(scalingGroupName(substrate.Name)),
 		DesiredCapacity:      aws.Int64(1),
 		MaxSize:              aws.Int64(1),
@@ -68,15 +71,16 @@ func (a *autoScalingGroup) createAutoScalingGroup(ctx context.Context, substrate
 		},
 		VPCZoneIdentifier: aws.String(strings.Join(publicSubnets, ",")),
 		Tags:              generateAutoScalingTags(substrate.Name, scalingGroupName(substrate.Name)),
-	}
-	if _, err := a.autoscalingAPI.CreateAutoScalingGroup(input); err != nil {
-		return fmt.Errorf("creating autoscaling group, %w", err)
+	}); err != nil {
+		if err.(awserr.Error).Code() != autoscaling.ErrCodeAlreadyExistsFault {
+			return fmt.Errorf("creating autoscaling group, %w", err)
+		}
 	}
 	return nil
 }
 
 func (a *autoScalingGroup) getAutoScalingGroup(ctx context.Context, identifier string) (*autoscaling.Group, error) {
-	output, err := a.autoscalingAPI.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
+	output, err := a.autoscalingClient.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
 		AutoScalingGroupNames: aws.StringSlice([]string{scalingGroupName(identifier)}),
 	})
 	if err != nil {

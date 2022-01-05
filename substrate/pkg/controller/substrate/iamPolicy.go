@@ -25,12 +25,7 @@ const (
 )
 
 type iamPolicy struct {
-	iam *IAM
-}
-
-// NewIAMPolicyController returns a controller for managing IAM policy in AWS
-func NewIAMPolicyController(iam *IAM) *iamPolicy {
-	return &iamPolicy{iam: iam}
+	iamClient *iam.IAM
 }
 
 // Create will check if the resource exists is AWS if it does sync status,
@@ -44,7 +39,7 @@ func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) e
 	}
 	if !policyFoundMatchesDesired(output, substrateNodePolicy) {
 		// Policy is not found or doesn't match the desired policy
-		if _, err := i.iam.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
+		if _, err := i.iamClient.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
 			RoleName:       aws.String(roleName(substrate.Name)),
 			PolicyName:     aws.String(policyName(substrate.Name)),
 			PolicyDocument: aws.String(substrateNodePolicy),
@@ -59,7 +54,7 @@ func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) e
 
 // Delete deletes the resource from AWS
 func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	if _, err := i.iam.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
+	if _, err := i.iamClient.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
 		RoleName:   aws.String(roleName(substrate.Name)),
 		PolicyName: aws.String(policyName(substrate.Name)),
 	}); err != nil {
@@ -71,7 +66,7 @@ func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) e
 }
 
 func (i *iamPolicy) getRolePolicy(ctx context.Context, policy, role string) (*iam.GetRolePolicyOutput, error) {
-	output, err := i.iam.GetRolePolicyWithContext(ctx, &iam.GetRolePolicyInput{
+	output, err := i.iamClient.GetRolePolicyWithContext(ctx, &iam.GetRolePolicyInput{
 		PolicyName: aws.String(policy),
 		RoleName:   aws.String(role),
 	})

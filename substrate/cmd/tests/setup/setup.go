@@ -9,13 +9,13 @@ import (
 )
 
 func main() {
-	err := substrate.Finalize(context.Background(), &v1alpha1.Substrate{
+	ctx := context.Background()
+	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: "testvpc"},
 		Spec: v1alpha1.SubstrateSpec{
 			VPC: &v1alpha1.VPCSpec{CIDR: "10.0.0.0/16"},
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		panic(err)
 	}
 }
