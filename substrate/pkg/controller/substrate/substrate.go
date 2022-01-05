@@ -69,8 +69,7 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 			return fmt.Errorf("failed to create resource, %w", err)
 		}
 	}
-	zap.S().Infof("Successfully created all the resources")
-	fmt.Printf("Time take to provision all resources %v\n", time.Since(start))
+	zap.S().Infof("Successfully created all the resources, time taken %v\n", time.Since(start))
 	// create the kubeconfig file for this substrate cluster
 	return nil
 }
@@ -81,7 +80,7 @@ func (c *Controller) Finalize(ctx context.Context, substrate *v1alpha1.Substrate
 			return fmt.Errorf("failed to create a resource, %w", err)
 		}
 	}
-	zap.S().Infof("Successfully created all the resources")
+	zap.S().Infof("Successfully deleted all the resources")
 	// create the kubeconfig file for this substrate cluster
 	return nil
 }

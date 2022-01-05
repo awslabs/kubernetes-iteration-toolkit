@@ -53,6 +53,9 @@ func (s *securityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrat
 	if err != nil {
 		return err
 	}
+	if existingGroup == nil {
+		return nil
+	}
 	if _, err := s.ec2Client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
 		GroupId: existingGroup.GroupId,
 	}); err != nil {

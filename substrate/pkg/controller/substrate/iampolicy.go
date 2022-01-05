@@ -46,7 +46,7 @@ func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) e
 		}); err != nil {
 			return fmt.Errorf("adding policy to role, %w", err)
 		}
-		zap.S().Infof("Successfully added policy %v to role %v", policyName, roleName)
+		zap.S().Infof("Successfully added policy %v to role %v", policyName(substrate.Name), roleName(substrate.Name))
 		return nil
 	}
 	return nil
@@ -57,11 +57,11 @@ func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) e
 	if _, err := i.iamClient.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
 		RoleName:   aws.String(roleName(substrate.Name)),
 		PolicyName: aws.String(policyName(substrate.Name)),
-	}); err != nil {
+	}); err != nil && !iamResourceNotFound(err) {
 		zap.S().Errorf("Failed to delete role policy, %v", err)
 		return err
 	}
-	zap.S().Infof("Successfully removed policy %s from role %s", policyName, roleName)
+	zap.S().Infof("Successfully removed policy %s from role %s\n", policyName(substrate.Name), roleName(substrate.Name))
 	return nil
 }
 

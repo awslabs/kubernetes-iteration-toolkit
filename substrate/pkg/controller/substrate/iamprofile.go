@@ -41,7 +41,7 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		}); err != nil {
 			return fmt.Errorf("adding role to instance profile, %w", err)
 		}
-		zap.S().Debugf("Successfully added role %v to instance profile %v", roleName, profileName)
+		zap.S().Infof("Successfully added role %v to instance profile %v", roleName(substrate.Name), profileName(substrate.Name))
 	}
 	return nil
 }
@@ -52,14 +52,14 @@ func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 	if _, err := i.iamClient.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName(substrate.Name)),
 		RoleName:            aws.String(roleName(substrate.Name)),
-	}); err != nil {
-		return err
+	}); err != nil && !iamResourceNotFound(err) {
+		return fmt.Errorf("removing instance profile from role err %w,", err)
 	}
 	// Delete the profile
 	if _, err := i.iamClient.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName(substrate.Name)),
-	}); err != nil {
-		return err
+	}); err != nil && !iamResourceNotFound(err) {
+		return fmt.Errorf("deleting instance profile err %w,", err)
 	}
 	return nil
 }
