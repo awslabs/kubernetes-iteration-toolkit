@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type iamProfile struct {
@@ -30,7 +30,7 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 			return fmt.Errorf("creating profile, %w", err)
 		}
 		profile = result.InstanceProfile
-		zap.S().Infof("Successfully created instance profile %v", *result.InstanceProfile.InstanceProfileName)
+		logging.FromContext(ctx).Infof("Successfully created instance profile %v", *result.InstanceProfile.InstanceProfileName)
 	}
 
 	// Add roles to the Instance Profile
@@ -41,7 +41,7 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		}); err != nil {
 			return fmt.Errorf("adding role to instance profile, %w", err)
 		}
-		zap.S().Infof("Successfully added role %v to instance profile %v", roleName(substrate.Name), profileName(substrate.Name))
+		logging.FromContext(ctx).Infof("Successfully added role %v to instance profile %v", roleName(substrate.Name), profileName(substrate.Name))
 	}
 	return nil
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type autoScalingGroup struct {
@@ -29,10 +29,10 @@ func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Subst
 		if err := a.createAutoScalingGroup(ctx, substrate); err != nil {
 			return fmt.Errorf("creating autoscaling groups, %w", err)
 		}
-		zap.S().Infof("Successfully created autoscaling group %v", scalingGroupName(substrate.Name))
+		logging.FromContext(ctx).Infof("Successfully created autoscaling group %v", scalingGroupName(substrate.Name))
 		return nil
 	}
-	zap.S().Debugf("Successfully discovered autoscaling group %v", scalingGroupName(substrate.Name))
+	logging.FromContext(ctx).Debugf("Successfully discovered autoscaling group %v", scalingGroupName(substrate.Name))
 	return nil
 }
 
@@ -48,7 +48,7 @@ func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Subst
 		}); err != nil {
 			return fmt.Errorf("deleting autoscaling group, %w", err)
 		}
-		zap.S().Infof("Successfully deleted auto-scaling-group %v", *existingASG.AutoScalingGroupName)
+		logging.FromContext(ctx).Infof("Successfully deleted auto-scaling-group %v", *existingASG.AutoScalingGroupName)
 	}
 	return nil
 }

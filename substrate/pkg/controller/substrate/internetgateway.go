@@ -21,7 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type internetGateway struct {
@@ -51,7 +51,7 @@ func (i *internetGateway) Create(ctx context.Context, substrate *v1alpha1.Substr
 			return fmt.Errorf("creating internet-gateway, %w", err)
 		}
 	} else {
-		zap.S().Debugf("Successfully discovered internet-gateway %v for cluster %v", *igw.InternetGatewayId, substrate.Name)
+		logging.FromContext(ctx).Debugf("Successfully discovered internet-gateway %v for cluster %v", *igw.InternetGatewayId, substrate.Name)
 	}
 	substrate.Status.InternetGatewayID = igw.InternetGatewayId
 	// Check igw is attached to the desired VPC ID
@@ -89,7 +89,7 @@ func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substr
 		}); err != nil {
 			return fmt.Errorf("deleting internet-gateway, %w", err)
 		}
-		zap.S().Infof("Successfully deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, substrate.Name)
+		logging.FromContext(ctx).Infof("Successfully deleted internet-gateway %v for cluster %v", *igw.InternetGatewayId, substrate.Name)
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func (i *internetGateway) createInternetGateway(ctx context.Context, identifier 
 	if err != nil {
 		return nil, err
 	}
-	zap.S().Infof("Successfully created internet-gateway %v for cluster %v", *output.InternetGateway.InternetGatewayId, identifier)
+	logging.FromContext(ctx).Infof("Successfully created internet-gateway %v for cluster %v", *output.InternetGateway.InternetGatewayId, identifier)
 	return output.InternetGateway, nil
 }
 
@@ -112,7 +112,7 @@ func (i *internetGateway) attachInternetGWToVPC(ctx context.Context, igwID, vpcI
 	}); err != nil {
 		return err
 	}
-	zap.S().Infof("Successfully attached internet-gateway %s to VPC ID %s", igwID, vpcID)
+	logging.FromContext(ctx).Infof("Successfully attached internet-gateway %s to VPC ID %s", igwID, vpcID)
 	return nil
 }
 

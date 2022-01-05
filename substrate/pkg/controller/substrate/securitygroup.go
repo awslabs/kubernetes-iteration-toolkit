@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type securityGroup struct {
@@ -43,7 +43,7 @@ func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 	if err := s.addIngressRuleFor(ctx, *substrate.Status.SecurityGroupID); err != nil {
 		return fmt.Errorf("adding ingress rule, %w", err)
 	}
-	zap.S().Infof("Successfully added ingress rules for security group %v", groupName(substrate.Name))
+	logging.FromContext(ctx).Infof("Successfully added ingress rules for security group %v", groupName(substrate.Name))
 	return nil
 }
 

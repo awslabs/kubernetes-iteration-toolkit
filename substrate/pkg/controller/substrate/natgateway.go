@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type natGateway struct {
@@ -42,18 +42,18 @@ func (n *natGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		if err != nil {
 			return fmt.Errorf("creating NAT GW for %v", substrate.Name)
 		}
-		zap.S().Infof("Successfully created nat-gateway %v for cluster %v", *output.NatGateway.NatGatewayId, substrate.Name)
+		logging.FromContext(ctx).Infof("Successfully created nat-gateway %v for cluster %v", *output.NatGateway.NatGatewayId, substrate.Name)
 		// Wait for the NAT Gateway to be available
 		// If we don't wait and add this GW ID to routes in a route table,
 		// it fails saying no NAT GW exists with this ID, although its in pending state.
 		func() {
-			zap.S().Infof("Waiting for nat-gateway %v to be available for cluster %v", *output.NatGateway.NatGatewayId, substrate.Name)
+			logging.FromContext(ctx).Infof("Waiting for nat-gateway %v to be available for cluster %v", *output.NatGateway.NatGatewayId, substrate.Name)
 			if err := n.ec2Client.WaitUntilNatGatewayAvailableWithContext(ctx, &ec2.DescribeNatGatewaysInput{
 				NatGatewayIds: []*string{output.NatGateway.NatGatewayId},
 			}); err != nil {
-				zap.S().Errorf("waiting for NAT GW %s to be available for %v", *output.NatGateway.NatGatewayId, substrate.Name)
+				logging.FromContext(ctx).Errorf("waiting for NAT GW %s to be available for %v", *output.NatGateway.NatGatewayId, substrate.Name)
 			}
-			zap.S().Infof("nat-gateway %v is available for cluster %v", *output.NatGateway.NatGatewayId, substrate.Name)
+			logging.FromContext(ctx).Infof("nat-gateway %v is available for cluster %v", *output.NatGateway.NatGatewayId, substrate.Name)
 		}()
 		substrate.Status.NatGatewayID = output.NatGateway.NatGatewayId
 		return nil
@@ -84,7 +84,7 @@ func (n *natGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 			return err
 		}
 		if deleted {
-			zap.S().Infof("Successfully deleted nat-gateway %v for cluster %v", *natGW.NatGatewayId, substrate.Name)
+			logging.FromContext(ctx).Infof("Successfully deleted nat-gateway %v for cluster %v", *natGW.NatGatewayId, substrate.Name)
 			return nil
 		}
 		maxTry--

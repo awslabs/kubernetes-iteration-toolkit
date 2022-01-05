@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type elasticIP struct {
@@ -30,7 +30,7 @@ func (e *elasticIP) Create(ctx context.Context, substrate *v1alpha1.Substrate) e
 		if err != nil {
 			return fmt.Errorf("allocating elastic IP for %v, %w", substrate.Name, err)
 		}
-		zap.S().Infof("Successfully created elastic-ip %v for cluster %v", *output.AllocationId, substrate.Name)
+		logging.FromContext(ctx).Infof("Successfully created elastic-ip %v for cluster %v", *output.AllocationId, substrate.Name)
 		substrate.Status.ElasticIPID = output.AllocationId
 		return nil
 	}
@@ -51,7 +51,7 @@ func (e *elasticIP) Delete(ctx context.Context, substrate *v1alpha1.Substrate) e
 	}); err != nil {
 		return fmt.Errorf("failed to release elastic IP, %w", err)
 	}
-	zap.S().Infof("Successfully deleted elastic-ip %v for cluster %v", *eip.AllocationId, substrate.Name)
+	logging.FromContext(ctx).Infof("Successfully deleted elastic-ip %v for cluster %v", *eip.AllocationId, substrate.Name)
 	substrate.Status.ElasticIPID = nil
 	return nil
 }

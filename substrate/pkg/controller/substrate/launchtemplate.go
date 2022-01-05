@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type launchTemplate struct {
@@ -33,10 +33,10 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 		if _, err := l.createLaunchTemplate(ctx, substrate); err != nil {
 			return fmt.Errorf("creating launch template, %w", err)
 		}
-		zap.S().Infof("Successfully created launch template %v ", launchTemplateName(substrate.Name))
+		logging.FromContext(ctx).Infof("Successfully created launch template %v ", launchTemplateName(substrate.Name))
 		return nil
 	}
-	zap.S().Debugf("Successfully discovered launch template %v", launchTemplateName(substrate.Name))
+	logging.FromContext(ctx).Debugf("Successfully discovered launch template %v", launchTemplateName(substrate.Name))
 	return nil
 }
 
@@ -52,7 +52,7 @@ func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substra
 		if err != nil {
 			return err
 		}
-		zap.S().Infof("Successfully deleted launch template %v", template.LaunchTemplateName)
+		logging.FromContext(ctx).Infof("Successfully deleted launch template %v", template.LaunchTemplateName)
 	}
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 const (
@@ -37,7 +37,7 @@ func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) e
 	if err != nil && !iamResourceNotFound(err) {
 		return fmt.Errorf("getting role policy, %w", err)
 	}
-	if !policyFoundMatchesDesired(output, substrateNodePolicy) {
+	if !policyFoundMatchesDesired(ctx, output, substrateNodePolicy) {
 		// Policy is not found or doesn't match the desired policy
 		if _, err := i.iamClient.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
 			RoleName:       aws.String(roleName(substrate.Name)),
@@ -46,7 +46,7 @@ func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) e
 		}); err != nil {
 			return fmt.Errorf("adding policy to role, %w", err)
 		}
-		zap.S().Infof("Successfully added policy %v to role %v", policyName(substrate.Name), roleName(substrate.Name))
+		logging.FromContext(ctx).Infof("Successfully added policy %v to role %v", policyName(substrate.Name), roleName(substrate.Name))
 		return nil
 	}
 	return nil
@@ -58,10 +58,10 @@ func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) e
 		RoleName:   aws.String(roleName(substrate.Name)),
 		PolicyName: aws.String(policyName(substrate.Name)),
 	}); err != nil && !iamResourceNotFound(err) {
-		zap.S().Errorf("Failed to delete role policy, %v", err)
+		logging.FromContext(ctx).Errorf("Failed to delete role policy, %v", err)
 		return err
 	}
-	zap.S().Infof("Successfully removed policy %s from role %s\n", policyName(substrate.Name), roleName(substrate.Name))
+	logging.FromContext(ctx).Infof("Successfully removed policy %s from role %s\n", policyName(substrate.Name), roleName(substrate.Name))
 	return nil
 }
 
@@ -76,11 +76,11 @@ func (i *iamPolicy) getRolePolicy(ctx context.Context, policy, role string) (*ia
 	return output, nil
 }
 
-func policyFoundMatchesDesired(output *iam.GetRolePolicyOutput, expectedPolicy string) bool {
+func policyFoundMatchesDesired(ctx context.Context, output *iam.GetRolePolicyOutput, expectedPolicy string) bool {
 	if output != nil {
 		decodedPolicyDoc, err := url.QueryUnescape(*output.PolicyDocument)
 		if err != nil {
-			zap.S().Errorf("Failed to decode policy document, %v", err)
+			logging.FromContext(ctx).Errorf("Failed to decode policy document, %v", err)
 			return false
 		}
 		return decodedPolicyDoc == expectedPolicy

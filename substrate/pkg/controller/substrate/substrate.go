@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 func NewSession() *session.Session {
@@ -63,24 +63,27 @@ type Resource interface {
 }
 
 func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	logging.FromContext(ctx).Infof("Reconciling resources for %s", substrate.Name)
 	start := time.Now()
 	for _, resource := range c.Resources {
 		if err := resource.Create(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create resource, %w", err)
 		}
 	}
-	zap.S().Infof("Successfully created all the resources, time taken %v\n", time.Since(start))
+	logging.FromContext(ctx).Infof("Succeeded after %s", time.Since(start))
 	// create the kubeconfig file for this substrate cluster
 	return nil
 }
 
 func (c *Controller) Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	logging.FromContext(ctx).Infof("Finalizing resources for %s", substrate.Name)
+	start := time.Now()
 	for _, resource := range c.Resources {
 		if err := resource.Delete(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create a resource, %w", err)
 		}
 	}
-	zap.S().Infof("Successfully deleted all the resources")
+	logging.FromContext(ctx).Infof("Succeeded after %s", time.Since(start))
 	// create the kubeconfig file for this substrate cluster
 	return nil
 }

@@ -22,7 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type routeTable struct {
@@ -52,7 +52,7 @@ func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		if err := r.createRouteTables(ctx, substrate); err != nil {
 			return err
 		}
-		zap.S().Infof("Successfully created route table for cluster %v", substrate.Name)
+		logging.FromContext(ctx).Infof("Successfully created route table for cluster %v", substrate.Name)
 		return nil
 	}
 	substrate.Status.PrivateRouteTableID = aws.String(parseTableID(routeTables, privateTableName(substrate.Name)))

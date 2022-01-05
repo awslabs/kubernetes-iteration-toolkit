@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type vpc struct {
@@ -33,7 +33,7 @@ func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 		if err != nil {
 			return fmt.Errorf("creating VPC, %w", err)
 		}
-		zap.S().Infof("Created VPC %v ID %v", substrate.Name, *result.Vpc.VpcId)
+		logging.FromContext(ctx).Infof("Created VPC %v ID %v", substrate.Name, *result.Vpc.VpcId)
 		vpcID = *result.Vpc.VpcId
 	} else {
 		vpcID = *vpc.VpcId

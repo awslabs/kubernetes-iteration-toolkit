@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 type iamRole struct {
@@ -44,10 +44,10 @@ func (i *iamRole) Create(ctx context.Context, substrate *v1alpha1.Substrate) err
 		if err != nil {
 			return fmt.Errorf("creating role, %w", err)
 		}
-		zap.S().Infof("Successfully created role %v", roleName(substrate.Name))
+		logging.FromContext(ctx).Infof("Successfully created role %v", roleName(substrate.Name))
 		return nil
 	}
-	zap.S().Debugf("Successfully discovered role %v", roleName(substrate.Name))
+	logging.FromContext(ctx).Debugf("Successfully discovered role %v", roleName(substrate.Name))
 	return nil
 }
 
@@ -66,7 +66,7 @@ func (i *iamRole) Delete(ctx context.Context, substrate *v1alpha1.Substrate) err
 	}); err != nil {
 		return err
 	}
-	zap.S().Infof("Successfully deleted role %s", roleName(substrate.Name))
+	logging.FromContext(ctx).Infof("Successfully deleted role %s", roleName(substrate.Name))
 	return nil
 }
 

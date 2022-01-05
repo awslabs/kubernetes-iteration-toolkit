@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/apis/v1alpha1"
-	"go.uber.org/zap"
+	"knative.dev/pkg/logging"
 )
 
 var (
@@ -95,7 +95,7 @@ func (s *subnet) Delete(ctx context.Context, substrate *v1alpha1.Substrate) erro
 		if err := s.deleteSubnets(ctx, subnets); err != nil {
 			return err
 		}
-		zap.S().Infof("Successfully deleted Subnets for %v", substrate.Name)
+		logging.FromContext(ctx).Infof("Successfully deleted Subnets for %v", substrate.Name)
 	}
 	substrate.Status.PrivateSubnetIDs = nil
 	substrate.Status.PublicSubnetIDs = nil
