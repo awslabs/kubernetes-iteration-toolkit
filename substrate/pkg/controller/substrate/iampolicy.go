@@ -12,16 +12,24 @@ import (
 )
 
 const (
-	substrateNodePolicy = `{
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Effect": "Allow",
-			"Action": "*",
-			"Resource": "*"
-		}
+	allowIPAttachment = `{
+  "Version": "2012-10-17",
+  "Statement": [
+	{
+	"Sid": "AllowEIPAttachment",
+	"Effect": "Allow",
+	"Resource": [
+		"*"
+	],
+	"Action": [
+		"ec2:AssociateAddress"
 	]
+	}
+  ]
 }`
+	IPAttachmentPolicy = "AllowIPAttachment"
+	ssmPolicy          = "AmazonSSMManagedInstanceCore"
+	policyARNPrefix    = "arn:aws:iam::aws:policy/"
 )
 
 type iamPolicy struct {
@@ -31,37 +39,83 @@ type iamPolicy struct {
 // Create will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with substrate.Status
 func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	// assume role already exists in IAM so we skip checking for role in IAM
-	// check policy exists on the role
-	output, err := i.getRolePolicy(ctx, policyName(substrate.Name), roleName(substrate.Name))
+	for _, policy := range []policyInfo{
+		&inlinePolicy{i, IPAttachmentPolicy, allowIPAttachment},
+		&managedPolicy{i, ssmPolicy},
+	} {
+		if err := policy.attachToRole(ctx, roleName(substrate.Name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type policyInfo interface {
+	attachToRole(ctx context.Context, roleName string) error
+}
+
+type inlinePolicy struct {
+	*iamPolicy
+	policyName string
+	policyDoc  string
+}
+
+func (p *inlinePolicy) attachToRole(ctx context.Context, roleName string) error {
+	output, err := p.getRolePolicy(ctx, p.policyName, roleName)
 	if err != nil && !iamResourceNotFound(err) {
 		return fmt.Errorf("getting role policy, %w", err)
 	}
-	if !policyFoundMatchesDesired(ctx, output, substrateNodePolicy) {
-		// Policy is not found or doesn't match the desired policy
-		if _, err := i.iamClient.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
-			RoleName:       aws.String(roleName(substrate.Name)),
-			PolicyName:     aws.String(policyName(substrate.Name)),
-			PolicyDocument: aws.String(substrateNodePolicy),
-		}); err != nil {
-			return fmt.Errorf("adding policy to role, %w", err)
+	if output != nil {
+		decodedPolicyDoc, err := url.QueryUnescape(*output.PolicyDocument)
+		if err != nil {
+			return fmt.Errorf("Failed to decode policy document, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Successfully added policy %v to role %v", policyName(substrate.Name), roleName(substrate.Name))
-		return nil
+		if decodedPolicyDoc == p.policyDoc {
+			return nil
+		}
+	}
+	if _, err := p.iamClient.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
+		RoleName:       aws.String(roleName),
+		PolicyName:     aws.String(p.policyName),
+		PolicyDocument: aws.String(p.policyDoc),
+	}); err != nil {
+		return fmt.Errorf("adding inline policy to role, %w", err)
+	}
+	return nil
+}
+
+type managedPolicy struct {
+	*iamPolicy
+	policyName string
+}
+
+func (p *managedPolicy) attachToRole(ctx context.Context, roleName string) error {
+	output, err := p.getRolePolicy(ctx, p.policyName, roleName)
+	if err != nil && !iamResourceNotFound(err) {
+		return fmt.Errorf("getting role policy, %w", err)
+	}
+	if output == nil || aws.StringValue(output.PolicyName) != p.policyName {
+		if _, err := p.iamClient.AttachRolePolicyWithContext(ctx, &iam.AttachRolePolicyInput{
+			RoleName:  aws.String(roleName),
+			PolicyArn: aws.String(policyARNPrefix + p.policyName),
+		}); err != nil {
+			return fmt.Errorf("adding managed policy to role, %w", err)
+		}
 	}
 	return nil
 }
 
 // Delete deletes the resource from AWS
 func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	if _, err := i.iamClient.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
-		RoleName:   aws.String(roleName(substrate.Name)),
-		PolicyName: aws.String(policyName(substrate.Name)),
-	}); err != nil && !iamResourceNotFound(err) {
-		logging.FromContext(ctx).Errorf("Failed to delete role policy, %v", err)
-		return err
+	for _, policy := range []string{IPAttachmentPolicy, ssmPolicy} {
+		if _, err := i.iamClient.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
+			RoleName:   aws.String(roleName(substrate.Name)),
+			PolicyName: aws.String(policy),
+		}); err != nil && !iamResourceNotFound(err) {
+			return fmt.Errorf("Failed to delete role policy, %v, %w", policy, err)
+		}
+		logging.FromContext(ctx).Infof("Successfully removed policy %s from role %s", policy, roleName(substrate.Name))
 	}
-	logging.FromContext(ctx).Infof("Successfully removed policy %s from role %s\n", policyName(substrate.Name), roleName(substrate.Name))
 	return nil
 }
 
@@ -74,20 +128,4 @@ func (i *iamPolicy) getRolePolicy(ctx context.Context, policy, role string) (*ia
 		return nil, err
 	}
 	return output, nil
-}
-
-func policyFoundMatchesDesired(ctx context.Context, output *iam.GetRolePolicyOutput, expectedPolicy string) bool {
-	if output != nil {
-		decodedPolicyDoc, err := url.QueryUnescape(*output.PolicyDocument)
-		if err != nil {
-			logging.FromContext(ctx).Errorf("Failed to decode policy document, %v", err)
-			return false
-		}
-		return decodedPolicyDoc == expectedPolicy
-	}
-	return false
-}
-
-func policyName(identifier string) string {
-	return fmt.Sprintf("substrate-node-policy-for-%s", identifier)
 }

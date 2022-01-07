@@ -21,7 +21,7 @@ func (n *natGateway) resourceName() string {
 
 func (n *natGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	// Get elastic IP ID
-	if substrate.Status.ElasticIPID == nil {
+	if substrate.Status.ElasticIPIDForNAT == nil {
 		return fmt.Errorf("elastic IP allocation ID not found for %v", substrate.Name)
 	}
 	if len(substrate.Status.PublicSubnetIDs) == 0 {
@@ -35,7 +35,7 @@ func (n *natGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	if natGW == nil || *natGW.NatGatewayId == "" {
 		// Create NAT Gateway
 		output, err := n.ec2Client.CreateNatGatewayWithContext(ctx, &ec2.CreateNatGatewayInput{
-			AllocationId:      substrate.Status.ElasticIPID,
+			AllocationId:      substrate.Status.ElasticIPIDForNAT,
 			SubnetId:          aws.String(substrate.Status.PublicSubnetIDs[0]),
 			TagSpecifications: generateEC2Tags(n.resourceName(), substrate.Name),
 		})
@@ -76,6 +76,7 @@ func (n *natGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 		return fmt.Errorf("creating NAT GW %s for %v", *natGW.NatGatewayId, substrate.Name)
 	}
 	// We need to wait for NAT GW to be deleted and SDK doesn't have a wait method for it
+	logging.FromContext(ctx).Infof("Waiting for NAT GW to be deleted")
 	maxTry := 20
 	for maxTry > 0 {
 		time.Sleep(5 * time.Second)
@@ -88,7 +89,6 @@ func (n *natGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 			return nil
 		}
 		maxTry--
-		fmt.Println("Waiting for NAT GW to be deleted")
 	}
 	return fmt.Errorf("timed out while waiting for NAT GW to be deleted")
 }

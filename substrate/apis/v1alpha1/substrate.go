@@ -13,15 +13,17 @@ type SubstrateSpec struct {
 }
 
 type SubstrateStatus struct {
-	VPCID               *string  `json:"vpcID,omitempty"`
-	InternetGatewayID   *string  `json:"internetGatewayID,omitempty"`
-	ElasticIPID         *string  `json:"elasticIPID,omitempty"`
-	NatGatewayID        *string  `json:"natGatewayID,omitempty"`
-	PrivateRouteTableID *string  `json:"privateRouteTableID,omitempty"`
-	PublicRouteTableID  *string  `json:"publicRouteTableID,omitempty"`
-	SecurityGroupID     *string  `json:"securityGroupID,omitempty"`
-	PrivateSubnetIDs    []string `json:"privateSubnetIDs,omitempty"`
-	PublicSubnetIDs     []string `json:"publicSubnetIDs,omitempty"`
+	VPCID                   *string  `json:"vpcID,omitempty"`
+	InternetGatewayID       *string  `json:"internetGatewayID,omitempty"`
+	ElasticIPIDForNAT       *string  `json:"elasticIPIDForNat,omitempty"`
+	ElasticIPIDForAPIServer *string  `json:"elasticIPIDForAPIServer,omitempty"`
+	ElasticIPForAPIServer   *string  `json:"elasticIPIDForAPIServer,omitempty"`
+	NatGatewayID            *string  `json:"natGatewayID,omitempty"`
+	PrivateRouteTableID     *string  `json:"privateRouteTableID,omitempty"`
+	PublicRouteTableID      *string  `json:"publicRouteTableID,omitempty"`
+	SecurityGroupID         *string  `json:"securityGroupID,omitempty"`
+	PrivateSubnetIDs        []string `json:"privateSubnetIDs,omitempty"`
+	PublicSubnetIDs         []string `json:"publicSubnetIDs,omitempty"`
 }
 
 // Substrate is the Schema for the Substrates API

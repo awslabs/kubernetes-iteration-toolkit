@@ -86,11 +86,6 @@ func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID string) e
 			ToPort:     aws.Int64(443),
 			IpProtocol: aws.String("tcp"),
 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
-		}, {
-			FromPort:   aws.Int64(22),
-			ToPort:     aws.Int64(22),
-			IpProtocol: aws.String("tcp"),
-			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
 		}},
 	}); err != nil {
 		return err

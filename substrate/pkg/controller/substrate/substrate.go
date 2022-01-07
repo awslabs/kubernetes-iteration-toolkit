@@ -33,28 +33,32 @@ func NewController(ctx context.Context) *Controller {
 	routeTable := &routeTable{ec2Client}
 	vpc := &vpc{ec2Client}
 	subnet := &subnet{ec2Client}
-
+	apiServer := &KubeAPIServer{}
 	return &Controller{
 		Resources: []Resource{
 			&iamRole{iamClient},
 			&iamPolicy{iamClient},
 			&iamProfile{iamClient},
 			vpc,
-			&elasticIP{ec2Client},
+			&elasticIPForNatGW{&elasticIP{ec2Client}},
+			&elasticIPForAPIServer{&elasticIP{ec2Client}},
 			&internetGateway{ec2Client, vpc},
 			subnet,
 			&securityGroup{ec2Client},
 			&natGateway{ec2Client},
 			routeTable,
 			&routeTableAssociation{ec2Client, routeTable},
-			&launchTemplate{ec2Client, ssmClient},
+			&launchTemplate{ec2Client, ssmClient, apiServer, session.Config.Region},
 			&autoScalingGroup{ec2Client, autoscalingClient, subnet},
+			apiServer,
 		},
+		KubeAPIServer: apiServer,
 	}
 }
 
 type Controller struct {
-	Resources []Resource
+	Resources     []Resource
+	KubeAPIServer *KubeAPIServer
 }
 
 type Resource interface {
@@ -71,14 +75,13 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 		}
 	}
 	logging.FromContext(ctx).Infof("Succeeded after %s", time.Since(start))
-	// create the kubeconfig file for this substrate cluster
 	return nil
 }
 
 func (c *Controller) Finalize(ctx context.Context, substrate *v1alpha1.Substrate) error {
 	logging.FromContext(ctx).Infof("Finalizing resources for %s", substrate.Name)
 	start := time.Now()
-	for _, resource := range c.Resources {
+	for _, resource := range reverse(c.Resources) {
 		if err := resource.Delete(ctx, substrate); err != nil {
 			return fmt.Errorf("failed to create a resource, %w", err)
 		}
@@ -86,4 +89,11 @@ func (c *Controller) Finalize(ctx context.Context, substrate *v1alpha1.Substrate
 	logging.FromContext(ctx).Infof("Succeeded after %s", time.Since(start))
 	// create the kubeconfig file for this substrate cluster
 	return nil
+}
+
+func reverse(resources []Resource) []Resource {
+	for i, j := 0, len(resources)-1; i < j; i, j = i+1, j-1 {
+		resources[i], resources[j] = resources[j], resources[i]
+	}
+	return resources
 }
