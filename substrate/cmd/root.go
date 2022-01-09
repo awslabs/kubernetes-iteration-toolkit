@@ -16,16 +16,17 @@ limitations under the License.
 package main
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"knative.dev/pkg/logging"
-	"knative.dev/pkg/signals"
 )
 
 func main() {
-	ctx := signals.NewContext()
-	logger, _ := zap.NewDevelopment()
+	ctx := context.Background()
+	logger, _ := zap.NewDevelopment(zap.WithCaller(false))
 	ctx = logging.WithLogger(ctx, logger.Sugar())
 	runtime.Must(rootCmd.ExecuteContext(ctx))
 }
