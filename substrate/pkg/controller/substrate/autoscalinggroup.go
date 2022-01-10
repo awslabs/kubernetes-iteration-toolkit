@@ -40,7 +40,7 @@ func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Subst
 	if _, err := a.autoscalingClient.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
 		AutoScalingGroupName: aws.String(autoScalingGroupName(substrate.Name)),
 		DesiredCapacity:      aws.Int64(1), MaxSize: aws.Int64(1), MinSize: aws.Int64(1),
-		LaunchTemplate:    &autoscaling.LaunchTemplateSpecification{LaunchTemplateName: aws.String(launchTemplateName(substrate.Name))},
+		LaunchTemplate:    &autoscaling.LaunchTemplateSpecification{LaunchTemplateName: aws.String(launchTemplateName(substrate.Name)), Version: aws.String("$Latest")},
 		VPCZoneIdentifier: aws.String(strings.Join(substrate.Status.PublicSubnetIDs, ",")),
 		Tags: []*autoscaling.Tag{{
 			Key:               aws.String(OwnerTagKey),
@@ -52,7 +52,7 @@ func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Subst
 			PropagateAtLaunch: aws.Bool(true),
 		}},
 	}); err != nil {
-		if err.(awserr.Error).Code() == "ValidationError" { // It can take a few seconds for the instance profile to propagate to the ASG service.
+		if strings.Contains(err.Error(), "Invalid IAM Instance Profile name") { // Instance Profile can take several seconds to propagate
 			return reconcile.Result{Requeue: true}, nil
 		}
 		if err.(awserr.Error).Code() != autoscaling.ErrCodeAlreadyExistsFault {

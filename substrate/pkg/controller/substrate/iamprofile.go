@@ -39,7 +39,6 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	} else {
 		logging.FromContext(ctx).Infof("Created instance profile %s", instanceProfileName(substrate.Name))
 	}
-
 	if _, err := i.iamClient.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
 		InstanceProfileName: aws.String(instanceProfileName(substrate.Name)),
 		RoleName:            aws.String(roleName(substrate.Name)),
