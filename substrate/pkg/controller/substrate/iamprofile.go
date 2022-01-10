@@ -27,11 +27,11 @@ import (
 )
 
 type iamProfile struct {
-	iamClient *iam.IAM
+	IAM *iam.IAM
 }
 
 func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if _, err := i.iamClient.CreateInstanceProfileWithContext(ctx, &iam.CreateInstanceProfileInput{InstanceProfileName: aws.String(instanceProfileName(substrate.Name))}); err != nil {
+	if _, err := i.IAM.CreateInstanceProfileWithContext(ctx, &iam.CreateInstanceProfileInput{InstanceProfileName: aws.String(instanceProfileName(substrate.Name))}); err != nil {
 		if err.(awserr.Error).Code() != iam.ErrCodeEntityAlreadyExistsException {
 			return reconcile.Result{}, fmt.Errorf("creating instance profile, %w", err)
 		}
@@ -39,7 +39,7 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	} else {
 		logging.FromContext(ctx).Infof("Created instance profile %s", instanceProfileName(substrate.Name))
 	}
-	if _, err := i.iamClient.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
+	if _, err := i.IAM.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
 		InstanceProfileName: aws.String(instanceProfileName(substrate.Name)),
 		RoleName:            aws.String(roleName(substrate.Name)),
 	}); err != nil {
@@ -54,7 +54,7 @@ func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 }
 
 func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if _, err := i.iamClient.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
+	if _, err := i.IAM.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
 		InstanceProfileName: aws.String(instanceProfileName(substrate.Name)),
 		RoleName:            aws.String(roleName(substrate.Name)),
 	}); err != nil {
@@ -64,7 +64,7 @@ func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 	} else {
 		logging.FromContext(ctx).Infof("Deleted role %s from instance profile %s", roleName(substrate.Name), instanceProfileName(substrate.Name))
 	}
-	if _, err := i.iamClient.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{InstanceProfileName: aws.String(instanceProfileName(substrate.Name))}); err != nil {
+	if _, err := i.IAM.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{InstanceProfileName: aws.String(instanceProfileName(substrate.Name))}); err != nil {
 		if err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
 			return reconcile.Result{}, fmt.Errorf("deleting instance profile %w,", err)
 		}

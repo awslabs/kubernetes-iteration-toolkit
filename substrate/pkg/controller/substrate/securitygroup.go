@@ -22,12 +22,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type securityGroup struct {
-	ec2Client *ec2.EC2
+	EC2 *ec2.EC2
 }
 
 func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
@@ -39,17 +40,12 @@ func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 		return reconcile.Result{}, err
 	}
 	substrate.Status.SecurityGroupID = securityGroup.GroupId
-	if _, err := s.ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
+	if _, err := s.EC2.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: securityGroup.GroupId,
 		IpPermissions: []*ec2.IpPermission{{
 			IpProtocol: aws.String("tcp"),
 			FromPort:   aws.Int64(443),
 			ToPort:     aws.Int64(443),
-			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
-		}, {
-			FromPort:   aws.Int64(22),
-			ToPort:     aws.Int64(22),
-			IpProtocol: aws.String("tcp"),
 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
 		}},
 	}); err != nil {
@@ -64,7 +60,7 @@ func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 }
 
 func (s *securityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.SecurityGroup, error) {
-	describeSecurityGroupsOutput, err := s.ec2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: filtersFor(substrate.Name, securityGroupName(substrate.Name))})
+	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(substrate.Name, securityGroupName(substrate.Name))})
 	if err != nil {
 		return nil, fmt.Errorf("describing security groups, %w", err)
 	}
@@ -72,11 +68,11 @@ func (s *securityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrat
 		logging.FromContext(ctx).Infof("Found security group %s", securityGroupName(substrate.Name))
 		return describeSecurityGroupsOutput.SecurityGroups[0], nil
 	}
-	createSecurityGroupOutput, err := s.ec2Client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
+	createSecurityGroupOutput, err := s.EC2.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
 		Description:       aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
 		GroupName:         aws.String(securityGroupName(substrate.Name)),
 		VpcId:             substrate.Status.VPCID,
-		TagSpecifications: tagsFor(ec2.ResourceTypeSecurityGroup, substrate.Name, securityGroupName(substrate.Name)),
+		TagSpecifications: discovery.Tags(ec2.ResourceTypeSecurityGroup, substrate.Name, securityGroupName(substrate.Name)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating security group, %w", err)
@@ -87,12 +83,12 @@ func (s *securityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrat
 
 // Finalize deletes the resource from AWS
 func (s *securityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeSecurityGroupsOutput, err := s.ec2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: filtersFor(substrate.Name, securityGroupName(substrate.Name))})
+	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(substrate.Name, securityGroupName(substrate.Name))})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing security groups, %w", err)
 	}
 	for _, securityGroup := range describeSecurityGroupsOutput.SecurityGroups {
-		if _, err := s.ec2Client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{GroupId: securityGroup.GroupId}); err != nil {
+		if _, err := s.EC2.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{GroupId: securityGroup.GroupId}); err != nil {
 			if err.(awserr.Error).Code() == "DependencyViolation" {
 				return reconcile.Result{Requeue: true}, nil
 			}

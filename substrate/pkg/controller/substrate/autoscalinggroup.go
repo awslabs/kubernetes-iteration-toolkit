@@ -22,28 +22,27 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type autoScalingGroup struct {
-	ec2Client         *ec2.EC2
-	autoscalingClient *autoscaling.AutoScaling
+	AutoScaling *autoscaling.AutoScaling
 }
 
 func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if len(substrate.Status.PublicSubnetIDs) == 0 {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	if _, err := a.autoscalingClient.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
+	if _, err := a.AutoScaling.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
 		AutoScalingGroupName: aws.String(autoScalingGroupName(substrate.Name)),
 		DesiredCapacity:      aws.Int64(1), MaxSize: aws.Int64(1), MinSize: aws.Int64(1),
 		LaunchTemplate:    &autoscaling.LaunchTemplateSpecification{LaunchTemplateName: aws.String(launchTemplateName(substrate.Name)), Version: aws.String("$Latest")},
 		VPCZoneIdentifier: aws.String(strings.Join(substrate.Status.PublicSubnetIDs, ",")),
 		Tags: []*autoscaling.Tag{{
-			Key:               aws.String(OwnerTagKey),
+			Key:               aws.String(discovery.OwnerTagKey),
 			Value:             aws.String(substrate.Name),
 			PropagateAtLaunch: aws.Bool(true),
 		}, {
@@ -66,7 +65,7 @@ func (a *autoScalingGroup) Create(ctx context.Context, substrate *v1alpha1.Subst
 }
 
 func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	autoscalingGroupsOutput, err := a.autoscalingClient.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
+	autoscalingGroupsOutput, err := a.AutoScaling.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
 		AutoScalingGroupNames: aws.StringSlice([]string{autoScalingGroupName(substrate.Name)}),
 	})
 	if err != nil {
@@ -76,7 +75,7 @@ func (a *autoScalingGroup) Delete(ctx context.Context, substrate *v1alpha1.Subst
 		if aws.StringValue(group.Status) == "Delete in progress" {
 			continue
 		}
-		if _, err := a.autoscalingClient.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
+		if _, err := a.AutoScaling.DeleteAutoScalingGroupWithContext(ctx, &autoscaling.DeleteAutoScalingGroupInput{
 			AutoScalingGroupName: group.AutoScalingGroupName,
 			ForceDelete:          aws.Bool(true),
 		}); err != nil {

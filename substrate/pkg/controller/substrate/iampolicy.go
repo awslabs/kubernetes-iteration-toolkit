@@ -40,19 +40,19 @@ const (
 )
 
 type iamPolicy struct {
-	iamClient *iam.IAM
+	IAM *iam.IAM
 }
 
 // Create will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with substrate.Status
 func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if _, err := i.iamClient.GetRoleWithContext(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName(substrate.Name))}); err != nil {
+	if _, err := i.IAM.GetRoleWithContext(ctx, &iam.GetRoleInput{RoleName: aws.String(roleName(substrate.Name))}); err != nil {
 		if err.(awserr.Error).Code() == iam.ErrCodeNoSuchEntityException {
 			return reconcile.Result{Requeue: true}, nil
 		}
 		return reconcile.Result{}, fmt.Errorf("getting role, %w", err)
 	}
-	if _, err := i.iamClient.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
+	if _, err := i.IAM.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{
 		RoleName:       aws.String(roleName(substrate.Name)),
 		PolicyName:     aws.String(policyName(substrate.Name)),
 		PolicyDocument: aws.String(substrateNodePolicy),
@@ -65,7 +65,7 @@ func (i *iamPolicy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 
 // Delete deletes the resource from AWS
 func (i *iamPolicy) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if _, err := i.iamClient.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
+	if _, err := i.IAM.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{
 		RoleName:   aws.String(roleName(substrate.Name)),
 		PolicyName: aws.String(policyName(substrate.Name)),
 	}); err != nil {

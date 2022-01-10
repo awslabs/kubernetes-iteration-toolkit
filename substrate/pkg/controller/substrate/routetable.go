@@ -22,12 +22,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type routeTable struct {
-	ec2Client *ec2.EC2
+	EC2 *ec2.EC2
 }
 
 func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
@@ -48,7 +49,7 @@ func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 }
 
 func (r *routeTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name string) (*ec2.RouteTable, error) {
-	describeRouteTablesOutput, err := r.ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: filtersFor(substrate.Name, name)})
+	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate.Name, name)})
 	if err != nil {
 		return nil, fmt.Errorf("describing route tables, %w", err)
 	}
@@ -56,9 +57,9 @@ func (r *routeTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 		logging.FromContext(ctx).Infof("Found route table %s", name)
 		return describeRouteTablesOutput.RouteTables[0], nil
 	}
-	createRouteTableOutput, err := r.ec2Client.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
+	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
 		VpcId:             substrate.Status.VPCID,
-		TagSpecifications: tagsFor(ec2.ResourceTypeRouteTable, substrate.Name, name),
+		TagSpecifications: discovery.Tags(ec2.ResourceTypeRouteTable, substrate.Name, name),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating route table, %w", err)
@@ -68,7 +69,7 @@ func (r *routeTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 }
 
 func (r *routeTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeRouteTablesOutput, err := r.ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: filtersFor(substrate.Name)})
+	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate.Name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing route tables, %w", err)
 	}
@@ -76,7 +77,7 @@ func (r *routeTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 		return reconcile.Result{}, nil
 	}
 	for _, routeTable := range describeRouteTablesOutput.RouteTables {
-		if _, err := r.ec2Client.DeleteRouteTableWithContext(ctx, &ec2.DeleteRouteTableInput{RouteTableId: routeTable.RouteTableId}); err != nil {
+		if _, err := r.EC2.DeleteRouteTableWithContext(ctx, &ec2.DeleteRouteTableInput{RouteTableId: routeTable.RouteTableId}); err != nil {
 			if err.(awserr.Error).Code() == "DependencyViolation" {
 				return reconcile.Result{Requeue: true}, nil
 			}

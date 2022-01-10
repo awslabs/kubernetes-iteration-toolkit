@@ -22,16 +22,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type vpc struct {
-	ec2Client *ec2.EC2
+	EC2 *ec2.EC2
 }
 
 func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeVpcsOutput, err := v.ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: filtersFor(substrate.Name)})
+	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate.Name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
@@ -40,9 +41,9 @@ func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 		logging.FromContext(ctx).Infof("Found vpc %s", aws.StringValue(substrate.Status.VPCID))
 		return reconcile.Result{}, nil
 	}
-	createVpcOutput, err := v.ec2Client.CreateVpc(&ec2.CreateVpcInput{
+	createVpcOutput, err := v.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock:         aws.String(substrate.Spec.VPC.CIDR),
-		TagSpecifications: tagsFor(ec2.ResourceTypeVpc, substrate.Name, substrate.Name),
+		TagSpecifications: discovery.Tags(ec2.ResourceTypeVpc, substrate.Name, substrate.Name),
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)
@@ -53,12 +54,12 @@ func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 }
 
 func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeVpcsOutput, err := v.ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: filtersFor(substrate.Name)})
+	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate.Name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
 	for _, vpc := range describeVpcsOutput.Vpcs {
-		if _, err := v.ec2Client.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{VpcId: vpc.VpcId}); err != nil {
+		if _, err := v.EC2.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{VpcId: vpc.VpcId}); err != nil {
 			if err.(awserr.Error).Code() == "DependencyViolation" {
 				return reconcile.Result{Requeue: true}, nil
 			}

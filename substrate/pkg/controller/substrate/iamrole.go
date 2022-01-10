@@ -27,7 +27,7 @@ import (
 )
 
 type iamRole struct {
-	iamClient *iam.IAM
+	IAM *iam.IAM
 }
 
 var assumeRolePolicyDocument = `{
@@ -46,7 +46,7 @@ var assumeRolePolicyDocument = `{
 // Create will check if the resource exists is AWS if it does sync status,
 // else create the resource and then sync status with the substrate.Status
 func (i *iamRole) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if _, err := i.iamClient.CreateRole(&iam.CreateRoleInput{
+	if _, err := i.IAM.CreateRole(&iam.CreateRoleInput{
 		AssumeRolePolicyDocument: aws.String(assumeRolePolicyDocument),
 		RoleName:                 aws.String(roleName(substrate.Name)),
 	}); err != nil {
@@ -62,7 +62,7 @@ func (i *iamRole) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 
 // Finalize deletes the resource from AWS
 func (i *iamRole) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if _, err := i.iamClient.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
+	if _, err := i.IAM.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{
 		RoleName: aws.String(roleName(substrate.Name)),
 	}); err != nil {
 		if err.(awserr.Error).Code() == iam.ErrCodeDeleteConflictException {

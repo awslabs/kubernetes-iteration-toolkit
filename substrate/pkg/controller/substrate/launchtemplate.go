@@ -24,20 +24,21 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type launchTemplate struct {
-	ec2Client *ec2.EC2
-	ssmClient *ssm.SSM
+	EC2 *ec2.EC2
+	SSM *ssm.SSM
 }
 
 func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.SecurityGroupID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	parameterOutput, err := l.ssmClient.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2")})
+	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2")})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("getting ssm parameter, %w", err)
 	}
@@ -71,9 +72,9 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 			sudo systemctl restart docker`,
 		))),
 	}
-	if _, err := l.ec2Client.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
+	if _, err := l.EC2.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateName: aws.String(launchTemplateName(substrate.Name)),
-		TagSpecifications:  tagsFor(ec2.ResourceTypeLaunchTemplate, substrate.Name, substrate.Name),
+		TagSpecifications:  discovery.Tags(ec2.ResourceTypeLaunchTemplate, substrate.Name, substrate.Name),
 		LaunchTemplateData: launchTemplateData,
 	}); err != nil {
 		if err.(awserr.Error).Code() != "InvalidLaunchTemplateName.AlreadyExistsException" {
@@ -83,7 +84,7 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 	} else {
 		logging.FromContext(ctx).Infof("Created launch template %s", launchTemplateName(substrate.Name))
 	}
-	if _, err := l.ec2Client.CreateLaunchTemplateVersionWithContext(ctx, &ec2.CreateLaunchTemplateVersionInput{
+	if _, err := l.EC2.CreateLaunchTemplateVersionWithContext(ctx, &ec2.CreateLaunchTemplateVersionInput{
 		LaunchTemplateName: aws.String(launchTemplateName(substrate.Name)),
 		LaunchTemplateData: launchTemplateData,
 	}); err != nil {
@@ -94,7 +95,7 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 }
 
 func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	launchTemplatesOutput, err := l.ec2Client.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{Filters: filtersFor(substrate.Name, substrate.Name)})
+	launchTemplatesOutput, err := l.EC2.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{Filters: discovery.Filters(substrate.Name, substrate.Name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing launch templates, %w", err)
 	}
@@ -102,7 +103,7 @@ func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substra
 		return reconcile.Result{}, nil
 	}
 	for _, launchTemplate := range launchTemplatesOutput.LaunchTemplates {
-		if _, err := l.ec2Client.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{LaunchTemplateId: launchTemplate.LaunchTemplateId}); err != nil {
+		if _, err := l.EC2.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{LaunchTemplateId: launchTemplate.LaunchTemplateId}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("deleting launch template, %w", err)
 		}
 		logging.FromContext(ctx).Infof("Deleted launch template %v", aws.StringValue(launchTemplate.LaunchTemplateId))

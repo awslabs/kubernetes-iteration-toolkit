@@ -36,7 +36,7 @@ func init() {
 func Apply(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	start := time.Now()
-	name := "test"
+	name := "test-substrate"
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1alpha1.SubstrateSpec{
