@@ -1,3 +1,17 @@
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package substrate
 
 import (
@@ -5,84 +19,61 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type iamProfile struct {
 	iamClient *iam.IAM
 }
 
-// Create will check if the resource exists is AWS if it does sync status,
-// else create the resource and then sync status with substrate.Status
-func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	profile, err := i.getInstanceProfile(ctx, profileName(substrate.Name))
-	if err != nil {
-		return fmt.Errorf("getting instance profile, %w", err)
-	}
-	if profile == nil {
-		// Create profile in IAM
-		result, err := i.iamClient.CreateInstanceProfile(&iam.CreateInstanceProfileInput{
-			InstanceProfileName: aws.String(profileName(substrate.Name)),
-		})
-		if err != nil {
-			return fmt.Errorf("creating profile, %w", err)
+func (i *iamProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if _, err := i.iamClient.CreateInstanceProfileWithContext(ctx, &iam.CreateInstanceProfileInput{InstanceProfileName: aws.String(instanceProfileName(substrate.Name))}); err != nil {
+		if err.(awserr.Error).Code() != iam.ErrCodeEntityAlreadyExistsException {
+			return reconcile.Result{}, fmt.Errorf("creating instance profile, %w", err)
 		}
-		profile = result.InstanceProfile
-		logging.FromContext(ctx).Infof("Successfully created instance profile %v", *result.InstanceProfile.InstanceProfileName)
+		logging.FromContext(ctx).Infof("Found instance profile %s", instanceProfileName(substrate.Name))
+	} else {
+		logging.FromContext(ctx).Infof("Created instance profile %s", instanceProfileName(substrate.Name))
 	}
-
-	// Add roles to the Instance Profile
-	if !rolesContains(profile, roleName(substrate.Name)) {
-		if _, err := i.iamClient.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
-			InstanceProfileName: aws.String(profileName(substrate.Name)),
-			RoleName:            aws.String(roleName(substrate.Name)),
-		}); err != nil {
-			return fmt.Errorf("adding role to instance profile, %w", err)
-		}
-		logging.FromContext(ctx).Infof("Successfully added role %v to instance profile %v", roleName(substrate.Name), profileName(substrate.Name))
-	}
-	return nil
-}
-
-// Delete deletes the resource from AWS
-func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	// Remove role from profile
-	if _, err := i.iamClient.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
-		InstanceProfileName: aws.String(profileName(substrate.Name)),
+	if _, err := i.iamClient.AddRoleToInstanceProfile(&iam.AddRoleToInstanceProfileInput{
+		InstanceProfileName: aws.String(instanceProfileName(substrate.Name)),
 		RoleName:            aws.String(roleName(substrate.Name)),
-	}); err != nil && !iamResourceNotFound(err) {
-		return fmt.Errorf("removing instance profile from role err %w,", err)
-	}
-	// Delete the profile
-	if _, err := i.iamClient.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{
-		InstanceProfileName: aws.String(profileName(substrate.Name)),
-	}); err != nil && !iamResourceNotFound(err) {
-		return fmt.Errorf("deleting instance profile err %w,", err)
-	}
-	return nil
-}
-
-func (i *iamProfile) getInstanceProfile(ctx context.Context, profileName string) (*iam.InstanceProfile, error) {
-	output, err := i.iamClient.GetInstanceProfileWithContext(ctx, &iam.GetInstanceProfileInput{
-		InstanceProfileName: aws.String(profileName),
-	})
-	if iamResourceNotFound(err) {
-		return nil, nil
-	}
-	return output.InstanceProfile, err
-}
-
-func rolesContains(profile *iam.InstanceProfile, roleName string) bool {
-	for _, role := range profile.Roles {
-		if aws.StringValue(role.RoleName) == roleName {
-			return true
+	}); err != nil {
+		if err.(awserr.Error).Code() != iam.ErrCodeLimitExceededException {
+			return reconcile.Result{}, fmt.Errorf("adding role to instance profile, %w", err)
 		}
+		logging.FromContext(ctx).Infof("Found role %s on instance profile %s", roleName(substrate.Name), instanceProfileName(substrate.Name))
+	} else {
+		logging.FromContext(ctx).Infof("Added role %s to instance profile %s", roleName(substrate.Name), instanceProfileName(substrate.Name))
 	}
-	return false
+	return reconcile.Result{}, nil
 }
 
-func profileName(identifier string) string {
+func (i *iamProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if _, err := i.iamClient.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{
+		InstanceProfileName: aws.String(instanceProfileName(substrate.Name)),
+		RoleName:            aws.String(roleName(substrate.Name)),
+	}); err != nil {
+		if err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+			return reconcile.Result{}, fmt.Errorf("removing instance profile from role %w,", err)
+		}
+	} else {
+		logging.FromContext(ctx).Infof("Deleted role %s from instance profile %s", roleName(substrate.Name), instanceProfileName(substrate.Name))
+	}
+	if _, err := i.iamClient.DeleteInstanceProfileWithContext(ctx, &iam.DeleteInstanceProfileInput{InstanceProfileName: aws.String(instanceProfileName(substrate.Name))}); err != nil {
+		if err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+			return reconcile.Result{}, fmt.Errorf("deleting instance profile %w,", err)
+		}
+	} else {
+		logging.FromContext(ctx).Infof("Deleted instance profile %s", instanceProfileName(substrate.Name))
+	}
+	return reconcile.Result{}, nil
+}
+
+func instanceProfileName(identifier string) string {
 	return fmt.Sprintf("substrate-node-profile-for-%s", identifier)
 }

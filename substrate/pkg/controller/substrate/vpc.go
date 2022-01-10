@@ -1,3 +1,17 @@
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package substrate
 
 import (
@@ -5,74 +19,52 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type vpc struct {
 	ec2Client *ec2.EC2
 }
 
-func (v *vpc) resourceName() string {
-	return "vpc"
+func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeVpcsOutput, err := v.ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: filtersFor(substrate.Name)})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
+	}
+	if len(describeVpcsOutput.Vpcs) > 0 {
+		substrate.Status.VPCID = describeVpcsOutput.Vpcs[0].VpcId
+		logging.FromContext(ctx).Infof("Found vpc %s", aws.StringValue(substrate.Status.VPCID))
+		return reconcile.Result{}, nil
+	}
+	createVpcOutput, err := v.ec2Client.CreateVpc(&ec2.CreateVpcInput{
+		CidrBlock:         aws.String(substrate.Spec.VPC.CIDR),
+		TagSpecifications: tagsFor(ec2.ResourceTypeVpc, substrate.Name, substrate.Name),
+	})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)
+	}
+	substrate.Status.VPCID = createVpcOutput.Vpc.VpcId
+	logging.FromContext(ctx).Infof("Created vpc %s", aws.StringValue(substrate.Status.VPCID))
+	return reconcile.Result{}, err
 }
 
-func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	vpc, err := v.getVPC(ctx, substrate.Name)
+func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeVpcsOutput, err := v.ec2Client.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: filtersFor(substrate.Name)})
 	if err != nil {
-		return err
+		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
-	// vpc doesn't exist create VPC
-	vpcID := ""
-	if vpc == nil || *vpc.VpcId == "" {
-		result, err := v.ec2Client.CreateVpc(&ec2.CreateVpcInput{
-			CidrBlock:         aws.String(substrate.Spec.VPC.CIDR),
-			TagSpecifications: generateEC2Tags(v.resourceName(), substrate.Name),
-		})
-		if err != nil {
-			return fmt.Errorf("creating VPC, %w", err)
+	for _, vpc := range describeVpcsOutput.Vpcs {
+		if _, err := v.ec2Client.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{VpcId: vpc.VpcId}); err != nil {
+			if err.(awserr.Error).Code() == "DependencyViolation" {
+				return reconcile.Result{Requeue: true}, nil
+			}
+			return reconcile.Result{}, fmt.Errorf("deleting vpc, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Created VPC %v ID %v", substrate.Name, *result.Vpc.VpcId)
-		vpcID = *result.Vpc.VpcId
-	} else {
-		vpcID = *vpc.VpcId
+		logging.FromContext(ctx).Infof("Deleted vpc %s", aws.StringValue(vpc.VpcId))
 	}
-	substrate.Status.VPCID = aws.String(vpcID)
-	return err
-}
-
-func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	vpc, err := v.getVPC(ctx, substrate.Name)
-	if err != nil {
-		return err
-	}
-	// vpc doesn't exist, return
-	if vpc == nil || *vpc.VpcId == "" {
-		return nil
-	}
-	if _, err := v.ec2Client.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{
-		VpcId: vpc.VpcId,
-	}); err != nil {
-		return fmt.Errorf("deleting vpc, %w", err)
-	}
-	return nil
-}
-
-func (v *vpc) getVPC(ctx context.Context, identifier string) (*ec2.Vpc, error) {
-	input := &ec2.DescribeVpcsInput{
-		Filters: ec2FilterFor(identifier),
-	}
-	output, err := v.ec2Client.DescribeVpcsWithContext(ctx, input)
-	if err != nil {
-		return nil, fmt.Errorf("describing VPC for %v, err: %w", identifier, err)
-	}
-	// Check if VPC doesn't exist return no error
-	if len(output.Vpcs) == 0 {
-		return nil, nil
-	}
-	if len(output.Vpcs) > 1 {
-		return nil, fmt.Errorf("expected to find one VPC, but found %v", len(output.Vpcs))
-	}
-	return output.Vpcs[0], nil
+	return reconcile.Result{}, nil
 }

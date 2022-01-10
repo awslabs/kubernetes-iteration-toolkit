@@ -1,3 +1,17 @@
+/*
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package substrate
 
 import (
@@ -5,86 +19,32 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/kit/substrate/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type securityGroup struct {
 	ec2Client *ec2.EC2
 }
 
-func (s *securityGroup) resourceName() string {
-	return "security-group"
-}
-
-func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) error {
+func (s *securityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.VPCID == nil {
-		return fmt.Errorf("vpc ID not found for %v", substrate.Name)
+		return reconcile.Result{Requeue: true}, nil
 	}
-	existingGroup, err := s.getSecurityGroups(ctx, substrate.Name)
+	securityGroup, err := s.ensure(ctx, substrate)
 	if err != nil {
-		return err
+		return reconcile.Result{}, err
 	}
-	if existingGroup == nil {
-		output, err := s.createFor(ctx, substrate)
-		if err != nil {
-			return fmt.Errorf("creating group, %w", err)
-		}
-		substrate.Status.SecurityGroupID = output.GroupId
-	} else {
-		substrate.Status.SecurityGroupID = existingGroup.GroupId
-	}
-	// group already has permissions configured
-	if existingGroup != nil && len(existingGroup.IpPermissions) != 0 {
-		return nil
-	}
-	// add ingress rules
-	if err := s.addIngressRuleFor(ctx, *substrate.Status.SecurityGroupID); err != nil {
-		return fmt.Errorf("adding ingress rule, %w", err)
-	}
-	logging.FromContext(ctx).Infof("Successfully added ingress rules for security group %v", groupName(substrate.Name))
-	return nil
-}
-
-// Finalize deletes the resource from AWS
-func (s *securityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	existingGroup, err := s.getSecurityGroups(ctx, substrate.Name)
-	if err != nil {
-		return err
-	}
-	if existingGroup == nil {
-		return nil
-	}
-	if _, err := s.ec2Client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
-		GroupId: existingGroup.GroupId,
-	}); err != nil {
-		return fmt.Errorf("deleting security group, %w", err)
-	}
-	substrate.Status.SecurityGroupID = nil
-	return nil
-}
-
-func (s *securityGroup) createFor(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.CreateSecurityGroupOutput, error) {
-	result, err := s.ec2Client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
-		Description:       aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
-		GroupName:         aws.String(groupName(substrate.Name)),
-		VpcId:             aws.String(*substrate.Status.VPCID),
-		TagSpecifications: generateEC2Tags(s.resourceName(), substrate.Name),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating security group for master %w", err)
-	}
-	return result, nil
-}
-
-func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID string) error {
+	substrate.Status.SecurityGroupID = securityGroup.GroupId
 	if _, err := s.ec2Client.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
-		GroupId: aws.String(groupID),
+		GroupId: securityGroup.GroupId,
 		IpPermissions: []*ec2.IpPermission{{
+			IpProtocol: aws.String("tcp"),
 			FromPort:   aws.Int64(443),
 			ToPort:     aws.Int64(443),
-			IpProtocol: aws.String("tcp"),
 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
 		}, {
 			FromPort:   aws.Int64(22),
@@ -93,29 +53,56 @@ func (s *securityGroup) addIngressRuleFor(ctx context.Context, groupID string) e
 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
 		}},
 	}); err != nil {
-		return err
+		if err.(awserr.Error).Code() != "InvalidPermission.Duplicate" {
+			return reconcile.Result{}, fmt.Errorf("authorizing security group ingress, %w", err)
+		}
+		logging.FromContext(ctx).Infof("Found ingress rules for security group %s", securityGroupName(substrate.Name))
+	} else {
+		logging.FromContext(ctx).Infof("Created ingress rules for security group %s", securityGroupName(substrate.Name))
 	}
-	return nil
+	return reconcile.Result{}, nil
 }
 
-func (s *securityGroup) getSecurityGroups(ctx context.Context, identifier string) (*ec2.SecurityGroup, error) {
-	output, err := s.ec2Client.DescribeSecurityGroups(
-		&ec2.DescribeSecurityGroupsInput{
-			Filters: ec2FilterFor(identifier),
-		},
-	)
+func (s *securityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.SecurityGroup, error) {
+	describeSecurityGroupsOutput, err := s.ec2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: filtersFor(substrate.Name, securityGroupName(substrate.Name))})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("describing security groups, %w", err)
 	}
-	if len(output.SecurityGroups) == 0 {
-		return nil, nil
+	if len(describeSecurityGroupsOutput.SecurityGroups) > 0 {
+		logging.FromContext(ctx).Infof("Found security group %s", securityGroupName(substrate.Name))
+		return describeSecurityGroupsOutput.SecurityGroups[0], nil
 	}
-	if len(output.SecurityGroups) != 1 {
-		return nil, fmt.Errorf("expected to find 1 security group but found %d", len(output.SecurityGroups))
+	createSecurityGroupOutput, err := s.ec2Client.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
+		Description:       aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
+		GroupName:         aws.String(securityGroupName(substrate.Name)),
+		VpcId:             substrate.Status.VPCID,
+		TagSpecifications: tagsFor(ec2.ResourceTypeSecurityGroup, substrate.Name, securityGroupName(substrate.Name)),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating security group, %w", err)
 	}
-	return output.SecurityGroups[0], nil
+	logging.FromContext(ctx).Infof("Created security group %s", aws.StringValue(createSecurityGroupOutput.GroupId))
+	return &ec2.SecurityGroup{GroupId: createSecurityGroupOutput.GroupId}, nil
 }
 
-func groupName(identifier string) string {
+// Finalize deletes the resource from AWS
+func (s *securityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeSecurityGroupsOutput, err := s.ec2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: filtersFor(substrate.Name, securityGroupName(substrate.Name))})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("describing security groups, %w", err)
+	}
+	for _, securityGroup := range describeSecurityGroupsOutput.SecurityGroups {
+		if _, err := s.ec2Client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{GroupId: securityGroup.GroupId}); err != nil {
+			if err.(awserr.Error).Code() == "DependencyViolation" {
+				return reconcile.Result{Requeue: true}, nil
+			}
+			return reconcile.Result{}, fmt.Errorf("deleting security group, %w", err)
+		}
+		logging.FromContext(ctx).Infof("Deleted security group %s", aws.StringValue(securityGroup.GroupId))
+	}
+	return reconcile.Result{}, nil
+}
+
+func securityGroupName(identifier string) string {
 	return fmt.Sprintf("substrate-group-for-%s", identifier)
 }
