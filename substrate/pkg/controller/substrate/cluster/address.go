@@ -31,7 +31,7 @@ type Address struct {
 }
 
 func (a *Address) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate.Name, substrate.Name)})
+	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing addresses, %w", err)
 	}
@@ -40,7 +40,7 @@ func (a *Address) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 		substrate.Status.Cluster.Address = addressesOutput.Addresses[0].PublicIp
 		return reconcile.Result{}, nil
 	}
-	addressOutput, err := a.EC2.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{TagSpecifications: discovery.Tags(ec2.ResourceTypeElasticIp, substrate.Name, substrate.Name)})
+	addressOutput, err := a.EC2.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeElasticIp, discovery.Name(substrate))})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("allocating address, %w", err)
 	}
@@ -50,7 +50,7 @@ func (a *Address) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 }
 
 func (a *Address) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate.Name)})
+	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing addresses, %w", err)
 	}

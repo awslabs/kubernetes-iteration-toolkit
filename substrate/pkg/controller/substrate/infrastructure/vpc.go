@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package substrate
+package infrastructure
 
 import (
 	"context"
@@ -27,12 +27,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type vpc struct {
+type VPC struct {
 	EC2 *ec2.EC2
 }
 
-func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate.Name)})
+func (v *VPC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
@@ -43,7 +43,7 @@ func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 	}
 	createVpcOutput, err := v.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock:         aws.String(substrate.Spec.VPC.CIDR),
-		TagSpecifications: discovery.Tags(ec2.ResourceTypeVpc, substrate.Name, substrate.Name),
+		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeVpc, discovery.Name(substrate)),
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)
@@ -53,8 +53,8 @@ func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 	return reconcile.Result{}, err
 }
 
-func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate.Name)})
+func (v *VPC) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}

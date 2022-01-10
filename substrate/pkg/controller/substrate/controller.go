@@ -31,6 +31,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/controller/substrate/cluster"
+	"github.com/awslabs/kit/substrate/pkg/controller/substrate/infrastructure"
 	"github.com/imdario/mergo"
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -45,17 +46,15 @@ func NewController(ctx context.Context) *Controller {
 	IAM := iam.New(session)
 	return &Controller{
 		Resources: []Resource{
-			&iamRole{IAM: IAM},
-			&iamPolicy{IAM: IAM},
-			&iamProfile{IAM: IAM},
-			&vpc{EC2: EC2},
-			&subnets{EC2: EC2},
-			&routeTable{EC2: EC2},
-			&internetGateway{EC2: EC2},
-			&securityGroup{EC2: EC2},
-			&launchTemplate{EC2: EC2, SSM: ssm.New(session)},
-			&autoScalingGroup{AutoScaling: autoscaling.New(session)},
+			&infrastructure.VPC{EC2: EC2},
+			&infrastructure.Subnets{EC2: EC2},
+			&infrastructure.RouteTable{EC2: EC2},
+			&infrastructure.InternetGateway{EC2: EC2},
+			&infrastructure.SecurityGroup{EC2: EC2},
 			&cluster.Address{EC2: EC2},
+			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session)},
+			&cluster.InstanceProfile{IAM: IAM},
+			&cluster.Instance{AutoScaling: autoscaling.New(session)},
 		},
 	}
 }

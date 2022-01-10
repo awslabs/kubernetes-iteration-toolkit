@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package substrate
+package infrastructure
 
 import (
 	"context"
@@ -27,20 +27,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type routeTable struct {
+type RouteTable struct {
 	EC2 *ec2.EC2
 }
 
-func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+func (r *RouteTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.VPCID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	publicRouteTable, err := r.ensure(ctx, substrate, publicTableName(substrate.Name))
+	publicRouteTable, err := r.ensure(ctx, substrate, publicTableName(substrate))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 	substrate.Status.PublicRouteTableID = publicRouteTable.RouteTableId
-	privateRouteTable, err := r.ensure(ctx, substrate, privateTableName(substrate.Name))
+	privateRouteTable, err := r.ensure(ctx, substrate, privateTableName(substrate))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -48,8 +48,8 @@ func (r *routeTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	return reconcile.Result{}, nil
 }
 
-func (r *routeTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name string) (*ec2.RouteTable, error) {
-	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate.Name, name)})
+func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name string) (*ec2.RouteTable, error) {
+	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return nil, fmt.Errorf("describing route tables, %w", err)
 	}
@@ -59,7 +59,7 @@ func (r *routeTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 	}
 	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
 		VpcId:             substrate.Status.VPCID,
-		TagSpecifications: discovery.Tags(ec2.ResourceTypeRouteTable, substrate.Name, name),
+		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeRouteTable, discovery.Name(substrate)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating route table, %w", err)
@@ -68,8 +68,8 @@ func (r *routeTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 	return createRouteTableOutput.RouteTable, nil
 }
 
-func (r *routeTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate.Name)})
+func (r *RouteTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing route tables, %w", err)
 	}
@@ -88,10 +88,10 @@ func (r *routeTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 	return reconcile.Result{}, nil
 }
 
-func privateTableName(identifier string) string {
-	return fmt.Sprintf("%s-%s", identifier, "private")
+func privateTableName(substrate *v1alpha1.Substrate) string {
+	return fmt.Sprintf("%s-%s", substrate.Name, "private")
 }
 
-func publicTableName(identifier string) string {
-	return fmt.Sprintf("%s-%s", identifier, "public")
+func publicTableName(substrate *v1alpha1.Substrate) string {
+	return fmt.Sprintf("%s-%s", substrate.Name, "public")
 }

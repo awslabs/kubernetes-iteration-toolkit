@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package substrate
+package infrastructure
 
 import (
 	"context"
@@ -27,11 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type internetGateway struct {
+type InternetGateway struct {
 	EC2 *ec2.EC2
 }
 
-func (i *internetGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+func (i *InternetGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.VPCID == nil || substrate.Status.PublicRouteTableID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -60,10 +60,8 @@ func (i *internetGateway) Create(ctx context.Context, substrate *v1alpha1.Substr
 	return reconcile.Result{}, nil
 }
 
-func (i *internetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.InternetGateway, error) {
-	descrbeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{
-		Filters: discovery.Filters(substrate.Name, substrate.Name),
-	})
+func (i *InternetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.InternetGateway, error) {
+	descrbeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return nil, fmt.Errorf("describing internet gateways, %w", err)
 	}
@@ -72,7 +70,7 @@ func (i *internetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substr
 		return descrbeInternetGatewaysOutput.InternetGateways[0], nil
 	}
 	createInternetGatewayOutput, err := i.EC2.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
-		TagSpecifications: discovery.Tags(ec2.ResourceTypeInternetGateway, substrate.Name, substrate.Name),
+		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeInternetGateway, discovery.Name(substrate)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating internet gateway, %w", err)
@@ -81,15 +79,15 @@ func (i *internetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substr
 	return createInternetGatewayOutput.InternetGateway, nil
 }
 
-func (i *internetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeVpcsOutput, err := i.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate.Name)})
+func (i *InternetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	describeVpcsOutput, err := i.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
 	if len(describeVpcsOutput.Vpcs) == 0 {
 		return reconcile.Result{}, nil
 	}
-	describeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: discovery.Filters(substrate.Name)})
+	describeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing internet gateways, %w", err)
 	}
