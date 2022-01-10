@@ -37,7 +37,7 @@ func (a *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		return reconcile.Result{Requeue: true}, nil
 	}
 	if _, err := a.AutoScaling.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
-		AutoScalingGroupName: autoScalingGroupName(substrate),
+		AutoScalingGroupName: discovery.Name(substrate),
 		DesiredCapacity:      aws.Int64(1), MaxSize: aws.Int64(1), MinSize: aws.Int64(1),
 		LaunchTemplate:    &autoscaling.LaunchTemplateSpecification{LaunchTemplateName: discovery.Name(substrate), Version: aws.String("$Latest")},
 		VPCZoneIdentifier: aws.String(strings.Join(substrate.Status.PublicSubnetIDs, ",")),
@@ -47,7 +47,7 @@ func (a *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 			PropagateAtLaunch: aws.Bool(true),
 		}, {
 			Key:               aws.String("Name"),
-			Value:             autoScalingGroupName(substrate),
+			Value:             discovery.Name(substrate),
 			PropagateAtLaunch: aws.Bool(true),
 		}},
 	}); err != nil {
@@ -57,16 +57,16 @@ func (a *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		if err.(awserr.Error).Code() != autoscaling.ErrCodeAlreadyExistsFault {
 			return reconcile.Result{}, fmt.Errorf("creating autoscaling group, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found auto scaling group %s", aws.StringValue(autoScalingGroupName(substrate)))
+		logging.FromContext(ctx).Infof("Found auto scaling group %s", aws.StringValue(discovery.Name(substrate)))
 	} else {
-		logging.FromContext(ctx).Infof("Created auto scaling group %s", aws.StringValue(autoScalingGroupName(substrate)))
+		logging.FromContext(ctx).Infof("Created auto scaling group %s", aws.StringValue(discovery.Name(substrate)))
 	}
 	return reconcile.Result{}, nil
 }
 
 func (a *Instance) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	autoscalingGroupsOutput, err := a.AutoScaling.DescribeAutoScalingGroupsWithContext(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
-		AutoScalingGroupNames: []*string{autoScalingGroupName(substrate)},
+		AutoScalingGroupNames: []*string{discovery.Name(substrate)},
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing auto scaling groups, %w", err)
@@ -81,11 +81,7 @@ func (a *Instance) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("deleting autoscaling group, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Deleted auto scaling group %s", aws.StringValue(autoScalingGroupName(substrate)))
+		logging.FromContext(ctx).Infof("Deleted auto scaling group %s", aws.StringValue(discovery.Name(substrate)))
 	}
 	return reconcile.Result{}, nil
-}
-
-func autoScalingGroupName(substrate *v1alpha1.Substrate) *string {
-	return aws.String(fmt.Sprintf("substrate-nodes-for-%s", substrate.Name))
 }

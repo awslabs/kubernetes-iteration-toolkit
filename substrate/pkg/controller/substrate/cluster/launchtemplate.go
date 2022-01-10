@@ -38,7 +38,7 @@ func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 	if substrate.Status.SecurityGroupID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2")})
+	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2")})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("getting ssm parameter, %w", err)
 	}
