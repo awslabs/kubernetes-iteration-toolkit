@@ -57,15 +57,14 @@ func (v *vpc) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
-	if len(describeVpcsOutput.Vpcs) == 0 {
-		return reconcile.Result{}, nil
-	}
-	if _, err := v.ec2Client.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{VpcId: describeVpcsOutput.Vpcs[0].VpcId}); err != nil {
-		if err.(awserr.Error).Code() == "DependencyViolation" {
-			return reconcile.Result{Requeue: true}, nil
+	for _, vpc := range describeVpcsOutput.Vpcs {
+		if _, err := v.ec2Client.DeleteVpcWithContext(ctx, &ec2.DeleteVpcInput{VpcId: vpc.VpcId}); err != nil {
+			if err.(awserr.Error).Code() == "DependencyViolation" {
+				return reconcile.Result{Requeue: true}, nil
+			}
+			return reconcile.Result{}, fmt.Errorf("deleting vpc, %w", err)
 		}
-		return reconcile.Result{}, fmt.Errorf("deleting vpc, %w", err)
+		logging.FromContext(ctx).Infof("Deleted vpc %s", aws.StringValue(vpc.VpcId))
 	}
-	logging.FromContext(ctx).Infof("Deleted vpc %s", aws.StringValue(describeVpcsOutput.Vpcs[0].VpcId))
 	return reconcile.Result{}, nil
 }
