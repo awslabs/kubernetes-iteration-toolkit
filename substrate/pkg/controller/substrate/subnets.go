@@ -129,9 +129,9 @@ func (s *subnets) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (re
 	return reconcile.Result{}, nil
 }
 
-func subnetName(idenfiier string, zone string, public bool) string {
+func subnetName(identifier string, zone string, public bool) string {
 	if public {
-		return fmt.Sprintf("%s-public-%s", idenfiier, zone)
+		return fmt.Sprintf("%s-public-%s", identifier, zone)
 	}
-	return fmt.Sprintf("%s-private-%s", idenfiier, zone)
+	return fmt.Sprintf("%s-private-%s", identifier, zone)
 }

@@ -47,9 +47,6 @@ func (v *vpc) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)
 	}
-	if createVpcOutput.Vpc.VpcId == nil {
-		return reconcile.Result{Requeue: true}, nil
-	}
 	substrate.Status.VPCID = createVpcOutput.Vpc.VpcId
 	logging.FromContext(ctx).Infof("Created vpc %s", aws.StringValue(substrate.Status.VPCID))
 	return reconcile.Result{}, err
