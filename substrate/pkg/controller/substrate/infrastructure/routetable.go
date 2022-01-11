@@ -90,6 +90,11 @@ func (r *RouteTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 
 func privateTableName(substrate *v1alpha1.Substrate) string {
 	return fmt.Sprintf("%s-%s", substrate.Name, "private")
+func routeTableName(substrate *v1alpha1.Substrate, public bool) *string {
+	if public {
+		return discovery.Name(substrate, "public")
+	}
+	return discovery.Name(substrate, "private")
 }
 
 func publicTableName(substrate *v1alpha1.Substrate) string {
