@@ -12,36 +12,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package substrate
+package discovery
 
 import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 )
 
 const (
-	OwnerTagKey = "kit.k8s.sh/substrate"
+	OwnerTagKey = "kit.aws/substrate"
 )
 
-func tagsFor(svcName, owner string, name string) []*ec2.TagSpecification {
+func Tags(substrate *v1alpha1.Substrate, resource string, name *string) []*ec2.TagSpecification {
 	return []*ec2.TagSpecification{{
-		ResourceType: aws.String(svcName),
+		ResourceType: aws.String(resource),
 		Tags: []*ec2.Tag{
-			{Key: aws.String(OwnerTagKey), Value: aws.String(owner)},
-			{Key: aws.String("Name"), Value: aws.String(name)},
+			{Key: aws.String(OwnerTagKey), Value: aws.String(substrate.Name)},
+			{Key: aws.String("Name"), Value: name},
 		},
 	}}
 }
 
-func filtersFor(owner string, name ...string) (filters []*ec2.Filter) {
-	if len(name) > 1 {
+func Filters(substrate *v1alpha1.Substrate, optionalName ...*string) (filters []*ec2.Filter) {
+	if len(optionalName) > 1 {
 		panic("name cannot have more than one value")
 	}
-	filters = append(filters, &ec2.Filter{Name: aws.String(fmt.Sprintf("tag:%s", OwnerTagKey)), Values: []*string{aws.String(owner)}})
-	if len(name) > 0 {
-		filters = append(filters, &ec2.Filter{Name: aws.String(fmt.Sprintf("tag:%s", "Name")), Values: aws.StringSlice(name)})
+	filters = append(filters, &ec2.Filter{Name: aws.String(fmt.Sprintf("tag:%s", OwnerTagKey)), Values: []*string{aws.String(substrate.Name)}})
+	if len(optionalName) > 0 {
+		filters = append(filters, &ec2.Filter{Name: aws.String(fmt.Sprintf("tag:%s", "Name")), Values: optionalName})
 	}
 	return filters
 }

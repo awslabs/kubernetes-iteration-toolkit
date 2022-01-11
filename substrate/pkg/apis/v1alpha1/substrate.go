@@ -28,16 +28,6 @@ type SubstrateSpec struct {
 	InstanceType *string `json:"instanceType,omitempty"`
 }
 
-type SubstrateStatus struct {
-	VPCID               *string  `json:"vpcID,omitempty"`
-	ElasticIPID         *string  `json:"elasticIPID,omitempty"`
-	PrivateRouteTableID *string  `json:"privateRouteTableID,omitempty"`
-	PublicRouteTableID  *string  `json:"publicRouteTableID,omitempty"`
-	SecurityGroupID     *string  `json:"securityGroupID,omitempty"`
-	PrivateSubnetIDs    []string `json:"privateSubnetIDs,omitempty"`
-	PublicSubnetIDs     []string `json:"publicSubnetIDs,omitempty"`
-}
-
 // Substrate is the Schema for the Substrates API
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=substrates

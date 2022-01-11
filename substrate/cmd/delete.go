@@ -38,12 +38,9 @@ func init() {
 func Delete(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	start := time.Now()
-	name := "test"
+	name := "test-substrate"
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: name, DeletionTimestamp: &metav1.Time{Time: time.Now()}},
-		Spec: v1alpha1.SubstrateSpec{
-			VPC: &v1alpha1.VPCSpec{CIDR: "10.0.0.0/16"},
-		},
 	}); err != nil {
 		logging.FromContext(ctx).Error(err.Error())
 		return

@@ -30,6 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/controller/substrate/cluster"
+	"github.com/awslabs/kit/substrate/pkg/controller/substrate/infrastructure"
 	"github.com/imdario/mergo"
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -37,30 +39,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func NewSession() *session.Session {
-	sess := session.Must(session.NewSession(&aws.Config{STSRegionalEndpoint: endpoints.RegionalSTSEndpoint}))
-	sess.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("kit.sh"))
-	return sess
-}
-
 func NewController(ctx context.Context) *Controller {
-	session := NewSession()
-	ec2Client := ec2.New(session)
-	iamClient := iam.New(session)
-	ssmClient := ssm.New(session)
-	autoscalingClient := autoscaling.New(session)
+	session := session.Must(session.NewSession(&aws.Config{STSRegionalEndpoint: endpoints.RegionalSTSEndpoint}))
+	session.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("kit.sh"))
+	EC2 := ec2.New(session)
+	IAM := iam.New(session)
 	return &Controller{
 		Resources: []Resource{
-			&iamRole{iamClient},
-			&iamPolicy{iamClient},
-			&iamProfile{iamClient},
-			&vpc{ec2Client},
-			&subnets{ec2Client},
-			&routeTable{ec2Client},
-			&internetGateway{ec2Client},
-			&securityGroup{ec2Client},
-			&launchTemplate{ec2Client, ssmClient},
-			&autoScalingGroup{ec2Client, autoscalingClient},
+			&infrastructure.VPC{EC2: EC2},
+			&infrastructure.Subnets{EC2: EC2},
+			&infrastructure.RouteTable{EC2: EC2},
+			&infrastructure.InternetGateway{EC2: EC2},
+			&infrastructure.SecurityGroup{EC2: EC2},
+			&cluster.Address{EC2: EC2},
+			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session)},
+			&cluster.InstanceProfile{IAM: IAM},
+			&cluster.Instance{AutoScaling: autoscaling.New(session)},
 		},
 	}
 }

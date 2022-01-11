@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package substrate
+package cluster
 
 import (
 	"context"
@@ -24,20 +24,21 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type launchTemplate struct {
-	ec2Client *ec2.EC2
-	ssmClient *ssm.SSM
+type LaunchTemplate struct {
+	EC2 *ec2.EC2
+	SSM *ssm.SSM
 }
 
-func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.SecurityGroupID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	parameterOutput, err := l.ssmClient.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2")})
+	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2")})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("getting ssm parameter, %w", err)
 	}
@@ -51,9 +52,9 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 				VolumeType:          aws.String("gp3"),
 			}},
 		},
-		InstanceType:       aws.String("t2.large"),
+		InstanceType:       substrate.Spec.InstanceType,
 		ImageId:            parameterOutput.Parameter.Value,
-		IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{Name: aws.String(instanceProfileName(substrate.Name))},
+		IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{Name: discovery.Name(substrate)},
 		Monitoring:         &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 		SecurityGroupIds:   []*string{substrate.Status.SecurityGroupID},
 		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(`#!/bin/bash
@@ -71,30 +72,27 @@ func (l *launchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 			sudo systemctl restart docker`,
 		))),
 	}
-	if _, err := l.ec2Client.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
-		LaunchTemplateName: aws.String(launchTemplateName(substrate.Name)),
-		TagSpecifications:  tagsFor(ec2.ResourceTypeLaunchTemplate, substrate.Name, substrate.Name),
+	if _, err := l.EC2.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
+		LaunchTemplateName: discovery.Name(substrate),
+		TagSpecifications:  discovery.Tags(substrate, ec2.ResourceTypeLaunchTemplate, discovery.Name(substrate)),
 		LaunchTemplateData: launchTemplateData,
 	}); err != nil {
 		if err.(awserr.Error).Code() != "InvalidLaunchTemplateName.AlreadyExistsException" {
 			return reconcile.Result{}, fmt.Errorf("creating launch template, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found launch template %s", launchTemplateName(substrate.Name))
+		logging.FromContext(ctx).Infof("Found launch template %s", aws.StringValue(discovery.Name(substrate)))
 	} else {
-		logging.FromContext(ctx).Infof("Created launch template %s", launchTemplateName(substrate.Name))
+		logging.FromContext(ctx).Infof("Created launch template %s", aws.StringValue(discovery.Name(substrate)))
 	}
-	if _, err := l.ec2Client.CreateLaunchTemplateVersionWithContext(ctx, &ec2.CreateLaunchTemplateVersionInput{
-		LaunchTemplateName: aws.String(launchTemplateName(substrate.Name)),
-		LaunchTemplateData: launchTemplateData,
-	}); err != nil {
+	if _, err := l.EC2.CreateLaunchTemplateVersionWithContext(ctx, &ec2.CreateLaunchTemplateVersionInput{LaunchTemplateName: discovery.Name(substrate), LaunchTemplateData: launchTemplateData}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating launch template version, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Ensured latest version for launch template %s", launchTemplateName(substrate.Name))
+	logging.FromContext(ctx).Infof("Ensured latest version for launch template %s", aws.StringValue(discovery.Name(substrate)))
 	return reconcile.Result{}, nil
 }
 
-func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	launchTemplatesOutput, err := l.ec2Client.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{Filters: filtersFor(substrate.Name, substrate.Name)})
+func (l *LaunchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	launchTemplatesOutput, err := l.EC2.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing launch templates, %w", err)
 	}
@@ -102,14 +100,10 @@ func (l *launchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substra
 		return reconcile.Result{}, nil
 	}
 	for _, launchTemplate := range launchTemplatesOutput.LaunchTemplates {
-		if _, err := l.ec2Client.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{LaunchTemplateId: launchTemplate.LaunchTemplateId}); err != nil {
+		if _, err := l.EC2.DeleteLaunchTemplateWithContext(ctx, &ec2.DeleteLaunchTemplateInput{LaunchTemplateId: launchTemplate.LaunchTemplateId}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("deleting launch template, %w", err)
 		}
 		logging.FromContext(ctx).Infof("Deleted launch template %v", aws.StringValue(launchTemplate.LaunchTemplateId))
 	}
 	return reconcile.Result{}, nil
-}
-
-func launchTemplateName(identifier string) string {
-	return fmt.Sprintf("template-for-%s", identifier)
 }

@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package substrate
+package infrastructure
 
 import (
 	"context"
@@ -22,17 +22,18 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"go.uber.org/multierr"
 	"k8s.io/client-go/util/workqueue"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type subnets struct {
-	ec2Client *ec2.EC2
+type Subnets struct {
+	EC2 *ec2.EC2
 }
 
-func (s *subnets) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+func (s *Subnets) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.VPCID == nil || substrate.Status.PrivateRouteTableID == nil || substrate.Status.PublicRouteTableID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -54,8 +55,8 @@ func (s *subnets) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 	return reconcile.Result{}, nil
 }
 
-func (s *subnets) ensure(ctx context.Context, substrate *v1alpha1.Substrate, subnetSpec *v1alpha1.SubnetSpec) (*ec2.Subnet, error) {
-	subnet, err := s.ensureSubnet(ctx, substrate, subnetName(substrate.Name, subnetSpec.Zone, subnetSpec.Public), subnetSpec.Zone, subnetSpec.CIDR)
+func (s *Subnets) ensure(ctx context.Context, substrate *v1alpha1.Substrate, subnetSpec *v1alpha1.SubnetSpec) (*ec2.Subnet, error) {
+	subnet, err := s.ensureSubnet(ctx, substrate, subnetSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -63,14 +64,14 @@ func (s *subnets) ensure(ctx context.Context, substrate *v1alpha1.Substrate, sub
 	if subnetSpec.Public {
 		routeTableID = substrate.Status.PublicRouteTableID
 	}
-	if _, err := s.ec2Client.AssociateRouteTableWithContext(ctx, &ec2.AssociateRouteTableInput{RouteTableId: routeTableID, SubnetId: subnet.SubnetId}); err != nil {
+	if _, err := s.EC2.AssociateRouteTableWithContext(ctx, &ec2.AssociateRouteTableInput{RouteTableId: routeTableID, SubnetId: subnet.SubnetId}); err != nil {
 		return nil, fmt.Errorf("associating route table with subnet, %w", err)
 	}
 	logging.FromContext(ctx).Infof("Ensured association of route table %s to subnet %s", aws.StringValue(routeTableID), aws.StringValue(subnet.SubnetId))
 	if !subnetSpec.Public {
 		return subnet, nil
 	}
-	if _, err := s.ec2Client.ModifySubnetAttribute(&ec2.ModifySubnetAttributeInput{SubnetId: subnet.SubnetId, MapPublicIpOnLaunch: &ec2.AttributeBooleanValue{Value: aws.Bool(true)}}); err != nil {
+	if _, err := s.EC2.ModifySubnetAttribute(&ec2.ModifySubnetAttributeInput{SubnetId: subnet.SubnetId, MapPublicIpOnLaunch: &ec2.AttributeBooleanValue{Value: aws.Bool(true)}}); err != nil {
 		return nil, fmt.Errorf("modifying subnet attribute, %w", err)
 	}
 	subnet.MapPublicIpOnLaunch = aws.Bool(true)
@@ -78,47 +79,48 @@ func (s *subnets) ensure(ctx context.Context, substrate *v1alpha1.Substrate, sub
 	return subnet, nil
 }
 
-func (s *subnets) ensureSubnet(ctx context.Context, substrate *v1alpha1.Substrate, name string, zone string, cidr string) (*ec2.Subnet, error) {
-	describeSubnetsOutput, err := s.ec2Client.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{Filters: filtersFor(substrate.Name, name)})
+func (s *Subnets) ensureSubnet(ctx context.Context, substrate *v1alpha1.Substrate, subnetSpec *v1alpha1.SubnetSpec) (*ec2.Subnet, error) {
+	name := subnetName(substrate, subnetSpec.Zone, subnetSpec.Public)
+	describeSubnetsOutput, err := s.EC2.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{Filters: discovery.Filters(substrate, name)})
 	if err != nil {
 		return nil, fmt.Errorf("describing subnets, %w", err)
 	}
 	if len(describeSubnetsOutput.Subnets) > 0 {
-		logging.FromContext(ctx).Infof("Found subnet %s", name)
+		logging.FromContext(ctx).Infof("Found subnet %s", aws.StringValue(name))
 		return describeSubnetsOutput.Subnets[0], nil
 	}
-	createSubnetsOutput, err := s.ec2Client.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
-		AvailabilityZone:  aws.String(zone),
-		CidrBlock:         aws.String(cidr),
+	createSubnetsOutput, err := s.EC2.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
+		AvailabilityZone:  aws.String(subnetSpec.Zone),
+		CidrBlock:         aws.String(subnetSpec.CIDR),
 		VpcId:             substrate.Status.VPCID,
-		TagSpecifications: tagsFor(ec2.ResourceTypeSubnet, substrate.Name, name),
+		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeSubnet, name),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating subnet, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Created subnet %s", name)
+	logging.FromContext(ctx).Infof("Created subnet %s", aws.StringValue(name))
 	return createSubnetsOutput.Subnet, nil
 }
 
-func (s *subnets) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	routeTablesOutput, err := s.ec2Client.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: filtersFor(substrate.Name)})
+func (s *Subnets) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	routeTablesOutput, err := s.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing subnets, %w", err)
 	}
 	for _, routeTable := range routeTablesOutput.RouteTables {
 		for _, association := range routeTable.Associations {
-			if _, err := s.ec2Client.DisassociateRouteTableWithContext(ctx, &ec2.DisassociateRouteTableInput{AssociationId: association.RouteTableAssociationId}); err != nil {
+			if _, err := s.EC2.DisassociateRouteTableWithContext(ctx, &ec2.DisassociateRouteTableInput{AssociationId: association.RouteTableAssociationId}); err != nil {
 				return reconcile.Result{}, fmt.Errorf("disassociating route table from subnet, %s", err)
 			}
 			logging.FromContext(ctx).Infof("Deleted association of route table %s to subnet %s", aws.StringValue(routeTable.RouteTableId), aws.StringValue(association.SubnetId))
 		}
 	}
-	subnetsOutput, err := s.ec2Client.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{Filters: filtersFor(substrate.Name)})
+	subnetsOutput, err := s.EC2.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing subnets, %w", err)
 	}
 	for _, subnet := range subnetsOutput.Subnets {
-		if _, err := s.ec2Client.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{SubnetId: subnet.SubnetId}); err != nil {
+		if _, err := s.EC2.DeleteSubnetWithContext(ctx, &ec2.DeleteSubnetInput{SubnetId: subnet.SubnetId}); err != nil {
 			if err.(awserr.Error).Code() == "DependencyViolation" {
 				return reconcile.Result{Requeue: true}, nil
 			}
@@ -129,9 +131,9 @@ func (s *subnets) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (re
 	return reconcile.Result{}, nil
 }
 
-func subnetName(identifier string, zone string, public bool) string {
+func subnetName(substrate *v1alpha1.Substrate, zone string, public bool) *string {
 	if public {
-		return fmt.Sprintf("%s-public-%s", identifier, zone)
+		return discovery.Name(substrate, zone, "public")
 	}
-	return fmt.Sprintf("%s-private-%s", identifier, zone)
+	return discovery.Name(substrate, zone, "private")
 }
