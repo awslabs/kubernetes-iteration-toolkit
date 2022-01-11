@@ -35,8 +35,8 @@ var AssumeRolePolicyDocument = aws.String(`{
 	"Version": "2012-10-17",
 	"Statement": [
 		{
-			"Action": "sts:AssumeRole",
 			"Effect": "Allow",
+			"Action": "sts:AssumeRole",
 			"Principal": {
 				"Service": "ec2.amazonaws.com"
 			}
@@ -49,11 +49,17 @@ var PolicyDocument = aws.String(`{
 	"Statement": [
 		{
 			"Effect": "Allow",
-			"Action": "*",
-			"Resource": "*"
+			"Action": [
+				"ec2:AssociateAddress"
+			],
+			"Resource": ["*"]
 		}
 	]
 }`)
+
+var ManagedPolicies = []string{
+	"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+}
 
 func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	// Role
@@ -70,6 +76,13 @@ func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substr
 		return reconcile.Result{}, fmt.Errorf("adding policy to role, %w", err)
 	} else {
 		logging.FromContext(ctx).Infof("Created policy %s for %s", aws.StringValue(discovery.Name(substrate)), aws.StringValue(discovery.Name(substrate)))
+	}
+	// Managed Policies
+	for _, policy := range ManagedPolicies {
+		if _, err := i.IAM.AttachRolePolicyWithContext(ctx, &iam.AttachRolePolicyInput{RoleName: discovery.Name(substrate), PolicyArn: aws.String(policy)}); err != nil {
+			return reconcile.Result{}, fmt.Errorf("attaching role policy %w", err)
+		}
+		logging.FromContext(ctx).Infof("Ensured managed policy %s for %s", policy, aws.StringValue(discovery.Name(substrate)))
 	}
 	// Profile
 	if _, err := i.IAM.CreateInstanceProfileWithContext(ctx, &iam.CreateInstanceProfileInput{InstanceProfileName: discovery.Name(substrate)}); err != nil {
@@ -100,6 +113,16 @@ func (i *InstanceProfile) Delete(ctx context.Context, substrate *v1alpha1.Substr
 		}
 	} else {
 		logging.FromContext(ctx).Infof("Deleted policy %s from role %s", aws.StringValue(discovery.Name(substrate)), aws.StringValue(discovery.Name(substrate)))
+	}
+	// Managed Policies
+	for _, policy := range ManagedPolicies {
+		if _, err := i.IAM.DetachRolePolicyWithContext(ctx, &iam.DetachRolePolicyInput{RoleName: discovery.Name(substrate), PolicyArn: aws.String(policy)}); err != nil {
+			if err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+				return reconcile.Result{}, fmt.Errorf("detatching policy from role, %w", err)
+			}
+		} else {
+			logging.FromContext(ctx).Infof("Deleted policy %s from role %s", aws.StringValue(discovery.Name(substrate)), aws.StringValue(discovery.Name(substrate)))
+		}
 	}
 	// Binding
 	if _, err := i.IAM.RemoveRoleFromInstanceProfileWithContext(ctx, &iam.RemoveRoleFromInstanceProfileInput{RoleName: discovery.Name(substrate), InstanceProfileName: discovery.Name(substrate)}); err != nil {
