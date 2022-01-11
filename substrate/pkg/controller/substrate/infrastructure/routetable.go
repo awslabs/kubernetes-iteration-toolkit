@@ -35,12 +35,12 @@ func (r *RouteTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	if substrate.Status.VPCID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	publicRouteTable, err := r.ensure(ctx, substrate, publicTableName(substrate))
+	publicRouteTable, err := r.ensure(ctx, substrate, discovery.Name(substrate, "public"))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 	substrate.Status.PublicRouteTableID = publicRouteTable.RouteTableId
-	privateRouteTable, err := r.ensure(ctx, substrate, privateTableName(substrate))
+	privateRouteTable, err := r.ensure(ctx, substrate, discovery.Name(substrate, "private"))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -48,13 +48,13 @@ func (r *RouteTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 	return reconcile.Result{}, nil
 }
 
-func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name string) (*ec2.RouteTable, error) {
+func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name *string) (*ec2.RouteTable, error) {
 	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return nil, fmt.Errorf("describing route tables, %w", err)
 	}
 	if len(describeRouteTablesOutput.RouteTables) > 0 {
-		logging.FromContext(ctx).Infof("Found route table %s", name)
+		logging.FromContext(ctx).Infof("Found route table %s", aws.StringValue(name))
 		return describeRouteTablesOutput.RouteTables[0], nil
 	}
 	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
@@ -64,7 +64,7 @@ func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 	if err != nil {
 		return nil, fmt.Errorf("creating route table, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Created route table %s", name)
+	logging.FromContext(ctx).Infof("Created route table %s", aws.StringValue(name))
 	return createRouteTableOutput.RouteTable, nil
 }
 
@@ -86,17 +86,4 @@ func (r *RouteTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) 
 		logging.FromContext(ctx).Infof("Deleted route table %s", aws.StringValue(routeTable.RouteTableId))
 	}
 	return reconcile.Result{}, nil
-}
-
-func privateTableName(substrate *v1alpha1.Substrate) string {
-	return fmt.Sprintf("%s-%s", substrate.Name, "private")
-func routeTableName(substrate *v1alpha1.Substrate, public bool) *string {
-	if public {
-		return discovery.Name(substrate, "public")
-	}
-	return discovery.Name(substrate, "private")
-}
-
-func publicTableName(substrate *v1alpha1.Substrate) string {
-	return fmt.Sprintf("%s-%s", substrate.Name, "public")
 }
