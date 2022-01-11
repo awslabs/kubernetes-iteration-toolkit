@@ -143,7 +143,7 @@ func (i *InstanceProfile) Delete(ctx context.Context, substrate *v1alpha1.Substr
 	// Role
 	if _, err := i.IAM.DeleteRoleWithContext(ctx, &iam.DeleteRoleInput{RoleName: discovery.Name(substrate)}); err != nil {
 		if err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
-			return reconcile.Result{}, fmt.Errorf("deleting, %w", err)
+			return reconcile.Result{}, fmt.Errorf("deleting role, %w", err)
 		}
 	} else {
 		logging.FromContext(ctx).Infof("Deleted role %s", aws.StringValue(discovery.Name(substrate)))
