@@ -54,7 +54,7 @@ func NewController(ctx context.Context) *Controller {
 			&cluster.Address{EC2: EC2},
 			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session)},
 			&cluster.InstanceProfile{IAM: IAM},
-			&cluster.Instance{AutoScaling: autoscaling.New(session)},
+			&cluster.Instance{EC2: EC2, AutoScaling: autoscaling.New(session)},
 		},
 	}
 }

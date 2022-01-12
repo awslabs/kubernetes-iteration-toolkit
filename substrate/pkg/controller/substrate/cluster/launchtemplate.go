@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
+	"github.com/mitchellh/hashstructure/v2"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -84,10 +85,21 @@ func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 	} else {
 		logging.FromContext(ctx).Infof("Created launch template %s", aws.StringValue(discovery.Name(substrate)))
 	}
-	if _, err := l.EC2.CreateLaunchTemplateVersionWithContext(ctx, &ec2.CreateLaunchTemplateVersionInput{LaunchTemplateName: discovery.Name(substrate), LaunchTemplateData: launchTemplateData}); err != nil {
+	// Only update the launch template if it's changed
+	hash, err := hashstructure.Hash(launchTemplateData, hashstructure.FormatV2, &hashstructure.HashOptions{SlicesAsSets: true})
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("hashing launch template, %w", err)
+	}
+	launchTemplateVersionOutput, err := l.EC2.CreateLaunchTemplateVersionWithContext(ctx, &ec2.CreateLaunchTemplateVersionInput{
+		ClientToken:        aws.String(fmt.Sprint(hash)),
+		LaunchTemplateName: discovery.Name(substrate),
+		LaunchTemplateData: launchTemplateData,
+	})
+	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating launch template version, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Ensured latest version for launch template %s", aws.StringValue(discovery.Name(substrate)))
+	substrate.Status.Cluster.LaunchTemplateVersion = aws.String(fmt.Sprint(aws.Int64Value(launchTemplateVersionOutput.LaunchTemplateVersion.VersionNumber)))
+	logging.FromContext(ctx).Infof("Created launch template version %s for %s", aws.StringValue(substrate.Status.Cluster.LaunchTemplateVersion), aws.StringValue(discovery.Name(substrate)))
 	return reconcile.Result{}, nil
 }
 

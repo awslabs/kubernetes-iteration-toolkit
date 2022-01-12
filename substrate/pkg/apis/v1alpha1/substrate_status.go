@@ -15,7 +15,8 @@ limitations under the License.
 package v1alpha1
 
 type ClusterStatus struct {
-	Address *string `json:"address,omitempty"`
+	Address               *string `json:"address,omitempty"`
+	LaunchTemplateVersion *string `json:"launchTemplateVersion,omitempty"`
 }
 
 type SubstrateStatus struct {
