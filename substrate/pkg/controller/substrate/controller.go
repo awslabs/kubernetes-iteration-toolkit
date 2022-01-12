@@ -25,7 +25,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/ssm"
@@ -54,7 +53,7 @@ func NewController(ctx context.Context) *Controller {
 			&cluster.Address{EC2: EC2},
 			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session)},
 			&cluster.InstanceProfile{IAM: IAM},
-			&cluster.Instance{EC2: EC2, AutoScaling: autoscaling.New(session)},
+			&cluster.Instance{EC2: EC2},
 		},
 	}
 }
@@ -94,7 +93,7 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 			if !result.Requeue && result.RequeueAfter == 0 {
 				return
 			}
-			time.Sleep(result.RequeueAfter + time.Millisecond*100)
+			time.Sleep(result.RequeueAfter + time.Second*1)
 		}
 	})
 	return multierr.Combine(errs...)

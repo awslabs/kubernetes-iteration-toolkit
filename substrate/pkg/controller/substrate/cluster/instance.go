@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
@@ -30,20 +29,19 @@ import (
 
 type Instance struct {
 	EC2         *ec2.EC2
-	AutoScaling *autoscaling.AutoScaling
 }
 
 func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if len(substrate.Status.PublicSubnetIDs) == 0 || substrate.Status.Cluster.LaunchTemplateVersion == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{})
+	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing instances, %w", err)
 	}
 	for _, reservation := range instancesOutput.Reservations {
 		for _, instance := range reservation.Instances {
-			if aws.StringValue(instance.State.Name) == ec2.InstanceStateNameRunning && aws.StringValue(instance.State.Name) == ec2.InstanceStateNamePending {
+			if aws.StringValue(instance.State.Name) == ec2.InstanceStateNameRunning || aws.StringValue(instance.State.Name) == ec2.InstanceStateNamePending {
 				for _, tag := range instance.Tags {
 					if aws.StringValue(tag.Key) == "aws:ec2launchtemplate:version" && aws.StringValue(tag.Value) == aws.StringValue(substrate.Status.Cluster.LaunchTemplateVersion) {
 						logging.FromContext(ctx).Infof("Found instance %s", aws.StringValue(instance.InstanceId))
@@ -74,13 +72,12 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		OnDemandOptions:   &ec2.OnDemandOptionsRequest{AllocationStrategy: aws.String(ec2.FleetOnDemandAllocationStrategyLowestPrice)},
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "Invalid IAM Instance Profile name") {
-			return reconcile.Result{Requeue: true}, nil
-		}
 		return reconcile.Result{}, fmt.Errorf("creating fleet, %w", err)
 	}
-	if len(createFleetOutput.Errors) > 0 {
-		return reconcile.Result{}, fmt.Errorf("creating fleet, %s", createFleetOutput.Errors)
+	for _, err := range createFleetOutput.Errors {
+		if strings.Contains(aws.StringValue(err.ErrorMessage), "Invalid IAM Instance Profile name") {
+			return reconcile.Result{Requeue: true}, nil
+		}
 	}
 	logging.FromContext(ctx).Infof("Created instance %s", aws.StringValue(createFleetOutput.Instances[0].InstanceIds[0]))
 
