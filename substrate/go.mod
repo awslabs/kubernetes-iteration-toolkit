@@ -11,6 +11,7 @@ require (
 	go.uber.org/zap v1.19.1
 	k8s.io/apimachinery v0.23.1
 	k8s.io/client-go v0.23.1
+	k8s.io/kubernetes v1.23.1
 	knative.dev/pkg v0.0.0-20211215065729-552319d4f55b
 	sigs.k8s.io/controller-runtime v0.11.0
 )
