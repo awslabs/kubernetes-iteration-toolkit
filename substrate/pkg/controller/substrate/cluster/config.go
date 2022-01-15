@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -58,14 +59,11 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		return reconcile.Result{Requeue: true}, nil
 	}
 	// ensure S3 bucket
-	if err := c.ensureS3Bucket(ctx, substrate); err != nil {
+	if err := c.ensureBucket(ctx, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("ensuring S3 bucket, %w", err)
 	}
 	// create all configs file
-	cfg, err := defaultClusterConfig(substrate)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	cfg := defaultClusterConfig(substrate)
 	if err := c.generateCerts(cfg, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("generating certs, %w", err)
 	}
@@ -73,9 +71,11 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		return reconcile.Result{}, fmt.Errorf("generating manifests, %w", err)
 	}
 	// upload to s3 bucket
-	if err := c.uploadDirectories(ctx, substrate); err != nil {
-		return reconcile.Result{}, fmt.Errorf("uploading to S3 bucket, %w", err)
+	if err := c.S3Uploader.UploadWithIterator(ctx, NewDirectoryIterator(
+		aws.StringValue(discovery.Name(substrate)), path.Join(clusterCertsBasePath, substrate.Name))); err != nil {
+		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
+	logging.FromContext(ctx).Infof("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
 	return reconcile.Result{}, nil
 }
 
@@ -125,38 +125,23 @@ func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, subs
 	return nil
 }
 
-func (c *Config) ensureS3Bucket(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	if _, err := c.S3.CreateBucket(&s3.CreateBucketInput{
-		Bucket: discovery.Name(substrate),
-		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: c.S3.Config.Region,
-		},
-	}); err != nil && err.(awserr.Error).Code() != s3.ErrCodeBucketAlreadyOwnedByYou {
-		return fmt.Errorf("creating S3 bucket, %w", err)
+func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	if _, err := c.S3.CreateBucket(&s3.CreateBucketInput{Bucket: discovery.Name(substrate),
+		CreateBucketConfiguration: &s3.CreateBucketConfiguration{LocationConstraint: c.S3.Config.Region},
+	}); err != nil {
+		if err.(awserr.Error).Code() != s3.ErrCodeBucketAlreadyOwnedByYou {
+			return fmt.Errorf("creating S3 bucket, %w", err)
+		}
+		logging.FromContext(ctx).Infof("Found s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
+	} else {
+		logging.FromContext(ctx).Infof("Created s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
-	logging.FromContext(ctx).Infof("Ensured s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	return nil
 }
 
-func (c *Config) uploadDirectories(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	if err := c.S3Uploader.UploadWithIterator(ctx, NewDirectoryIterator(
-		aws.StringValue(discovery.Name(substrate)), localConfigPath(substrate))); err != nil {
-		return fmt.Errorf("uploading to S3 %w", err)
-	}
-	logging.FromContext(ctx).Infof("Uploaded configs from %q to bucket %q",
-		localConfigPath(substrate), aws.StringValue(discovery.Name(substrate)))
-	return nil
-}
-
-func localConfigPath(substrate *v1alpha1.Substrate) string {
-	return path.Join(clusterCertsBasePath, substrate.Name)
-}
-
-func defaultClusterConfig(substrate *v1alpha1.Substrate) (*kubeadm.InitConfiguration, error) {
+func defaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfiguration {
 	defaultStaticConfig, err := configutil.DefaultedStaticInitConfiguration()
-	if err != nil {
-		return nil, err
-	}
+	runtime.Must(err)
 	// etcd specific config
 	defaultStaticConfig.ClusterConfiguration.KubernetesVersion = kubernetesVersionTag
 	defaultStaticConfig.ClusterConfiguration.ImageRepository = imageRepository
@@ -192,7 +177,7 @@ func defaultClusterConfig(substrate *v1alpha1.Substrate) (*kubeadm.InitConfigura
 		defaultStaticConfig.ControllerManager.ExtraArgs = map[string]string{}
 	}
 	defaultStaticConfig.NodeRegistration = kubeadm.NodeRegistrationOptions{Name: substrate.Name}
-	return defaultStaticConfig, nil
+	return defaultStaticConfig
 }
 
 // DirectoryIterator represents an iterator of a specified directory
@@ -230,9 +215,7 @@ func (d *DirectoryIterator) Next() bool {
 		d.next.f = nil
 		return false
 	}
-	f, err := os.Open(d.filePaths[0])
-	d.err = err
-	d.next.f = f
+	d.next.f, d.err = os.Open(d.filePaths[0])
 	d.next.path = d.filePaths[0]
 	d.filePaths = d.filePaths[1:]
 	return true && d.Err() == nil
@@ -245,15 +228,9 @@ func (d *DirectoryIterator) Err() error {
 
 // UploadObject uploads a file
 func (d *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
-	f := d.next.f
+	// f := d.next.f
 	return s3manager.BatchUploadObject{
-		Object: &s3manager.UploadInput{
-			Bucket: &d.bucket,
-			Key:    &d.next.path,
-			Body:   f,
-		},
-		After: func() error {
-			return f.Close()
-		},
+		Object: &s3manager.UploadInput{Bucket: &d.bucket, Key: &d.next.path, Body: d.next.f},
+		After:  d.next.f.Close,
 	}
 }
