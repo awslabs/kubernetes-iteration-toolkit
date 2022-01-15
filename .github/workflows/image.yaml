@@ -3,6 +3,7 @@ name: Build the operator image and push to public ECR on the main branch
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}
 jobs:
   build-push-docker-image:
     runs-on: ubuntu-latest

@@ -2,6 +2,7 @@ name: Release operator version, generates a new Docker image and helm charts
 on:
   push:
     tags: ['v*']
+  workflow_dispatch: {}
 jobs:
   release:
     runs-on: ubuntu-latest
