@@ -4,6 +4,7 @@ on:
     branches: [main]
   push:
     branches-ignore: [main]
+  workflow_dispatch: {}
 jobs:
   build-test-operator:
     runs-on: ubuntu-latest
