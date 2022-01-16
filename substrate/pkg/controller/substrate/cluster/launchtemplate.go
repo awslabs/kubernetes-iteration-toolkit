@@ -31,15 +31,16 @@ import (
 )
 
 type LaunchTemplate struct {
-	EC2 *ec2.EC2
-	SSM *ssm.SSM
+	EC2    *ec2.EC2
+	SSM    *ssm.SSM
+	Region *string
 }
 
 func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.SecurityGroupID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2")})
+	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/eks/optimized-ami/1.21/amazon-linux-2-arm64/recommended/image_id")})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("getting ssm parameter, %w", err)
 	}
@@ -58,20 +59,58 @@ func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 		IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{Name: discovery.Name(substrate)},
 		Monitoring:         &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 		SecurityGroupIds:   []*string{substrate.Status.SecurityGroupID},
-		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(`#!/bin/bash
-			sudo swapoff -a
-			sudo yum install -y docker
-			sudo yum install -y conntrack-tools
-			cat <<EOF | sudo tee /etc/docker/daemon.json
-			{
-			  "exec-opts": ["native.cgroupdriver=systemd"]
-			}
-			EOF
+		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`#!/bin/bash
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+	"exec-opts": ["native.cgroupdriver=systemd"]
+}
+EOF
+sudo systemctl enable docker
+sudo systemctl daemon-reload
+sudo systemctl restart docker
 
-			sudo systemctl enable docker
-			sudo systemctl daemon-reload
-			sudo systemctl restart docker`,
-		))),
+REGION=$(echo $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone) | sed 's/[a-z]$//')
+echo "Region is $REGION"
+
+#Instance ID through Instance meta data
+InstanceID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+#Assigning Elastic IP to Instance
+ELASTICIP_ALLOCATION_ID=""
+for i in {0..30}; do
+	if [ -z "$ELASTICIP_ALLOCATION_ID" ]
+	then
+		ELASTICIP_ALLOCATION_ID=$(AWS_DEFAULT_REGION=$REGION aws ec2 describe-addresses --filters "Name=tag:Name,Values=%[1]s" --query "Addresses[*].AllocationId" --output text)
+		sleep 2
+	fi
+done
+[[ -z "$ELASTICIP_ALLOCATION_ID" ]] && { echo "ELASTICIP_ALLOCATION_ID not found, exiting"; exit 1; }
+AWS_DEFAULT_REGION=$REGION aws ec2 associate-address --instance-id $InstanceID --allocation-id $ELASTICIP_ALLOCATION_ID
+
+sudo mkdir -p /etc/kit/
+cat <<EOF | sudo tee /etc/kit/sync.sh
+#!/bin/env bash
+while [ true ]; do
+ dirs=("/etc/systemd/system" "/etc/kubernetes")
+ for dir in "\${dirs[@]}"; do
+    echo "\$(date) Syncing S3 files for \$dir"
+    mkdir -p \$dir
+    existing_checksum=\$(ls -alR \$dir | md5sum)
+    aws s3 sync s3://%[1]s/tmp/%[1]s\$dir "\$dir"
+    new_checksum=\$(ls -alR \$dir | md5sum)
+    if [ "\$new_checksum" != "\$existing_checksum" ]; then
+		echo "Successfully synced from S3 \$dir"
+		echo "Restarting Kubelet service"
+		systemctl daemon-reload
+		systemctl restart kubelet
+    fi
+ done
+ sleep 10
+done
+EOF
+
+chmod a+x /etc/kit/sync.sh
+/etc/kit/sync.sh > /var/log/sync-kit-files.log&`, aws.StringValue(discovery.Name(substrate)))))),
 	}
 	if _, err := l.EC2.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateName: discovery.Name(substrate),

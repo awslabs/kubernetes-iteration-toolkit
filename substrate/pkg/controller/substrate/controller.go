@@ -53,7 +53,7 @@ func NewController(ctx context.Context) *Controller {
 			&infrastructure.InternetGateway{EC2: EC2},
 			&infrastructure.SecurityGroup{EC2: EC2},
 			&cluster.Address{EC2: EC2},
-			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session)},
+			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session), Region: session.Config.Region},
 			&cluster.InstanceProfile{IAM: IAM},
 			&cluster.Instance{EC2: EC2},
 			&cluster.Config{S3: s3.New(session), S3Uploader: s3manager.NewUploader(session)},

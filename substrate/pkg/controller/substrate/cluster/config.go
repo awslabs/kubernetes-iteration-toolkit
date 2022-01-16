@@ -16,10 +16,13 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -33,6 +36,7 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -43,10 +47,12 @@ const (
 	kubeconfigPath       = "/etc/kubernetes"
 	certPKIPath          = "/etc/kubernetes/pki"
 	clusterManifestPath  = "/etc/kubernetes/manifests"
-	kubeletSystemdPath   = "/etc/systemd/system/kubelet.service.d/"
+	kubeletSystemdPath   = "/etc/systemd/system"
 	kubeletConfigPath    = "/var/lib/kubelet/"
 	kubernetesVersionTag = "v1.21.2-eks-1-21-4"
 	imageRepository      = "public.ecr.aws/eks-distro/kubernetes"
+	etcdVersionTag       = "v3.4.16-eks-1-21-7"
+	etcdImageRepository  = "public.ecr.aws/eks-distro/etcd-io"
 )
 
 type Config struct {
@@ -67,12 +73,18 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 	if err := c.generateCerts(cfg, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("generating certs, %w", err)
 	}
+	if err := c.kubeConfigs(cfg, substrate); err != nil {
+		return reconcile.Result{}, fmt.Errorf("generating kube config, %w", err)
+	}
 	if err := c.generateStaticPodManifests(cfg, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("generating manifests, %w", err)
 	}
+	if err := c.kubeletSystemService(cfg, substrate); err != nil {
+		return reconcile.Result{}, fmt.Errorf("generating kubelet service config, %w", err)
+	}
 	// upload to s3 bucket
 	if err := c.S3Uploader.UploadWithIterator(ctx, NewDirectoryIterator(
-		aws.StringValue(discovery.Name(substrate)), path.Join(clusterCertsBasePath, substrate.Name))); err != nil {
+		aws.StringValue(discovery.Name(substrate)), path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))); err != nil {
 		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
 	logging.FromContext(ctx).Infof("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
@@ -82,18 +94,31 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 func (c *Config) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	// delete the s3 bucket
 	if err := s3manager.NewBatchDeleteWithClient(c.S3).Delete(ctx, s3manager.NewDeleteListIterator(
-		c.S3, &s3.ListObjectsInput{Bucket: discovery.Name(substrate)})); err != nil {
-		return reconcile.Result{}, fmt.Errorf("deleting objects from bucket %s, %w", aws.StringValue(discovery.Name(substrate)), err)
+		c.S3, &s3.ListObjectsInput{Bucket: discovery.Name(substrate)}),
+	); err != nil && !strings.Contains(err.(awserr.Error).Error(), "NoSuchBucket") {
+		return reconcile.Result{}, fmt.Errorf("deleting objects from bucket %v", err)
 	}
 	if _, err := c.S3.DeleteBucketWithContext(ctx, &s3.DeleteBucketInput{Bucket: discovery.Name(substrate)}); err != nil {
-		return reconcile.Result{}, fmt.Errorf("deleting S3, %w", err)
+		if err.(awserr.Error).Code() != s3.ErrCodeNoSuchBucket {
+			return reconcile.Result{}, fmt.Errorf("deleting S3, %w", err)
+		}
+	} else {
+		logging.FromContext(ctx).Infof("Deleted S3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
-	logging.FromContext(ctx).Infof("Deleted S3 bucket %s", aws.StringValue(discovery.Name(substrate)))
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, os.RemoveAll(path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))
+}
+
+func ErrNoSuchBucket(err error) bool {
+	if err != nil {
+		if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+			return aerr.Code() == s3.ErrCodeNoSuchBucket
+		}
+	}
+	return false
 }
 
 func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	cfg.CertificatesDir = path.Join(clusterCertsBasePath, substrate.Name, certPKIPath)
+	cfg.CertificatesDir = path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), certPKIPath)
 	certTree, err := certsphase.GetDefaultCertList().AsMap().CertTree()
 	if err != nil {
 		return err
@@ -101,11 +126,27 @@ func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alph
 	if err := certTree.CreateTree(cfg); err != nil {
 		return fmt.Errorf("error creating cert tree, %w", err)
 	}
+	// create private and public keys for service accounts
+	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.PublicKeyAlgorithm())
+}
+
+func (c *Config) kubeConfigs(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
+	// Generate Kube config files for master components
+	kubeConfigDir := path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigPath)
+	for _, kubeConfigFileName := range []string{
+		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.KubeletKubeConfigFileName,
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName} {
+		if err := kubeconfig.CreateKubeConfigFile(kubeConfigFileName, kubeConfigDir, cfg); err != nil {
+			return fmt.Errorf("creating %v, %w", kubeConfigFileName, err)
+		}
+	}
 	return nil
 }
 
 func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	manifestDir := path.Join(clusterCertsBasePath, substrate.Name, clusterManifestPath)
+	manifestDir := path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath)
 	// etcd phase adds cfg.CertificatesDir to static pod yaml for pods to read the certs from
 	cfg.CertificatesDir = certPKIPath
 	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(
@@ -116,7 +157,7 @@ func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, subs
 		kubeadmconstants.KubeAPIServer,
 		kubeadmconstants.KubeControllerManager,
 		kubeadmconstants.KubeScheduler} {
-		err := controlplane.CreateStaticPodFiles(path.Join(clusterCertsBasePath, substrate.Name, clusterManifestPath), "",
+		err := controlplane.CreateStaticPodFiles(path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath), "",
 			&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false, componentName)
 		if err != nil {
 			return fmt.Errorf("creating static pod file for %v, %w", componentName, err)
@@ -139,6 +180,29 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 	return nil
 }
 
+func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
+	localDir := path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
+	if _, err := os.Stat(localDir); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.MkdirAll(localDir, 0777); err != nil {
+			return err
+		}
+	}
+	if err := ioutil.WriteFile(path.Join(localDir, "kubelet.service"), []byte(`[Unit]
+After=docker.service iptables-restore.service
+Requires=docker.service
+
+[Service]
+ExecStart=/usr/bin/kubelet --address=127.0.0.1 --pod-manifest-path=/etc/kubernetes/manifests --cgroup-driver=systemd  --container-runtime=docker
+Restart=always`,
+	), 0644); err != nil {
+		return fmt.Errorf("writing kubelet configuration, %w", err)
+	}
+	return nil
+}
+
 func defaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfiguration {
 	defaultStaticConfig, err := configutil.DefaultedStaticInitConfiguration()
 	runtime.Must(err)
@@ -146,6 +210,7 @@ func defaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 	defaultStaticConfig.ClusterConfiguration.KubernetesVersion = kubernetesVersionTag
 	defaultStaticConfig.ClusterConfiguration.ImageRepository = imageRepository
 	defaultStaticConfig.Etcd.Local = &kubeadm.LocalEtcd{
+		ImageMeta:      kubeadm.ImageMeta{ImageRepository: etcdImageRepository, ImageTag: etcdVersionTag},
 		ServerCertSANs: []string{"localhost", "127.0.0.1"},
 		PeerCertSANs:   []string{"localhost", "127.0.0.1"},
 		DataDir:        "/var/lib/etcd",
@@ -176,7 +241,12 @@ func defaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 	if defaultStaticConfig.ControllerManager.ExtraArgs == nil {
 		defaultStaticConfig.ControllerManager.ExtraArgs = map[string]string{}
 	}
-	defaultStaticConfig.NodeRegistration = kubeadm.NodeRegistrationOptions{Name: substrate.Name}
+	defaultStaticConfig.NodeRegistration = kubeadm.NodeRegistrationOptions{
+		Name: substrate.Name,
+		KubeletExtraArgs: map[string]string{"cgroup-driver": "systemd", "network-plugin": "cni",
+			"pod-infra-container-image": imageRepository + "/pause:" + kubernetesVersionTag,
+		},
+	}
 	return defaultStaticConfig
 }
 
@@ -228,7 +298,6 @@ func (d *DirectoryIterator) Err() error {
 
 // UploadObject uploads a file
 func (d *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
-	// f := d.next.f
 	return s3manager.BatchUploadObject{
 		Object: &s3manager.UploadInput{Bucket: &d.bucket, Key: &d.next.path, Body: d.next.f},
 		After:  d.next.f.Close,

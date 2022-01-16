@@ -52,6 +52,7 @@ var PolicyDocument = aws.String(`{
 			"Action": [
 				"s3:GetObject",
 				"s3:ListBucket",
+				"ec2:DescribeAddresses",
 				"ec2:AssociateAddress"
 			],
 			"Resource": ["*"]
