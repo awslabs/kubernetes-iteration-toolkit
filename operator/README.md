@@ -51,7 +51,7 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
 
 ```bash
    helm repo add kit https://awslabs.github.io/kubernetes-iteration-toolkit/
-   helm upgrade --install kit-operator kit/kit-operator --namespace kit --create-namespace --version 0.0.1
+   helm upgrade --install kit-operator kit/kit-operator --namespace kit --create-namespace --set serviceAccount.create=false
 ```
 
 Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kubernetes control plane and worker nodes by following these steps in any namespace in the substrate cluster

@@ -28,7 +28,7 @@ var (
 
 func WithOwner(owner, obj client.Object) client.Object {
 	obj.SetOwnerReferences([]metav1.OwnerReference{{
-		APIVersion: owner.GetObjectKind().GroupVersionKind().Version,
+		APIVersion: owner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 		Name:       owner.GetName(),
 		Kind:       owner.GetObjectKind().GroupVersionKind().Kind,
 		UID:        owner.GetUID(),
