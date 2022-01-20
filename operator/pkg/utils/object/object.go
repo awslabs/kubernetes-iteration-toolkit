@@ -15,8 +15,6 @@ limitations under the License.
 package object
 
 import (
-	"fmt"
-
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,7 +28,7 @@ var (
 
 func WithOwner(owner, obj client.Object) client.Object {
 	obj.SetOwnerReferences([]metav1.OwnerReference{{
-		APIVersion: fmt.Sprintf("%s/%s", owner.GetObjectKind().GroupVersionKind().Group, owner.GetObjectKind().GroupVersionKind().Version),
+		APIVersion: owner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 		Name:       owner.GetName(),
 		Kind:       owner.GetObjectKind().GroupVersionKind().Kind,
 		UID:        owner.GetUID(),
