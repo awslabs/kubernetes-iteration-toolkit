@@ -54,6 +54,49 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
    helm upgrade --install kit-operator kit/kit-operator --namespace kit --create-namespace --set serviceAccount.create=false
 ```
 
+#### Configure Karpenter provisioners to be able provision right kind of nodes 
+Create the two following provisioners for Karpenter to be able to provisioner nodes for master and etcd
+
+```bash
+  cat <<EOF | kubectl apply -f -
+  apiVersion: karpenter.sh/v1alpha5
+  kind: Provisioner
+  metadata:
+    name: master-nodes
+  spec:
+    labels:
+      kit.k8s.sh/app: ${GUEST_CLUSTER_NAME}-apiserver
+      kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
+    provider:
+      instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
+      securityGroupSelector:
+        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
+      subnetSelector:
+        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
+    ttlSecondsAfterEmpty: 30
+  EOF
+```
+
+```bash
+  cat <<EOF | kubectl apply -f -
+  apiVersion: karpenter.sh/v1alpha5
+  kind: Provisioner
+  metadata:
+    name: etcd-nodes
+  spec:
+    labels:
+      kit.k8s.sh/app: ${GUEST_CLUSTER_NAME}-etcd
+      kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
+    provider:
+      instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
+      securityGroupSelector:
+        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
+      subnetSelector:
+        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
+    ttlSecondsAfterEmpty: 30
+  EOF
+```
+
 Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kubernetes control plane and worker nodes by following these steps in any namespace in the substrate cluster
 
 1. Provision a control plane for the guest cluster
