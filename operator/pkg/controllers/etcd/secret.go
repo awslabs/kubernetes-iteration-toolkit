@@ -143,7 +143,7 @@ func SvcFQDN(clusterName, namespace string) string {
 // hostnames are <podname>.<svcname>.kit.svc.cluster.local
 func etcdPodAndHostnames(controlPlane *v1alpha1.ControlPlane) []string {
 	result := []string{}
-	for i := 0; i < defaultEtcdReplicas; i++ {
+	for i := 0; i < controlPlane.Spec.Etcd.Replicas; i++ {
 		podname := fmt.Sprintf("%s-etcd-%d", controlPlane.ClusterName(), i)
 		result = append(result, podname, fmt.Sprintf("%s.%s", podname, SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace)))
 	}

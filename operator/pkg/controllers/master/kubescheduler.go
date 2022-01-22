@@ -37,36 +37,32 @@ func (c *Controller) reconcileScheduler(ctx context.Context, controlPlane *v1alp
 			return fmt.Errorf("patch scheduler pod spec, %w", err)
 		}
 	}
-	return c.kubeClient.EnsurePatch(ctx, &appsv1.Deployment{},
-		object.WithOwner(controlPlane, &appsv1.Deployment{
+	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
+		object.WithOwner(controlPlane, &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      SchedulerDeploymentName(controlPlane.ClusterName()),
+				Name:      SchedulerDaemonSetName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
+				Labels:    schedulerLabels(controlPlane.ClusterName()),
 			},
-			Spec: appsv1.DeploymentSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: schedulerLabels(controlPlane.ClusterName()),
-				},
-				Replicas: aws.Int32(3),
-				Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
+			Spec: appsv1.DaemonSetSpec{
+				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
+				Selector:       &metav1.LabelSelector{MatchLabels: schedulerLabels(controlPlane.ClusterName())},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: schedulerLabels(controlPlane.ClusterName()),
-					},
-					Spec: schedulerPodSpec,
+					ObjectMeta: metav1.ObjectMeta{Labels: schedulerLabels(controlPlane.ClusterName())},
+					Spec:       schedulerPodSpec,
 				},
 			},
 		}),
 	)
 }
 
-func SchedulerDeploymentName(clusterName string) string {
+func SchedulerDaemonSetName(clusterName string) string {
 	return fmt.Sprintf("%s-scheduler", clusterName)
 }
 
 func schedulerLabels(clustername string) map[string]string {
 	return map[string]string{
-		object.AppNameLabelKey: SchedulerDeploymentName(clustername),
+		object.AppNameLabelKey: SchedulerDaemonSetName(clustername),
 	}
 }
 
@@ -77,28 +73,8 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		PriorityClassName:             "system-node-critical",
+		Tolerations:                   []v1.Toleration{{Operator: v1.TolerationOpExists}},
 		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
-		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
-			MaxSkew:           int32(1),
-			TopologyKey:       "topology.kubernetes.io/zone",
-			WhenUnsatisfiable: v1.DoNotSchedule,
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: schedulerLabels(controlPlane.ClusterName()),
-			},
-		}, {
-			MaxSkew:           int32(1),
-			TopologyKey:       "kubernetes.io/hostname",
-			WhenUnsatisfiable: v1.DoNotSchedule,
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: schedulerLabels(controlPlane.ClusterName()),
-			},
-		}},
-		Affinity: &v1.Affinity{PodAffinity: &v1.PodAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
-				LabelSelector: &metav1.LabelSelector{MatchLabels: APIServerLabels(controlPlane.ClusterName())},
-				TopologyKey:   "kubernetes.io/hostname",
-			}},
-		}},
 		Containers: []v1.Container{{
 			Name:    "scheduler",
 			Image:   imageprovider.KubeScheduler(controlPlane.Spec.KubernetesVersion),

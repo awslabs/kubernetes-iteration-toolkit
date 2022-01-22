@@ -28,8 +28,8 @@ spec:
               properties:
                 etcd:
                   properties:
-                    ami:
-                      type: string
+                    replicas:
+                      type: integer
                     spec:
                       properties:
                         activeDeadlineSeconds:
@@ -1738,15 +1738,11 @@ spec:
                       required:
                         - containers
                       type: object
-                    type:
-                      type: string
                   type: object
                 kubernetesVersion:
                   type: string
                 master:
                   properties:
-                    ami:
-                      type: string
                     apiServer:
                       properties:
                         replicas:
@@ -6886,8 +6882,6 @@ spec:
                             - containers
                           type: object
                       type: object
-                    type:
-                      type: string
                   type: object
               type: object
             status:

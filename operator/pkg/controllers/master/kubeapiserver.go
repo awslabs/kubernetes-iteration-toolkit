@@ -52,7 +52,7 @@ func (c *Controller) reconcileApiServer(ctx context.Context, controlPlane *v1alp
 				Selector: &metav1.LabelSelector{
 					MatchLabels: APIServerLabels(controlPlane.ClusterName()),
 				},
-				Replicas: aws.Int32(3),
+				Replicas: aws.Int32(int32(controlPlane.Spec.Master.APIServer.Replicas)),
 				Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{

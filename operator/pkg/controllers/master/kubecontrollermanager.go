@@ -38,30 +38,26 @@ func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.Co
 			return fmt.Errorf("patch KCM pod spec, %w", err)
 		}
 	}
-	return c.kubeClient.EnsurePatch(ctx, &appsv1.Deployment{},
-		object.WithOwner(controlPlane, &appsv1.Deployment{
+	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
+		object.WithOwner(controlPlane, &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      KCMDeploymentName(controlPlane.ClusterName()),
+				Name:      KCMDaemonSetName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
+				Labels:    kcmLabels(controlPlane.ClusterName()),
 			},
-			Spec: appsv1.DeploymentSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: kcmLabels(controlPlane.ClusterName()),
-				},
-				Replicas: aws.Int32(3),
-				Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
+			Spec: appsv1.DaemonSetSpec{
+				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
+				Selector:       &metav1.LabelSelector{MatchLabels: kcmLabels(controlPlane.ClusterName())},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: kcmLabels(controlPlane.ClusterName()),
-					},
-					Spec: kcmPodSpec,
+					ObjectMeta: metav1.ObjectMeta{Labels: kcmLabels(controlPlane.ClusterName())},
+					Spec:       kcmPodSpec,
 				},
 			},
 		}),
 	)
 }
 
-func KCMDeploymentName(clusterName string) string {
+func KCMDaemonSetName(clusterName string) string {
 	return fmt.Sprintf("%s-controller-manager", clusterName)
 }
 
@@ -76,28 +72,8 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		PriorityClassName:             "system-node-critical",
+		Tolerations:                   []v1.Toleration{{Operator: v1.TolerationOpExists}},
 		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
-		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
-			MaxSkew:           int32(1),
-			TopologyKey:       "topology.kubernetes.io/zone",
-			WhenUnsatisfiable: v1.DoNotSchedule,
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: kcmLabels(controlPlane.ClusterName()),
-			},
-		}, {
-			MaxSkew:           int32(1),
-			TopologyKey:       "kubernetes.io/hostname",
-			WhenUnsatisfiable: v1.DoNotSchedule,
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: kcmLabels(controlPlane.ClusterName()),
-			},
-		}},
-		Affinity: &v1.Affinity{PodAffinity: &v1.PodAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
-				LabelSelector: &metav1.LabelSelector{MatchLabels: APIServerLabels(controlPlane.ClusterName())},
-				TopologyKey:   "kubernetes.io/hostname",
-			}},
-		}},
 		Containers: []v1.Container{{
 			Name:    "controller-manager",
 			Image:   imageprovider.KubeControllerManager(controlPlane.Spec.KubernetesVersion),

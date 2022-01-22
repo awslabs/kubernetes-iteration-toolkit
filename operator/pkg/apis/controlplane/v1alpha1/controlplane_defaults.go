@@ -36,4 +36,7 @@ func (s *ControlPlaneSpec) SetDefaults(ctx context.Context) {
 	if s.Master.APIServer == nil {
 		s.Master.APIServer = &Component{}
 	}
+	if s.Master.APIServer.Replicas == 0 {
+		s.Master.APIServer.Replicas = 1
+	}
 }

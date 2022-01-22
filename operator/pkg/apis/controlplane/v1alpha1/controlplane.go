@@ -15,8 +15,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -46,23 +44,16 @@ type ControlPlaneList struct {
 type ControlPlaneSpec struct {
 	KubernetesVersion string     `json:"kubernetesVersion,omitempty"`
 	Master            MasterSpec `json:"master,omitempty"`
-	Etcd              ETCDSpec   `json:"etcd,omitempty"`
+	Etcd              *Component `json:"etcd,omitempty"`
 }
 
 // MasterSpec provides a way for the user to configure master instances and
 // custom flags for components running on master nodes like apiserver, KCM and
 // scheduler.
 type MasterSpec struct {
-	Instances         `json:",inline"`
 	Scheduler         *Component `json:"scheduler,omitempty"`
 	ControllerManager *Component `json:"controllerManager,omitempty"`
 	APIServer         *Component `json:"apiServer,omitempty"`
-}
-
-// ETCDSpec provides a way to configure the etcd nodes and args which are passed to the etcd process.
-type ETCDSpec struct {
-	Instances `json:",inline"`
-	Spec      *v1.PodSpec `json:"spec,omitempty"`
 }
 
 // Component provides a generic way to pass in args and images to master and etcd
@@ -73,19 +64,6 @@ type Component struct {
 	Spec     *v1.PodSpec `json:"spec,omitempty"`
 }
 
-// Instances denotes how the infrastructure of a particular components looks
-// like, if a user wants to use a specific AMI ID, they can provide this in the
-// Instances for the corresponding component.
-type Instances struct {
-	AMI  string `json:"ami,omitempty"`
-	Type string `json:"type,omitempty"`
-}
-
 func (c *ControlPlane) ClusterName() string {
 	return c.Name
-}
-
-type ReconcileFinalize interface {
-	Reconcile(context.Context, *ControlPlane) error
-	Finalize(context.Context, *ControlPlane) error
 }

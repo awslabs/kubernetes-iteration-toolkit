@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/awslabs/kit/operator/pkg/apis/controlplane"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/errors"
@@ -49,7 +50,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		return err
 	}
 	// reconcile addons to the guest cluster
-	for _, resource := range []v1alpha1.ReconcileFinalize{
+	for _, resource := range []controlplane.ReconcileFinalize{
 		KubeProxyController(guestClusterClient, c.substrateClient),
 		CoreDNSController(guestClusterClient),
 	} {
