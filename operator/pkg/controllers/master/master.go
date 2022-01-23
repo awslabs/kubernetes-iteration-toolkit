@@ -32,11 +32,11 @@ type Controller struct {
 	kubeClient    *kubeprovider.Client
 	keypairs      *keypairs.Provider
 	kubeConfigs   *kubeconfigs.Provider
-	iamProvider   controlplane.ReconcileFinalize
+	iamProvider   controlplane.Controller
 	cloudProvider awsprovider.AccountMetadata
 }
 
-func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamProvider controlplane.ReconcileFinalize) *Controller {
+func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamProvider controlplane.Controller) *Controller {
 	return &Controller{
 		kubeClient:    kubeclient,
 		keypairs:      keypairs.Reconciler(kubeclient),

@@ -41,7 +41,7 @@ func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.Co
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
 		object.WithOwner(controlPlane, &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      KCMDaemonSetName(controlPlane.ClusterName()),
+				Name:      controllerManagerName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
 				Labels:    kcmLabels(controlPlane.ClusterName()),
 			},
@@ -57,7 +57,7 @@ func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.Co
 	)
 }
 
-func KCMDaemonSetName(clusterName string) string {
+func controllerManagerName(clusterName string) string {
 	return fmt.Sprintf("%s-controller-manager", clusterName)
 }
 

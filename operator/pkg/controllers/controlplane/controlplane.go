@@ -38,7 +38,7 @@ type controlPlane struct {
 }
 
 // NewController returns a controller for managing controlPlane components of the cluster
-func NewController(kubeClient client.Client, account awsprovider.AccountMetadata, iamProvider controlplane.ReconcileFinalize) *controlPlane {
+func NewController(kubeClient client.Client, account awsprovider.AccountMetadata, iamProvider controlplane.Controller) *controlPlane {
 	return &controlPlane{
 		etcdController:   etcd.New(kubeprovider.New(kubeClient)),
 		masterController: master.New(kubeprovider.New(kubeClient), account, iamProvider),
@@ -58,7 +58,7 @@ func (c *controlPlane) For() controllers.Object {
 
 // Reconcile will reconcile all the components running on the control plane
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
-	for _, resource := range []controlplane.ReconcileFinalize{
+	for _, resource := range []controlplane.Controller{
 		c.etcdController,
 		c.masterController,
 		c.addonsController,

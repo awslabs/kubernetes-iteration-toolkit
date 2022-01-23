@@ -50,7 +50,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		return err
 	}
 	// reconcile addons to the guest cluster
-	for _, resource := range []controlplane.ReconcileFinalize{
+	for _, resource := range []controlplane.Controller{
 		KubeProxyController(guestClusterClient, c.substrateClient),
 		CoreDNSController(guestClusterClient),
 	} {

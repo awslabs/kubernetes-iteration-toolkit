@@ -40,7 +40,7 @@ func (c *Controller) reconcileScheduler(ctx context.Context, controlPlane *v1alp
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
 		object.WithOwner(controlPlane, &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      SchedulerDaemonSetName(controlPlane.ClusterName()),
+				Name:      SchedulerName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
 				Labels:    schedulerLabels(controlPlane.ClusterName()),
 			},
@@ -56,13 +56,13 @@ func (c *Controller) reconcileScheduler(ctx context.Context, controlPlane *v1alp
 	)
 }
 
-func SchedulerDaemonSetName(clusterName string) string {
+func SchedulerName(clusterName string) string {
 	return fmt.Sprintf("%s-scheduler", clusterName)
 }
 
 func schedulerLabels(clustername string) map[string]string {
 	return map[string]string{
-		object.AppNameLabelKey: SchedulerDaemonSetName(clustername),
+		object.AppNameLabelKey: SchedulerName(clustername),
 	}
 }
 

@@ -20,7 +20,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 )
 
-type ReconcileFinalize interface {
+type Controller interface {
 	Reconcile(context.Context, *v1alpha1.ControlPlane) error
 	Finalize(context.Context, *v1alpha1.ControlPlane) error
 }
