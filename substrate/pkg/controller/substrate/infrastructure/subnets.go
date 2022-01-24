@@ -46,6 +46,9 @@ func (s *Subnets) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 		return reconcile.Result{}, err
 	}
 	for _, subnet := range subnets {
+		if subnet == nil { // we can run into a case when ctx is canceled, errs and subnets are all nil
+			continue
+		}
 		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
 			substrate.Status.PublicSubnetIDs = append(substrate.Status.PublicSubnetIDs, aws.StringValue(subnet.SubnetId))
 		} else {

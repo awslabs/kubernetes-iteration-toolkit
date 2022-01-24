@@ -55,8 +55,13 @@ func (a *Address) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (re
 		return reconcile.Result{}, fmt.Errorf("describing addresses, %w", err)
 	}
 	for _, address := range addressesOutput.Addresses {
+		if address.AssociationId != nil {
+			if _, err := a.EC2.DisassociateAddressWithContext(ctx, &ec2.DisassociateAddressInput{AssociationId: address.AssociationId}); err != nil {
+				return reconcile.Result{}, fmt.Errorf("disassociating elastic IP, %w", err)
+			}
+		}
 		if _, err := a.EC2.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{AllocationId: address.AllocationId}); err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to release elastic IP, %w", err)
+			return reconcile.Result{}, fmt.Errorf("releasing elastic IP, %w", err)
 		}
 	}
 	return reconcile.Result{}, nil

@@ -28,7 +28,7 @@ import (
 )
 
 type Instance struct {
-	EC2         *ec2.EC2
+	EC2 *ec2.EC2
 }
 
 func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
@@ -78,7 +78,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		if strings.Contains(aws.StringValue(err.ErrorMessage), "Invalid IAM Instance Profile name") {
 			return reconcile.Result{Requeue: true}, nil
 		}
-		return reconcile.Result{}, fmt.Errorf("creating fleet", aws.StringValue(err.ErrorMessage))
+		return reconcile.Result{}, fmt.Errorf("creating fleet %v", aws.StringValue(err.ErrorMessage))
 	}
 	logging.FromContext(ctx).Infof("Created instance %s", aws.StringValue(createFleetOutput.Instances[0].InstanceIds[0]))
 

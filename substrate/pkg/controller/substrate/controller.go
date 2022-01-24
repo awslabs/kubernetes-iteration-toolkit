@@ -27,6 +27,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/controller/substrate/cluster"
@@ -51,9 +53,10 @@ func NewController(ctx context.Context) *Controller {
 			&infrastructure.InternetGateway{EC2: EC2},
 			&infrastructure.SecurityGroup{EC2: EC2},
 			&cluster.Address{EC2: EC2},
-			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session)},
+			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session), Region: session.Config.Region},
 			&cluster.InstanceProfile{IAM: IAM},
 			&cluster.Instance{EC2: EC2},
+			&cluster.Config{S3: s3.New(session), S3Uploader: s3manager.NewUploader(session)},
 		},
 	}
 }
