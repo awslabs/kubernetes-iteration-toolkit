@@ -69,10 +69,10 @@ Create the two following provisioners for Karpenter to be able to provisioner no
       kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
     provider:
       instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
-      securityGroupSelector:
-        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
       subnetSelector:
-        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
+        karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
+      securityGroupSelector:
+        karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
     ttlSecondsAfterEmpty: 30
   EOF
 ```
@@ -89,10 +89,10 @@ Create the two following provisioners for Karpenter to be able to provisioner no
       kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
     provider:
       instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
-      securityGroupSelector:
-        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
       subnetSelector:
-        kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: '*'
+        karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
+      securityGroupSelector:
+        karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
     ttlSecondsAfterEmpty: 30
   EOF
 ```
