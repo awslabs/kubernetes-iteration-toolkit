@@ -25,7 +25,7 @@ import (
 // CRD instance object in Kubernetes. All the defaults are set while reconciling
 // over ControlPlane object in the controllers.
 func (c *ControlPlane) SetDefaults(ctx context.Context) {
-	c.Spec = c.Spec.SetVersionDefaults().SetMasterDefaults()
+	c.Spec = c.Spec.SetVersionDefaults().SetMasterDefaults().SetEtcdDefaults()
 }
 
 // SetVersionDefaults for the controlPlane
@@ -43,6 +43,17 @@ func (s ControlPlaneSpec) SetMasterDefaults() ControlPlaneSpec {
 	}
 	if s.Master.APIServer.Replicas == 0 {
 		s.Master.APIServer.Replicas = 1
+	}
+	return s
+}
+
+// SetEtcdDefaults for the etcd components
+func (s ControlPlaneSpec) SetEtcdDefaults() ControlPlaneSpec {
+	if s.Etcd == nil {
+		s.Etcd = &Component{}
+	}
+	if s.Etcd.Replicas == 0 {
+		s.Etcd.Replicas = 3
 	}
 	return s
 }
