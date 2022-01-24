@@ -18,16 +18,16 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
 ### Deploy KIT operator
 
 ```bash
-  SUBSTRATE_CLUSTER_NAME=kit-management-cluster
-  GUEST_CLUSTER_NAME=example
-  AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-  AWS_REGION=us-west-2
+SUBSTRATE_CLUSTER_NAME=kit-management-cluster
+GUEST_CLUSTER_NAME=example
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+AWS_REGION=us-west-2
 ```
 
 #### Create an IAM role and policy which will be assumed by KIT operator to be able to talk AWS APIs
 
 ```bash
-  aws cloudformation deploy  \
+aws cloudformation deploy  \
   --template-file docs/kit.cloudformation.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --stack-name kitControllerPolicy \
@@ -37,21 +37,64 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
 #### Associate the policy we just created to the kit-controller service account 
 
 ```bash
-  eksctl create iamserviceaccount \
-    --name kit-controller \
-    --namespace kit \
-    --cluster ${SUBSTRATE_CLUSTER_NAME} \
-    --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy-${SUBSTRATE_CLUSTER_NAME} \
-    --approve \
-    --override-existing-serviceaccounts \
-    --region=${AWS_REGION}
+eksctl create iamserviceaccount \
+  --name kit-controller \
+  --namespace kit \
+  --cluster ${SUBSTRATE_CLUSTER_NAME} \
+  --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy-${SUBSTRATE_CLUSTER_NAME} \
+  --approve \
+  --override-existing-serviceaccounts \
+  --region=${AWS_REGION}
 ```
 
 #### Install KIT operator to the cluster
 
 ```bash
-   helm repo add kit https://awslabs.github.io/kubernetes-iteration-toolkit/
-   helm upgrade --install kit-operator kit/kit-operator --namespace kit --create-namespace --set serviceAccount.create=false
+helm repo add kit https://awslabs.github.io/kubernetes-iteration-toolkit/
+helm upgrade --install kit-operator kit/kit-operator --namespace kit --create-namespace --set serviceAccount.create=false
+```
+
+#### Configure Karpenter provisioners to be able provision right kind of nodes 
+Create the two following provisioners for Karpenter to be able to provisioner nodes for master and etcd
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: master-nodes
+spec:
+  labels:
+    kit.k8s.sh/app: ${GUEST_CLUSTER_NAME}-apiserver
+    kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
+  provider:
+    instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
+    subnetSelector:
+      karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
+    securityGroupSelector:
+      karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
+  ttlSecondsAfterEmpty: 30
+EOF
+```
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: etcd-nodes
+spec:
+  labels:
+    kit.k8s.sh/app: ${GUEST_CLUSTER_NAME}-etcd
+    kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
+  provider:
+    instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
+    subnetSelector:
+      karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
+    securityGroupSelector:
+      karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
+  ttlSecondsAfterEmpty: 30
+EOF
 ```
 
 Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kubernetes control plane and worker nodes by following these steps in any namespace in the substrate cluster
@@ -59,40 +102,40 @@ Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kube
 1. Provision a control plane for the guest cluster
 
 ```bash
-  cat <<EOF | kubectl apply -f -
-  apiVersion: kit.k8s.sh/v1alpha1
-  kind: ControlPlane
-  metadata:
-    name: ${GUEST_CLUSTER_NAME} # Desired Cluster name
-  spec: {}
+cat <<EOF | kubectl apply -f -
+apiVersion: kit.k8s.sh/v1alpha1
+kind: ControlPlane
+metadata:
+  name: ${GUEST_CLUSTER_NAME} # Desired Cluster name
+spec: {}
 EOF
 ```
 
 2. Get the admin KUBECONFIG for the guest cluster from the substrate cluster
 
 ```bash
-  kubectl get secret ${GUEST_CLUSTER_NAME}-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
+kubectl get secret ${GUEST_CLUSTER_NAME}-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
 ```
 > NOTE: It takes about 3-4 minutes for the cluster control plane to be available and healthy
 
 3. Deploy CNI plugin to the guest cluster for the nodes to be ready. If you are deploying in `us-west-2` region run the following command to install AWS CNI plugin
 
 ```bash
-  kubectl --kubeconfig=/tmp/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/v1.9/aws-k8s-cni.yaml
+kubectl --kubeconfig=/tmp/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/v1.9/aws-k8s-cni.yaml
 ```
 > For other regions, follow this guide to deploy the AWS CNI plugin- https://docs.aws.amazon.com/eks/latest/userguide/managing-vpc-cni.html
 
 4. Provision worker nodes for the guest cluster
 
 ```bash
-  cat <<EOF | kubectl apply -f -
-  apiVersion: kit.k8s.sh/v1alpha1
-  kind: DataPlane
-  metadata:
-    name: ${GUEST_CLUSTER_NAME}-nodes 
-  spec: 
-    clusterName: ${GUEST_CLUSTER_NAME} # Associated Cluster name
-    nodeCount: 1
+cat <<EOF | kubectl apply -f -
+apiVersion: kit.k8s.sh/v1alpha1
+kind: DataPlane
+metadata:
+  name: ${GUEST_CLUSTER_NAME}-nodes
+spec:
+  clusterName: ${GUEST_CLUSTER_NAME} # Associated Cluster name
+  nodeCount: 1
 EOF
 ```
 
@@ -104,8 +147,8 @@ EOF
 
 > If you run into issues with AWS permissions in KIT-controller, delete the iamserviceaccount and recreate again with the steps mentioned above.
 ```bash
-  eksctl delete iamserviceaccount --name kit-controller \
-    --namespace kit \
-    --cluster ${SUBSTRATE_CLUSTER_NAME} \
-    --region=$AWS_REGION
+eksctl delete iamserviceaccount --name kit-controller \
+  --namespace kit \
+  --cluster ${SUBSTRATE_CLUSTER_NAME} \
+  --region=$AWS_REGION
 ```
