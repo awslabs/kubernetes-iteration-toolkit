@@ -74,7 +74,9 @@ var _ = Describe("ControlPlane", func() {
 		controlPlane = &v1alpha1.ControlPlane{ObjectMeta: metav1.ObjectMeta{
 			Name:      "testcluster",
 			Namespace: "default",
-		}}
+		}, Spec: v1alpha1.ControlPlaneSpec{
+			Master: v1alpha1.MasterSpec{APIServer: &v1alpha1.Component{Replicas: 1}},
+			Etcd:   &v1alpha1.Component{}}}
 	})
 	AfterEach(func() {
 		ExpectCleanedUp(kubeClient)
@@ -114,8 +116,6 @@ var _ = Describe("ControlPlane", func() {
 				ExpectStatefulSetExists(kubeClient, etcd.ServiceNameFor(controlPlane.Name), controlPlane.Namespace)
 				// check master deployments
 				ExpectDeploymentExists(kubeClient, master.APIServerDeploymentName(controlPlane.Name), controlPlane.Namespace)
-				ExpectDeploymentExists(kubeClient, master.KCMDeploymentName(controlPlane.Name), controlPlane.Namespace)
-				ExpectDeploymentExists(kubeClient, master.SchedulerDeploymentName(controlPlane.Name), controlPlane.Namespace)
 			})
 		})
 	})

@@ -72,9 +72,7 @@ func (c *Controller) reconcileAuthenticatorDaemonSet(ctx context.Context, contro
 					MatchLabels: authenticatorLabels(),
 				},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: authenticatorLabels(),
-					},
+					ObjectMeta: metav1.ObjectMeta{Labels: authenticatorLabels()},
 					Spec: v1.PodSpec{
 						HostNetwork:  true,
 						NodeSelector: APIServerLabels(controlPlane.ClusterName()),

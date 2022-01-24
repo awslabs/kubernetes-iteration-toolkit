@@ -47,7 +47,7 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 			},
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			ServiceName:         ServiceNameFor(controlPlane.ClusterName()),
-			Replicas:            aws.Int32(defaultEtcdReplicas),
+			Replicas:            aws.Int32(int32(controlPlane.Spec.Etcd.Replicas)),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labelsFor(controlPlane.ClusterName()),

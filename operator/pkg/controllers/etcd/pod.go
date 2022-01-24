@@ -28,10 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	defaultEtcdReplicas = 3
-)
-
 func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 	return &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
@@ -173,7 +169,7 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 
 func initialClusterFlag(controlPlane *v1alpha1.ControlPlane) string {
 	nodes := make([]string, 0)
-	for i := 0; i < defaultEtcdReplicas; i++ {
+	for i := 0; i < controlPlane.Spec.Etcd.Replicas; i++ {
 		nodes = append(nodes, fmt.Sprintf("%[1]s-etcd-%[2]d=https://%[1]s-etcd-%[2]d.%[1]s-etcd.%[3]s.svc.cluster.local:2380", controlPlane.ClusterName(), i, controlPlane.Namespace))
 	}
 	return strings.Join(nodes, ",")
