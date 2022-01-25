@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/controllers/etcd"
+	"github.com/awslabs/kit/operator/pkg/utils/functional"
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"github.com/awslabs/kit/operator/pkg/utils/patch"
@@ -31,7 +32,9 @@ import (
 )
 
 const (
-	serviceClusterIPRange = "10.96.0.0/12"
+	serviceClusterIPRange         = "10.96.0.0/12"
+	instanceTypeLabelKey          = "node.kubernetes.io/instance-type"
+	instanceTypeLabelDefaultValue = "m5.16xlarge"
 )
 
 func (c *Controller) reconcileApiServer(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
@@ -82,7 +85,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		PriorityClassName:             "system-cluster-critical",
-		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
+		NodeSelector:                  apiserverNodeSelector(controlPlane.ClusterName()),
 		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
 			MaxSkew:           int32(1),
 			TopologyKey:       "topology.kubernetes.io/zone",
@@ -328,4 +331,9 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			},
 		}},
 	}
+}
+
+func apiserverNodeSelector(clusterName string) map[string]string {
+	return functional.UnionStringMaps(nodeSelector(clusterName),
+		map[string]string{instanceTypeLabelKey: instanceTypeLabelDefaultValue})
 }

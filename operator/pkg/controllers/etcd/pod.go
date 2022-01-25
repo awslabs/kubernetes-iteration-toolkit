@@ -28,6 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	instanceTypeLabelKey          = "node.kubernetes.io/instance-type"
+	instanceTypeLabelDefaultValue = "m5.16xlarge"
+)
+
 func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 	return &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
@@ -200,5 +205,5 @@ func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 
 func nodeSelector(clusterName string) map[string]string {
 	return functional.UnionStringMaps(labelsFor(clusterName),
-		map[string]string{object.ControlPlaneLabelKey: clusterName})
+		map[string]string{object.ControlPlaneLabelKey: clusterName, instanceTypeLabelKey: instanceTypeLabelDefaultValue})
 }
