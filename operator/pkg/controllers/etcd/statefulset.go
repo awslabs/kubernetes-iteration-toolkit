@@ -54,6 +54,18 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 				},
 				Spec: etcdSpec,
 			},
+			VolumeClaimTemplates: []v1.PersistentVolumeClaim{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "etcd-data",
+				},
+				Spec: v1.PersistentVolumeClaimSpec{
+					AccessModes:      []v1.PersistentVolumeAccessMode{"ReadWriteOnce"},
+					StorageClassName: &controlPlane.Spec.Etcd.StorageSpec.StorageClassName,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{"storage": controlPlane.Spec.Etcd.StorageSpec.Size},
+					},
+				},
+			}},
 		},
 	}))
 }

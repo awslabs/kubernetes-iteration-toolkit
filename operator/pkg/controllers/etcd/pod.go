@@ -112,13 +112,6 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 			}},
 		}},
 		Volumes: []v1.Volume{{
-			Name: "etcd-data",
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: "/var/lib/etcd",
-				},
-			},
-		}, {
 			Name: "etcd-ca",
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{

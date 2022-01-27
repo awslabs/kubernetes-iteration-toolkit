@@ -32,7 +32,7 @@ import (
 const (
 	rootCACommonName       = "kubernetes"
 	frontProxyCACommonName = "front-proxy-ca"
-	kubeAdminName          = "kubernetes-admin"
+	//kubeAdminName          = "kubernetes-admin"
 )
 
 // reconcileCertificates creates the kubernetes secrets containing all the certs

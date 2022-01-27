@@ -16,6 +16,7 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,7 +45,17 @@ type ControlPlaneList struct {
 type ControlPlaneSpec struct {
 	KubernetesVersion string     `json:"kubernetesVersion,omitempty"`
 	Master            MasterSpec `json:"master,omitempty"`
-	Etcd              *Component `json:"etcd,omitempty"`
+	Etcd              Etcd       `json:"etcd,omitempty"`
+}
+
+type StorageSpec struct {
+	StorageClassName string            `json:"storageClassName,omitempty"`
+	Size             resource.Quantity `json:"size,omitempty"`
+}
+
+type Etcd struct {
+	Component   `json:",inline"`
+	StorageSpec StorageSpec `json:"storageSpec,omitempty"`
 }
 
 // MasterSpec provides a way for the user to configure master instances and

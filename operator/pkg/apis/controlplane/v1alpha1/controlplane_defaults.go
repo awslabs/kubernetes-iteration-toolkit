@@ -49,9 +49,6 @@ func (s ControlPlaneSpec) SetMasterDefaults() ControlPlaneSpec {
 
 // SetEtcdDefaults for the etcd components
 func (s ControlPlaneSpec) SetEtcdDefaults() ControlPlaneSpec {
-	if s.Etcd == nil {
-		s.Etcd = &Component{}
-	}
 	if s.Etcd.Replicas == 0 {
 		s.Etcd.Replicas = 3
 	}
