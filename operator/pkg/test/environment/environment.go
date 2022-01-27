@@ -57,5 +57,5 @@ func (e *Environment) Stop() error {
 func crdFilePath() string {
 	_, file, _, _ := runtime.Caller(0)
 	p := filepath.Join(filepath.Dir(file), "..", "..", "..")
-	return filepath.Join(p, "config/control-plane-crd.yaml")
+	return filepath.Join(p, "charts/kit-operator/crds/control-plane-crd.yaml")
 }
