@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.4.1
+    controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
   name: controlplanes.kit.k8s.sh
 spec:
@@ -28,8 +28,8 @@ spec:
               properties:
                 etcd:
                   properties:
-                    ami:
-                      type: string
+                    replicas:
+                      type: integer
                     spec:
                       properties:
                         activeDeadlineSeconds:
@@ -1738,15 +1738,11 @@ spec:
                       required:
                         - containers
                       type: object
-                    type:
-                      type: string
                   type: object
                 kubernetesVersion:
                   type: string
                 master:
                   properties:
-                    ami:
-                      type: string
                     apiServer:
                       properties:
                         replicas:
@@ -6886,8 +6882,6 @@ spec:
                             - containers
                           type: object
                       type: object
-                    type:
-                      type: string
                   type: object
               type: object
             status:
@@ -6896,7 +6890,6 @@ spec:
                   items:
                     properties:
                       lastTransitionTime:
-                        format: date-time
                         type: string
                       message:
                         type: string
