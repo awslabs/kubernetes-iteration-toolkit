@@ -25,7 +25,6 @@ import (
 	"github.com/awslabs/kit/operator/pkg/controllers/master"
 	"github.com/awslabs/kit/operator/pkg/test/environment"
 	"github.com/awslabs/kit/operator/pkg/utils/scheme"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/awslabs/kit/operator/pkg/test/expectations"
@@ -77,7 +76,7 @@ var _ = Describe("ControlPlane", func() {
 			Namespace: "default",
 		}, Spec: v1alpha1.ControlPlaneSpec{
 			Master: v1alpha1.MasterSpec{APIServer: &v1alpha1.Component{Replicas: 1}},
-			Etcd:   v1alpha1.Etcd{Component: v1alpha1.Component{Replicas: 3, Spec: nil}, StorageSpec: v1alpha1.StorageSpec{StorageClassName: "test", Size: resource.MustParse("1Gi")}}}}
+			Etcd:   v1alpha1.Etcd{Component: v1alpha1.Component{Replicas: 3, Spec: nil}, VolumeClaimTemplates: nil}}}
 	})
 	AfterEach(func() {
 		ExpectCleanedUp(kubeClient)

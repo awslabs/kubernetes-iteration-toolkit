@@ -32,9 +32,16 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 	// Generate the default pod spec for the given control plane, if user has
 	// provided custom config for the etcd pod spec, patch this user
 	// provided config to the default spec
-	etcdSpec, err := patch.PodSpec(podSpecFor(controlPlane), controlPlane.Spec.Etcd.Spec)
+	podSpec, err := patch.PodSpec(podSpecFor(controlPlane), controlPlane.Spec.Etcd.Spec)
 	if err != nil {
 		return fmt.Errorf("failed to patch pod spec, %w", err)
+	}
+	// Generate the default volume claim template spec for the given control plane, if user has
+	// provided custom config for the etcd volume template spec, patch this user
+	// provided config to the default spec
+	volumeClaimSpec, err := patch.VolumeClaimTemplateSpec(DefaultVolumeClaimTemplateSpec(), controlPlane.Spec.Etcd.VolumeClaimTemplates)
+	if err != nil {
+		return fmt.Errorf("failed to patch voluemclaim template spec, %w", err)
 	}
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.StatefulSet{}, object.WithOwner(controlPlane, &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -52,20 +59,9 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labelsFor(controlPlane.ClusterName()),
 				},
-				Spec: etcdSpec,
+				Spec: podSpec,
 			},
-			VolumeClaimTemplates: []v1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "etcd-data",
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					AccessModes:      []v1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-					StorageClassName: &controlPlane.Spec.Etcd.StorageSpec.StorageClassName,
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{"storage": controlPlane.Spec.Etcd.StorageSpec.Size},
-					},
-				},
-			}},
+			VolumeClaimTemplates: volumeClaimSpec,
 		},
 	}))
 }

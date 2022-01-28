@@ -23,6 +23,47 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
 
+// VolumeClaimTemplateSpec returns the merged VolumeClaimTemplate spes
+func VolumeClaimTemplateSpec(defaultSpec, patch []v1.PersistentVolumeClaim) ([]v1.PersistentVolumeClaim, error) {
+	if len(patch) == 0 {
+		return defaultSpec, nil
+	}
+	defaults, patches := map[string]v1.PersistentVolumeClaim{}, map[string]v1.PersistentVolumeClaim{}
+	for _, spec := range defaultSpec {
+		if _, ok := defaults[spec.Name]; ok {
+			return nil, fmt.Errorf("duplicate PersistentVolumeClaim detected, Name: %s", spec.ObjectMeta.Name)
+		}
+		defaults[spec.Name] = spec
+	}
+	for _, spec := range patch {
+		if _, ok := patches[spec.Name]; ok {
+			return nil, fmt.Errorf("duplicate PersistentVolumeClaim detected, Name: %s", spec.ObjectMeta.Name)
+		}
+		patches[spec.Name] = spec
+	}
+	result := []v1.PersistentVolumeClaim{}
+	for name, spec := range patches {
+		s := &spec
+		if _, ok := defaults[name]; ok {
+			merged, err := mergePatch(defaults[name], spec, v1.PersistentVolumeClaim{})
+			if err != nil {
+				return nil, err
+			}
+			re := &v1.PersistentVolumeClaim{}
+			if err := json.Unmarshal(merged, re); err != nil {
+				return nil, fmt.Errorf("unmarshalling merged patch to volumeClaimTemplateSpec, %w", err)
+			}
+			s = re
+			delete(defaults, name)
+		}
+		result = append(result, *s)
+	}
+	for _, spec := range defaults {
+		result = append(result, spec)
+	}
+	return result, nil
+}
+
 // PodSpec will merge the patch with the default pod spec and return the merged podSpec object
 func PodSpec(defaultSpec, patch *v1.PodSpec) (v1.PodSpec, error) {
 	if patch == nil {

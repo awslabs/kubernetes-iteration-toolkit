@@ -16,7 +16,6 @@ package v1alpha1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,14 +47,9 @@ type ControlPlaneSpec struct {
 	Etcd              Etcd       `json:"etcd,omitempty"`
 }
 
-type StorageSpec struct {
-	StorageClassName string            `json:"storageClassName,omitempty"`
-	Size             resource.Quantity `json:"size,omitempty"`
-}
-
 type Etcd struct {
-	Component   `json:",inline"`
-	StorageSpec StorageSpec `json:"storageSpec,omitempty"`
+	Component            `json:",inline"`
+	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 }
 
 // MasterSpec provides a way for the user to configure master instances and
