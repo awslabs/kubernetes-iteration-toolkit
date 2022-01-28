@@ -15,21 +15,18 @@ limitations under the License.
 package master
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
+	"github.com/awslabs/kit/operator/pkg/utils/object"
 	"knative.dev/pkg/ptr"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
-	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // reconcileAuthenticatorConfig creates required configs for aws-iam-authenticator and stores them as secret in api server
@@ -38,7 +35,7 @@ func (c *Controller) reconcileAuthenticatorConfig(ctx context.Context, controlPl
 	if err != nil {
 		return fmt.Errorf("getting AWS account ID, %w", err)
 	}
-	configMapBytes, err := ParseTemplate(authenticatorConfig, struct{ Name, ClusterName, Namespace, Group, KitNodeRole, AWSAccountID, PrivateDNS, SessionName string }{
+	configMap, err := object.GenerateConfigMap(authenticatorConfig, struct{ Name, ClusterName, Namespace, Group, KitNodeRole, AWSAccountID, PrivateDNS, SessionName string }{
 		Name:         AuthenticatorConfigMapName(controlPlane.ClusterName()),
 		ClusterName:  controlPlane.ClusterName(),
 		Namespace:    controlPlane.Namespace,
@@ -50,10 +47,6 @@ func (c *Controller) reconcileAuthenticatorConfig(ctx context.Context, controlPl
 	})
 	if err != nil {
 		return fmt.Errorf("generating authenticator config, %w", err)
-	}
-	configMap := &v1.ConfigMap{}
-	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configMapBytes, configMap); err != nil {
-		return fmt.Errorf("decoding authenticator config map, %w", err)
 	}
 	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, configMap)
 }
@@ -178,18 +171,6 @@ data:
         - {{ .AWSAccountID }}
 `
 )
-
-// TODO move this to util. ParseTemplate validates and parses passed as argument template
-func ParseTemplate(strtmpl string, obj interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	tmpl := template.Must(template.New("Text").Parse(strtmpl))
-	err := tmpl.Execute(&buf, obj)
-	if err != nil {
-		return nil, fmt.Errorf("error when executing template, %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
 func AuthenticatorDaemonSetName(clusterName string) string {
 	return fmt.Sprintf("%s-authenticator", clusterName)
 }

@@ -12,12 +12,12 @@ If you are developing KIT operator, finish the installation steps listed in the 
 ### Create a [Private ECR repository](https://docs.aws.amazon.com/AmazonECR/latest/userguide/repository-create.html) to push controller and webhook image for kit-operator
 
 ```bash
-    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-    AWS_REGION=us-west-2
-    CONTAINER_IMAGE_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_REGION=us-west-2
+export CONTAINER_IMAGE_REGISTRY=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
-    aws ecr create-repository --repository-name kit --region ${AWS_REGION}
-    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin $CONTAINER_IMAGE_REGISTRY
+aws ecr create-repository --repository-name kit --region ${AWS_REGION}
+aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin $CONTAINER_IMAGE_REGISTRY
 ```
 
 ## Deploy
@@ -25,14 +25,14 @@ If you are developing KIT operator, finish the installation steps listed in the 
 Makefile calls `Ko` and `Ko` will build the Docker image and push the image to the container repo created in ECR in the last step. Once the image is published, Ko will `kubectl apply` KIT YAML(s) in `config` directory. This will install KIT operator and the required configs to the cluster listed in `kubectl config current-context`
 
 ```bash
-    kubectl create namespace kit
-    make apply
+kubectl create namespace kit
+make apply
 ```
 
 ## Delete KIT
 To delete KIT from Kubernetes cluster
 
 ```bash
-    make delete
-    kubectl delete namespace kit
+make delete
+kubectl delete namespace kit
 ```

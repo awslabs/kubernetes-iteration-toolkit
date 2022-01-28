@@ -15,9 +15,17 @@ limitations under the License.
 package object
 
 import (
+	"bytes"
+	"fmt"
+	"html/template"
+
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,4 +46,16 @@ func WithOwner(owner, obj client.Object) client.Object {
 
 func NamespacedName(name, namespace string) types.NamespacedName {
 	return types.NamespacedName{Namespace: namespace, Name: name}
+}
+
+func GenerateConfigMap(strtmpl string, obj interface{}) (*v1.ConfigMap, error) {
+	var buf bytes.Buffer
+	tmpl := template.Must(template.New("Text").Parse(strtmpl))
+	err := tmpl.Execute(&buf, obj)
+	if err != nil {
+		return nil, fmt.Errorf("error when executing template, %w", err)
+	}
+	configMap := &v1.ConfigMap{}
+	err = kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), buf.Bytes(), configMap)
+	return configMap, err
 }

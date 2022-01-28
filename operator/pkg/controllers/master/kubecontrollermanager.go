@@ -17,7 +17,6 @@ package master
 import (
 	"context"
 	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
@@ -29,6 +28,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func (c *Controller) reconcileKCMCloudConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	configMap, err := object.GenerateConfigMap(cloudConfig, struct{ ClusterName, ConfigMapName, Namespace string }{
+		ClusterName:   controlPlane.ClusterName(),
+		ConfigMapName: CloudConfigMapName(controlPlane.ClusterName()),
+		Namespace:     controlPlane.Namespace,
+	})
+	if err != nil {
+		return fmt.Errorf("generating cloud config, %w", err)
+	}
+	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, configMap)
+}
 
 func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
 	kcmPodSpec := kcmPodSpecFor(controlPlane)
@@ -98,6 +109,8 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				"--root-ca-file=/etc/kubernetes/pki/ca/ca.crt",
 				"--service-account-private-key-file=/etc/kubernetes/pki/sa/sa.key",
 				"--use-service-account-credentials=true",
+				"--cloud-provider=aws",
+				"--cloud-config=/etc/kubernetes/cloud-config/aws.config",
 			},
 			VolumeMounts: []v1.VolumeMount{{
 				Name:      "ca-certs",
@@ -118,6 +131,10 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			}, {
 				Name:      "kcm-config",
 				MountPath: "/etc/kubernetes/config/kcm",
+				ReadOnly:  true,
+			}, {
+				Name:      "cloud-config",
+				MountPath: "/etc/kubernetes/cloud-config",
 				ReadOnly:  true,
 			}},
 		}},
@@ -183,6 +200,31 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					}},
 				},
 			},
+		}, {
+			Name: "cloud-config",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{Name: CloudConfigMapName(controlPlane.ClusterName())},
+				},
+			},
 		}},
 	}
 }
+
+func CloudConfigMapName(clusterName string) string {
+	return fmt.Sprintf("%s-cloud-config", clusterName)
+}
+
+var (
+	cloudConfig = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .ConfigMapName }}
+  namespace: {{ .Namespace }}
+data:
+  aws.config: |
+    [Global]
+    KubernetesClusterID={{ .ClusterName}}
+`
+)
