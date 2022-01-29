@@ -147,12 +147,10 @@ func (in *ControlPlaneStatus) DeepCopy() *ControlPlaneStatus {
 func (in *Etcd) DeepCopyInto(out *Etcd) {
 	*out = *in
 	in.Component.DeepCopyInto(&out.Component)
-	if in.VolumeClaimTemplates != nil {
-		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-		*out = make([]v1.PersistentVolumeClaim, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+	if in.PersistentVolumeClaimSpec != nil {
+		in, out := &in.PersistentVolumeClaimSpec, &out.PersistentVolumeClaimSpec
+		*out = new(v1.PersistentVolumeClaimSpec)
+		(*in).DeepCopyInto(*out)
 	}
 }
 

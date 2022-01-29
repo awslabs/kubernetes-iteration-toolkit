@@ -48,8 +48,8 @@ type ControlPlaneSpec struct {
 }
 
 type Etcd struct {
-	Component            `json:",inline"`
-	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+	Component                 `json:",inline"`
+	PersistentVolumeClaimSpec *v1.PersistentVolumeClaimSpec `json:"persistentVolumeClaimSpec,omitempty"`
 }
 
 // MasterSpec provides a way for the user to configure master instances and
