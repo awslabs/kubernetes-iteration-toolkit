@@ -68,7 +68,9 @@ func (s *Subnets) ensure(ctx context.Context, substrate *v1alpha1.Substrate, sub
 		routeTableID = substrate.Status.PublicRouteTableID
 	}
 	if _, err := s.EC2.AssociateRouteTableWithContext(ctx, &ec2.AssociateRouteTableInput{RouteTableId: routeTableID, SubnetId: subnet.SubnetId}); err != nil {
-		return nil, fmt.Errorf("associating route table with subnet, %w", err)
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() != "Resource.AlreadyAssociated" {
+			return nil, fmt.Errorf("associating route table with subnet, %w", err)
+		}
 	}
 	logging.FromContext(ctx).Infof("Ensured association of route table %s to subnet %s", aws.StringValue(routeTableID), aws.StringValue(subnet.SubnetId))
 	if !subnetSpec.Public {

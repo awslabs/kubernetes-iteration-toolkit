@@ -91,7 +91,7 @@ sudo mkdir -p /etc/kit/
 cat <<EOF | sudo tee /etc/kit/sync.sh
 #!/bin/env bash
 while [ true ]; do
- dirs=("/etc/systemd/system" "/etc/kubernetes")
+ dirs=("/etc/systemd/system" "/etc/kubernetes" "/etc/aws-iam-authenticator")
  for dir in "\${dirs[@]}"; do
     echo "\$(date) Syncing S3 files for \$dir"
     mkdir -p \$dir
@@ -105,7 +105,6 @@ while [ true ]; do
 		systemctl restart kubelet
     fi
  done
- sleep 10
 done
 EOF
 

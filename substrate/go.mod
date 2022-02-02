@@ -4,11 +4,13 @@ go 1.16
 
 require (
 	github.com/aws/aws-sdk-go v1.42.23
+	github.com/awslabs/kit/operator v0.0.0-00010101000000-000000000000
 	github.com/imdario/mergo v0.3.12
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/spf13/cobra v1.3.0
-	go.uber.org/multierr v1.6.0
+	go.uber.org/multierr v1.7.0
 	go.uber.org/zap v1.19.1
+	k8s.io/api v0.23.1
 	k8s.io/apimachinery v0.23.1
 	k8s.io/client-go v0.23.1
 	k8s.io/kubernetes v1.23.1
@@ -17,6 +19,7 @@ require (
 )
 
 replace (
+	github.com/awslabs/kit/operator => ../operator
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => k8s.io/api v0.23.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.23.1

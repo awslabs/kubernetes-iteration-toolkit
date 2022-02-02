@@ -22,6 +22,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
+	"github.com/awslabs/kit/operator/pkg/utils/iamauthenticator"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
@@ -29,20 +30,22 @@ import (
 )
 
 type Controller struct {
-	kubeClient    *kubeprovider.Client
-	keypairs      *keypairs.Provider
-	kubeConfigs   *kubeconfigs.Provider
-	iamProvider   controlplane.Controller
-	cloudProvider awsprovider.AccountMetadata
+	kubeClient          *kubeprovider.Client
+	keypairs            *keypairs.Provider
+	kubeConfigs         *kubeconfigs.Provider
+	iamProvider         controlplane.Controller
+	cloudProvider       awsprovider.AccountMetadata
+	awsIamAuthenticator *iamauthenticator.Controller
 }
 
 func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamProvider controlplane.Controller) *Controller {
 	return &Controller{
-		kubeClient:    kubeclient,
-		keypairs:      keypairs.Reconciler(kubeclient),
-		kubeConfigs:   kubeconfigs.Reconciler(kubeclient),
-		iamProvider:   iamProvider,
-		cloudProvider: account,
+		kubeClient:          kubeclient,
+		keypairs:            keypairs.Reconciler(kubeclient),
+		kubeConfigs:         kubeconfigs.Reconciler(kubeclient),
+		iamProvider:         iamProvider,
+		cloudProvider:       account,
+		awsIamAuthenticator: &iamauthenticator.Controller{KubeClient: kubeclient},
 	}
 }
 

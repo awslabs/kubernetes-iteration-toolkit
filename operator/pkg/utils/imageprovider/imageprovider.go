@@ -60,9 +60,9 @@ func CoreDNS() string {
 }
 
 func AWSIamAuthenticator() string {
-	return "602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon/aws-iam-authenticator:v0.5.3-amazonlinux-2"
+	return RepositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.3-eks-1-21-8"
 }
 
 func BusyBox() string {
-	return "public.ecr.aws/runecast/busybox:1.33.1"
+	return "public.ecr.aws/docker/library/busybox:stable"
 }
