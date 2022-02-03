@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
-	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -28,6 +28,9 @@ type RBAC struct {
 }
 
 func (r *RBAC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if substrate.Status.Cluster.Address == nil {
+		return reconcile.Result{Requeue: true}, nil
+	}
 	client, err := KubeClientFor(ctx, substrate)
 	if errors.Is(err, ErrWaitingForSubstrateEndpoint) {
 		return reconcile.Result{Requeue: true}, nil
@@ -35,15 +38,15 @@ func (r *RBAC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (recon
 		return reconcile.Result{}, err
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
+	if err := node.AllowBootstrapTokensToPostCSRs(client); err != nil {
 		return reconcile.Result{}, fmt.Errorf("error allowing bootstrap tokens to post CSRs, %w", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
+	if err := node.AutoApproveNodeBootstrapTokens(client); err != nil {
 		return reconcile.Result{}, fmt.Errorf("error auto-approving node bootstrap tokens, %w", err)
 	}
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
+	if err := node.AutoApproveNodeCertificateRotation(client); err != nil {
 		return reconcile.Result{}, fmt.Errorf("err AutoApproveNodeCertificateRotation, %w", err)
 	}
 	return reconcile.Result{}, nil

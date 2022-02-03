@@ -31,63 +31,6 @@ type InstanceProfile struct {
 	IAM *iam.IAM
 }
 
-var AssumeRolePolicyDocument = aws.String(`{
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Effect": "Allow",
-			"Action": "sts:AssumeRole",
-			"Principal": {
-				"Service": "ec2.amazonaws.com"
-			}
-		}
-	]
-}`)
-
-var SubstrateNodePolicyDocument = aws.String(`{
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Effect": "Allow",
-			"Action": [
-				"s3:GetObject",
-				"s3:ListBucket",
-				"ec2:DescribeAddresses",
-				"ec2:AssociateAddress",
-				"ec2:CreateLaunchTemplate",
-				"ec2:CreateFleet",
-				"ec2:RunInstances",
-				"ec2:CreateTags",
-				"iam:PassRole",
-				"ec2:TerminateInstances",
-				"ec2:DescribeLaunchTemplates",
-				"ec2:DescribeInstances",
-				"ec2:DescribeSecurityGroups",
-				"ec2:DescribeSubnets",
-				"ec2:DescribeInstanceTypes",
-				"ec2:DescribeInstanceTypeOfferings",
-				"ec2:DescribeAvailabilityZones",
-				"ssm:GetParameter"
-			],
-			"Resource": ["*"]
-		}
-	]
-}`)
-
-var ManagedPoliciesForSubstrateNode = []string{
-	"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
-	"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-	"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-}
-
-var ManagedPoliciesForNodeProvisionedByKarpenter = []string{
-	"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
-	"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-	"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-	"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
-	"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-}
-
 type roleInfo struct {
 	objectName      *string
 	policyDocument  *string
@@ -106,7 +49,17 @@ func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substr
 
 func (i *InstanceProfile) create(ctx context.Context, resourceName, policyDocument *string, managedPolicies []string) (reconcile.Result, error) {
 	// Role
-	if _, err := i.IAM.CreateRole(&iam.CreateRoleInput{RoleName: resourceName, AssumeRolePolicyDocument: AssumeRolePolicyDocument}); err != nil {
+	if _, err := i.IAM.CreateRole(&iam.CreateRoleInput{RoleName: resourceName, AssumeRolePolicyDocument: aws.String(`{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": "sts:AssumeRole",
+			"Principal": {
+				"Service": "ec2.amazonaws.com"
+			}
+		}
+	]}`)}); err != nil {
 		if err.(awserr.Error).Code() != iam.ErrCodeEntityAlreadyExistsException {
 			return reconcile.Result{}, fmt.Errorf("creating role, %w", err)
 		}
@@ -211,11 +164,49 @@ func (i *InstanceProfile) delete(ctx context.Context, resourceName, policyDocume
 func desiredRolesFor(substrate *v1alpha1.Substrate) []roleInfo {
 	return []roleInfo{{
 		// Roles and policies attached to the substrate node
-		objectName: discovery.Name(substrate), policyDocument: SubstrateNodePolicyDocument,
-		managedPolicies: ManagedPoliciesForSubstrateNode,
+		objectName: discovery.Name(substrate), policyDocument: aws.String(`{
+			"Version": "2012-10-17",
+			"Statement": [
+				{
+					"Effect": "Allow",
+					"Action": [
+						"s3:GetObject",
+						"s3:ListBucket",
+						"ec2:DescribeAddresses",
+						"ec2:AssociateAddress",
+						"ec2:CreateLaunchTemplate",
+						"ec2:CreateFleet",
+						"ec2:RunInstances",
+						"ec2:CreateTags",
+						"iam:PassRole",
+						"ec2:TerminateInstances",
+						"ec2:DescribeLaunchTemplates",
+						"ec2:DescribeInstances",
+						"ec2:DescribeSecurityGroups",
+						"ec2:DescribeSubnets",
+						"ec2:DescribeInstanceTypes",
+						"ec2:DescribeInstanceTypeOfferings",
+						"ec2:DescribeAvailabilityZones",
+						"ssm:GetParameter"
+					],
+					"Resource": ["*"]
+				}
+			]
+		}`),
+		managedPolicies: []string{
+			"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+			"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+			"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+		},
 	}, {
 		// Roles and policies attached to the nodes provisioned by Karpenter
-		objectName:      discovery.Name(substrate, KarpenterNodeRole),
-		managedPolicies: ManagedPoliciesForNodeProvisionedByKarpenter,
+		objectName: discovery.Name(substrate, KarpenterNodeRole),
+		managedPolicies: []string{
+			"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+			"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+			"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+			"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+			"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+		},
 	}}
 }

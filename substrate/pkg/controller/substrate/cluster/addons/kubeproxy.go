@@ -29,13 +29,15 @@ type KubeProxy struct {
 }
 
 func (k *KubeProxy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if substrate.Status.Cluster.Address == nil {
+		return reconcile.Result{Requeue: true}, nil
+	}
 	client, err := KubeClientFor(ctx, substrate)
 	if errors.Is(err, ErrWaitingForSubstrateEndpoint) {
 		return reconcile.Result{Requeue: true}, nil
 	} else if err != nil {
 		return reconcile.Result{}, err
 	}
-	// deploy kube proxy addon
 	config := cluster.DefaultClusterConfig(substrate)
 	if err := proxyaddon.EnsureProxyAddon(&config.ClusterConfiguration, &config.LocalAPIEndpoint, client); err != nil {
 		return reconcile.Result{Requeue: true}, fmt.Errorf("deploying kube-proxy addon, %w", err)

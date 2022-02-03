@@ -22,7 +22,6 @@ import (
 	"github.com/awslabs/kit/operator/pkg/awsprovider"
 	"github.com/awslabs/kit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
-	"github.com/awslabs/kit/operator/pkg/utils/iamauthenticator"
 	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
@@ -30,22 +29,20 @@ import (
 )
 
 type Controller struct {
-	kubeClient          *kubeprovider.Client
-	keypairs            *keypairs.Provider
-	kubeConfigs         *kubeconfigs.Provider
-	iamProvider         controlplane.Controller
-	cloudProvider       awsprovider.AccountMetadata
-	awsIamAuthenticator *iamauthenticator.Controller
+	kubeClient    *kubeprovider.Client
+	keypairs      *keypairs.Provider
+	kubeConfigs   *kubeconfigs.Provider
+	iamController controlplane.Controller
+	cloudProvider awsprovider.AccountMetadata
 }
 
-func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamProvider controlplane.Controller) *Controller {
+func New(kubeclient *kubeprovider.Client, account awsprovider.AccountMetadata, iamController controlplane.Controller) *Controller {
 	return &Controller{
-		kubeClient:          kubeclient,
-		keypairs:            keypairs.Reconciler(kubeclient),
-		kubeConfigs:         kubeconfigs.Reconciler(kubeclient),
-		iamProvider:         iamProvider,
-		cloudProvider:       account,
-		awsIamAuthenticator: &iamauthenticator.Controller{KubeClient: kubeclient},
+		kubeClient:    kubeclient,
+		keypairs:      keypairs.Reconciler(kubeclient),
+		kubeConfigs:   kubeconfigs.Reconciler(kubeclient),
+		iamController: iamController,
+		cloudProvider: account,
 	}
 }
 
@@ -61,9 +58,8 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileKCMCloudConfig,
 		c.reconcileKCM,
 		c.reconcileScheduler,
-		c.reconcileAuthenticatorConfig,
-		c.reconcileAuthenticatorDaemonSet,
-		c.iamProvider.Reconcile,
+		c.reconcileAuthenticator,
+		c.iamController.Reconcile,
 	} {
 		if err := reconcile(ctx, controlPlane); err != nil {
 			return err
@@ -74,7 +70,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 }
 
 func (c *Controller) Finalize(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	return c.iamProvider.Finalize(ctx, controlPlane)
+	return c.iamController.Finalize(ctx, controlPlane)
 }
 
 // Karpenter only created nodes for API server pods, as KCM and scheduler pods

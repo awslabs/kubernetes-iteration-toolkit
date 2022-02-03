@@ -29,20 +29,20 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sts"
-	iamauthenticatoraddon "github.com/awslabs/kit/operator/pkg/utils/iamauthenticator"
+	"github.com/awslabs/kit/operator/pkg/utils/iamauthenticator"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
-	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -64,7 +64,7 @@ const (
 
 type Config struct {
 	S3         *s3.S3
-	StsClient  *sts.STS
+	STS        *sts.STS
 	S3Uploader *s3manager.Uploader
 }
 
@@ -134,7 +134,7 @@ func ErrNoSuchBucket(err error) bool {
 
 func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
 	cfg.CertificatesDir = path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), certPKIPath)
-	certTree, err := certsphase.GetDefaultCertList().AsMap().CertTree()
+	certTree, err := certs.GetDefaultCertList().AsMap().CertTree()
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alph
 		return fmt.Errorf("error creating cert tree, %w", err)
 	}
 	// create private and public keys for service accounts
-	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.PublicKeyAlgorithm())
+	return certs.CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.PublicKeyAlgorithm())
 }
 
 func (c *Config) kubeConfigs(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
@@ -164,7 +164,7 @@ func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, subs
 	manifestDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath)
 	// etcd phase adds cfg.CertificatesDir to static pod yaml for pods to read the certs from
 	cfg.CertificatesDir = certPKIPath
-	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(
+	if err := etcd.CreateLocalEtcdStaticPodManifestFile(
 		manifestDir, "", cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false); err != nil {
 		return fmt.Errorf("error creating local etcd static pod manifest file %w", err)
 	}
@@ -219,7 +219,7 @@ Restart=always`,
 }
 
 func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfiguration {
-	defaultStaticConfig, err := configutil.DefaultedStaticInitConfiguration()
+	defaultStaticConfig, err := config.DefaultedStaticInitConfiguration()
 	runtime.Must(err)
 	// etcd specific config
 	defaultStaticConfig.ClusterConfiguration.KubernetesVersion = kubernetesVersionTag
@@ -256,7 +256,7 @@ func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 		HostPath:  "/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 		MountPath: "/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 		ReadOnly:  true,
-		PathType:  corev1.HostPathFileOrCreate,
+		PathType:  v1.HostPathFileOrCreate,
 	}}
 	if defaultStaticConfig.Scheduler.ExtraArgs == nil {
 		defaultStaticConfig.Scheduler.ExtraArgs = map[string]string{}
@@ -274,12 +274,11 @@ func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 }
 
 func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	// deploy aws IAM authenticator
-	identity, err := c.StsClient.GetCallerIdentityWithContext(ctx, &sts.GetCallerIdentityInput{})
+	identity, err := c.STS.GetCallerIdentityWithContext(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return fmt.Errorf("getting caller identity, %w", err)
 	}
-	configMap, err := iamauthenticatoraddon.Config(ctx, substrate.Name, substrate.Namespace,
+	configMap, err := iamauthenticator.Config(ctx, substrate.Name, substrate.Namespace,
 		aws.StringValue(discovery.Name(substrate, KarpenterNodeRole)), aws.StringValue(identity.Account))
 	if err != nil {
 		return err
@@ -296,21 +295,21 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 }
 
 func (c *Config) staticPodSpecForAuthenticator(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	authenticatorPod := &corev1.Pod{
+	authenticatorPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "aws-iam-authenticator",
 			Namespace: "kube-system",
 			Labels:    map[string]string{"component": "aws-iam-authenticator"},
 		},
-		Spec: iamauthenticatoraddon.PodSpec(substrate, func(spec corev1.PodSpec) corev1.PodSpec {
-			spec.Volumes = append(spec.Volumes, corev1.Volume{
+		Spec: iamauthenticator.PodSpec(func(spec v1.PodSpec) v1.PodSpec {
+			spec.Volumes = append(spec.Volumes, v1.Volume{
 				Name:         "config",
-				VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: authenticatorConfigDir}},
+				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: authenticatorConfigDir}},
 			})
 			return spec
 		}),
 	}
-	serialized, err := kubeadmutil.MarshalToYaml(authenticatorPod, corev1.SchemeGroupVersion)
+	serialized, err := kubeadmutil.MarshalToYaml(authenticatorPod, v1.SchemeGroupVersion)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config map manifest, %w", err)
 	}

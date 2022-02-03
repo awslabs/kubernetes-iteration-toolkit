@@ -41,9 +41,6 @@ const (
 )
 
 func KubeClientFor(ctx context.Context, substrate *v1alpha1.Substrate) (*kubernetes.Clientset, error) {
-	if substrate.Status.Cluster.Address == nil {
-		return nil, ErrWaitingForSubstrateEndpoint
-	}
 	// check if the kube-admin file for the cluster exists
 	kubeAdminFile := path.Join(cluster.ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeAdminFilePath)
 	if _, err := os.Stat(kubeAdminFile); errors.Is(err, os.ErrNotExist) {

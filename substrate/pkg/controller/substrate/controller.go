@@ -58,8 +58,7 @@ func NewController(ctx context.Context) *Controller {
 			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session), Region: session.Config.Region},
 			&cluster.InstanceProfile{IAM: IAM},
 			&cluster.Instance{EC2: EC2},
-			&cluster.Config{S3: s3.New(session), StsClient: sts.New(session), S3Uploader: s3manager.NewUploader(session)},
-			// Addons installed on substrate cluster
+			&cluster.Config{S3: s3.New(session), STS: sts.New(session), S3Uploader: s3manager.NewUploader(session)},
 			&addons.RBAC{},
 			&addons.KubeProxy{},
 		},
