@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -198,6 +199,34 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
 					ReadOnly:  true,
 				}},
+				LivenessProbe: &v1.Probe{
+					Handler: v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
+							Host:   "127.0.0.1",
+							Scheme: v1.URISchemeHTTPS,
+							Path:   "/livez",
+							Port:   intstr.FromInt(443),
+						},
+					},
+					InitialDelaySeconds: 10,
+					PeriodSeconds:       5,
+					TimeoutSeconds:      5,
+					FailureThreshold:    5,
+				},
+				ReadinessProbe: &v1.Probe{
+					Handler: v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
+							Host:   "127.0.0.1",
+							Scheme: v1.URISchemeHTTPS,
+							Path:   "/readyz",
+							Port:   intstr.FromInt(443),
+						},
+					},
+					InitialDelaySeconds: 0,
+					PeriodSeconds:       5,
+					TimeoutSeconds:      5,
+					FailureThreshold:    5,
+				},
 			}},
 		Volumes: []v1.Volume{{
 			Name: "ca-certs",

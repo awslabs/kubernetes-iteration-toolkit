@@ -17,11 +17,11 @@ package master
 import (
 	"context"
 	"fmt"
-
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"knative.dev/pkg/ptr"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -108,6 +108,20 @@ func (c *Controller) reconcileAuthenticatorDaemonSet(ctx context.Context, contro
 								Name:      "kubeconfig",
 								MountPath: "/var/aws-iam-authenticator/kubeconfig/",
 							}},
+							LivenessProbe: &v1.Probe{
+								Handler: v1.Handler{
+									HTTPGet: &v1.HTTPGetAction{
+										Host:   "127.0.0.1",
+										Scheme: v1.URISchemeHTTP,
+										Path:   "/healthz",
+										Port:   intstr.FromInt(21363),
+									},
+								},
+								InitialDelaySeconds: 10,
+								PeriodSeconds:       5,
+								TimeoutSeconds:      5,
+								FailureThreshold:    5,
+							},
 						}},
 						Volumes: []v1.Volume{{
 							Name: "config",
@@ -171,6 +185,7 @@ data:
         - {{ .AWSAccountID }}
 `
 )
+
 func AuthenticatorDaemonSetName(clusterName string) string {
 	return fmt.Sprintf("%s-authenticator", clusterName)
 }

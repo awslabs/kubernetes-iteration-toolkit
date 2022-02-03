@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func (c *Controller) reconcileKCMCloudConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
@@ -104,7 +105,6 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				"--controllers=*,-csrsigning",
 				"--kubeconfig=/etc/kubernetes/config/kcm/controller-manager.conf",
 				"--leader-elect=true",
-				"--port=0",
 				"--requestheader-client-ca-file=/etc/kubernetes/pki/proxy-ca/front-proxy-ca.crt",
 				"--root-ca-file=/etc/kubernetes/pki/ca/ca.crt",
 				"--service-account-private-key-file=/etc/kubernetes/pki/sa/sa.key",
@@ -137,6 +137,20 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				MountPath: "/etc/kubernetes/cloud-config",
 				ReadOnly:  true,
 			}},
+			LivenessProbe: &v1.Probe{
+				Handler: v1.Handler{
+					HTTPGet: &v1.HTTPGetAction{
+						Host:   "127.0.0.1",
+						Scheme: v1.URISchemeHTTP,
+						Path:   "/healthz",
+						Port:   intstr.FromInt(10252),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       5,
+				TimeoutSeconds:      5,
+				FailureThreshold:    5,
+			},
 		}},
 		Volumes: []v1.Volume{{
 			Name: "ca-certs",

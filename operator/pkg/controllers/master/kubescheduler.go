@@ -17,7 +17,6 @@ package master
 import (
 	"context"
 	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
@@ -27,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func (c *Controller) reconcileScheduler(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
@@ -90,7 +90,6 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				"--bind-address=127.0.0.1",
 				"--kubeconfig=/etc/kubernetes/config/scheduler/scheduler.conf",
 				"--leader-elect=true",
-				"--port=0",
 			},
 			VolumeMounts: []v1.VolumeMount{{
 				Name:      "ca-certs",
@@ -101,6 +100,20 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				MountPath: "/etc/kubernetes/config/scheduler",
 				ReadOnly:  true,
 			}},
+			LivenessProbe: &v1.Probe{
+				Handler: v1.Handler{
+					HTTPGet: &v1.HTTPGetAction{
+						Host:   "127.0.0.1",
+						Scheme: v1.URISchemeHTTP,
+						Path:   "/healthz",
+						Port:   intstr.FromInt(10251),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       5,
+				TimeoutSeconds:      5,
+				FailureThreshold:    5,
+			},
 		}},
 		Volumes: []v1.Volume{{
 			Name: "ca-certs",
