@@ -48,18 +48,18 @@ import (
 )
 
 const (
-	ClusterCertsBasePath   = "/tmp/"
-	kubeconfigPath         = "/etc/kubernetes"
-	certPKIPath            = "/etc/kubernetes/pki"
-	clusterManifestPath    = "/etc/kubernetes/manifests"
-	kubeletSystemdPath     = "/etc/systemd/system"
-	kubeletConfigPath      = "/var/lib/kubelet/"
-	authenticatorConfigDir = "/etc/aws-iam-authenticator"
-	kubernetesVersionTag   = "v1.21.2-eks-1-21-4"
-	imageRepository        = "public.ecr.aws/eks-distro/kubernetes"
-	etcdVersionTag         = "v3.4.16-eks-1-21-7"
-	etcdImageRepository    = "public.ecr.aws/eks-distro/etcd-io"
-	KarpenterNodeRole      = "karpenter-node-role"
+	ClusterCertsBasePath       = "/tmp/"
+	kubeconfigPath             = "/etc/kubernetes"
+	certPKIPath                = "/etc/kubernetes/pki"
+	clusterManifestPath        = "/etc/kubernetes/manifests"
+	kubeletSystemdPath         = "/etc/systemd/system"
+	kubeletConfigPath          = "/var/lib/kubelet/"
+	authenticatorConfigDir     = "/etc/aws-iam-authenticator"
+	kubernetesVersionTag       = "v1.21.2-eks-1-21-4"
+	imageRepository            = "public.ecr.aws/eks-distro/kubernetes"
+	etcdVersionTag             = "v3.4.16-eks-1-21-7"
+	etcdImageRepository        = "public.ecr.aws/eks-distro/etcd-io"
+	tenantControlPlaneNodeRole = "tenant-controlplane-node-role"
 )
 
 type Config struct {
@@ -279,7 +279,7 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 		return fmt.Errorf("getting caller identity, %w", err)
 	}
 	configMap, err := iamauthenticator.Config(ctx, substrate.Name, substrate.Namespace,
-		aws.StringValue(discovery.Name(substrate, KarpenterNodeRole)), aws.StringValue(identity.Account))
+		aws.StringValue(discovery.Name(substrate, tenantControlPlaneNodeRole)), aws.StringValue(identity.Account))
 	if err != nil {
 		return err
 	}
