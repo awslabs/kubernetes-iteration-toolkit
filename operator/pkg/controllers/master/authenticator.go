@@ -25,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // reconcileAuthenticator creates required configs for aws-iam-authenticator and stores them as secret in api server
@@ -45,29 +44,24 @@ func (c *Controller) reconcileAuthenticator(ctx context.Context, controlPlane *v
 	return c.ensureDaemonSet(ctx, controlPlane)
 }
 
-func (c *Controller) ensureDaemonSet(ctx context.Context, obj client.Object) error {
-	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{}, object.WithOwner(obj, &appsv1.DaemonSet{
+func (c *Controller) ensureDaemonSet(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{}, object.WithOwner(controlPlane, &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-authenticator", obj.GetName()),
-			Namespace: obj.GetNamespace(),
+			Name:      fmt.Sprintf("%s-authenticator", controlPlane.ClusterName()),
+			Namespace: controlPlane.Namespace,
 			Labels:    authenticatorLabels(),
 		},
 		Spec: appsv1.DaemonSetSpec{
 			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
-			Selector: &metav1.LabelSelector{
-				MatchLabels: authenticatorLabels(),
-			},
+			Selector:       &metav1.LabelSelector{MatchLabels: authenticatorLabels()},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: authenticatorLabels()},
 				Spec: iamauthenticator.PodSpec(func(spec v1.PodSpec) v1.PodSpec {
-					spec.NodeSelector = APIServerLabels(obj.GetName())
-					spec.Volumes = append(spec.Volumes, v1.Volume{
-						Name: "config",
-						VolumeSource: v1.VolumeSource{
-							ConfigMap: &v1.ConfigMapVolumeSource{
-								LocalObjectReference: v1.LocalObjectReference{Name: iamauthenticator.AuthenticatorConfigMapName(obj.GetName())},
-							},
-						},
+					spec.NodeSelector = APIServerLabels(controlPlane.ClusterName())
+					spec.Volumes = append(spec.Volumes, v1.Volume{Name: "config",
+						VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{Name: iamauthenticator.AuthenticatorConfigMapName(controlPlane.ClusterName())},
+						}},
 					})
 					return spec
 				}),
