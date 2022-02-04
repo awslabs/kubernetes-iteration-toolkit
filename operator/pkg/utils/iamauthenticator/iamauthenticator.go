@@ -22,8 +22,8 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	v1 "k8s.io/api/core/v1"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
-	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"knative.dev/pkg/ptr"
 )
 
@@ -41,7 +41,7 @@ func Config(ctx context.Context, name, ns, instanceRole, accountID string) (*v1.
 		return nil, fmt.Errorf("generating authenticator config, %w", err)
 	}
 	configMap := &v1.ConfigMap{}
-	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configMapBytes, configMap); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configMapBytes, configMap); err != nil {
 		return nil, fmt.Errorf("decoding authenticator config map, %w", err)
 	}
 	return configMap, nil

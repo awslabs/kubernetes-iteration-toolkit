@@ -29,7 +29,7 @@ import (
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
 var (
@@ -49,7 +49,7 @@ func KubeClientFor(ctx context.Context, substrate *v1alpha1.Substrate) (*kuberne
 		return nil, err
 	}
 	// create kubernetes interface to substrate cluster
-	client, err := kubeconfigutil.ClientSetFromFile(kubeAdminFile)
+	client, err := kubeconfig.ClientSetFromFile(kubeAdminFile)
 	if err != nil {
 		return nil, fmt.Errorf("creating Kube client from admin config, %w", err)
 	}

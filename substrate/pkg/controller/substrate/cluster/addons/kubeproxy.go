@@ -21,7 +21,7 @@ import (
 
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/controller/substrate/cluster"
-	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -39,7 +39,7 @@ func (k *KubeProxy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		return reconcile.Result{}, err
 	}
 	config := cluster.DefaultClusterConfig(substrate)
-	if err := proxyaddon.EnsureProxyAddon(&config.ClusterConfiguration, &config.LocalAPIEndpoint, client); err != nil {
+	if err := proxy.EnsureProxyAddon(&config.ClusterConfiguration, &config.LocalAPIEndpoint, client); err != nil {
 		return reconcile.Result{Requeue: true}, fmt.Errorf("deploying kube-proxy addon, %w", err)
 	}
 	return reconcile.Result{}, nil
