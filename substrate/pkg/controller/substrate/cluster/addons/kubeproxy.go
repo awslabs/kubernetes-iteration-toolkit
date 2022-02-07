@@ -43,6 +43,6 @@ func (k *KubeProxy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 	return reconcile.Result{}, nil
 }
 
-func (rk *KubeProxy) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {
+func (k *KubeProxy) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
