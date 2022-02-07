@@ -22,6 +22,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"knative.dev/pkg/ptr"
@@ -49,67 +50,70 @@ func Config(ctx context.Context, name, ns, instanceRole, accountID string) (*v1.
 
 type Options func(v1.PodSpec) v1.PodSpec
 
-func PodSpec(opts ...Options) v1.PodSpec {
-	spec := v1.PodSpec{
-		HostNetwork: true,
-		Tolerations: []v1.Toleration{{Operator: v1.TolerationOpExists}},
-		InitContainers: []v1.Container{{
-			Name:  "chown",
-			Image: imageprovider.BusyBox(),
-			Command: []string{"sh", "-c",
-				"touch /var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml && chown -R 10000:10000 /var/aws-iam-authenticator/state/ && chown -R 10000:10000 /var/aws-iam-authenticator/kubeconfig && ls -lrt /var/aws-iam-authenticator",
-			},
-			SecurityContext: &v1.SecurityContext{AllowPrivilegeEscalation: ptr.Bool(true)},
-			VolumeMounts: []v1.VolumeMount{{
-				Name:      "state",
-				MountPath: "/var/aws-iam-authenticator/state/",
-			}, {
-				Name:      "kubeconfig",
-				MountPath: "/var/aws-iam-authenticator/kubeconfig/",
-			}},
-		}},
-		Containers: []v1.Container{{
-			Name:  "aws-iam-authenticator",
-			Image: imageprovider.AWSIamAuthenticator(),
-			Args: []string{
-				"server",
-				"--master=https://localhost/",
-				"--config=/etc/aws-iam-authenticator/config.yaml",
-				"--state-dir=/var/aws-iam-authenticator/state/",
-				"--generate-kubeconfig=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
-			},
-			SecurityContext: &v1.SecurityContext{AllowPrivilegeEscalation: ptr.Bool(true)},
-			VolumeMounts: []v1.VolumeMount{{
-				Name:      "config",
-				MountPath: "/etc/aws-iam-authenticator/",
-			}, {
-				Name:      "state",
-				MountPath: "/var/aws-iam-authenticator/state/",
-			}, {
-				Name:      "kubeconfig",
-				MountPath: "/var/aws-iam-authenticator/kubeconfig/",
-			}},
-		}},
-		Volumes: []v1.Volume{{
-			Name: "kubeconfig",
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: "/var/aws-iam-authenticator/kubeconfig/",
+func PodSpec(opts ...Options) v1.PodTemplateSpec {
+	podTemplateSpec := v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{Name: "aws-iam-authenticator", Labels: Labels()},
+		Spec: v1.PodSpec{
+			HostNetwork: true,
+			Tolerations: []v1.Toleration{{Operator: v1.TolerationOpExists}},
+			InitContainers: []v1.Container{{
+				Name:  "chown",
+				Image: imageprovider.BusyBox(),
+				Command: []string{"sh", "-c",
+					"touch /var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml && chown -R 10000:10000 /var/aws-iam-authenticator/state/ && chown -R 10000:10000 /var/aws-iam-authenticator/kubeconfig && ls -lrt /var/aws-iam-authenticator",
 				},
-			},
-		}, {
-			Name: "state",
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: "/var/aws-iam-authenticator/state/",
+				SecurityContext: &v1.SecurityContext{AllowPrivilegeEscalation: ptr.Bool(true)},
+				VolumeMounts: []v1.VolumeMount{{
+					Name:      "state",
+					MountPath: "/var/aws-iam-authenticator/state/",
+				}, {
+					Name:      "kubeconfig",
+					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
+				}},
+			}},
+			Containers: []v1.Container{{
+				Name:  "aws-iam-authenticator",
+				Image: imageprovider.AWSIamAuthenticator(),
+				Args: []string{
+					"server",
+					"--master=https://localhost/",
+					"--config=/etc/aws-iam-authenticator/config.yaml",
+					"--state-dir=/var/aws-iam-authenticator/state/",
+					"--generate-kubeconfig=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 				},
-			},
-		}},
+				SecurityContext: &v1.SecurityContext{AllowPrivilegeEscalation: ptr.Bool(true)},
+				VolumeMounts: []v1.VolumeMount{{
+					Name:      "config",
+					MountPath: "/etc/aws-iam-authenticator/",
+				}, {
+					Name:      "state",
+					MountPath: "/var/aws-iam-authenticator/state/",
+				}, {
+					Name:      "kubeconfig",
+					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
+				}},
+			}},
+			Volumes: []v1.Volume{{
+				Name: "kubeconfig",
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
+						Path: "/var/aws-iam-authenticator/kubeconfig/",
+					},
+				},
+			}, {
+				Name: "state",
+				VolumeSource: v1.VolumeSource{
+					HostPath: &v1.HostPathVolumeSource{
+						Path: "/var/aws-iam-authenticator/state/",
+					},
+				},
+			}},
+		},
 	}
 	for _, opt := range opts {
-		spec = opt(spec)
+		podTemplateSpec.Spec = opt(podTemplateSpec.Spec)
 	}
-	return spec
+	return podTemplateSpec
 }
 
 var (
@@ -146,4 +150,8 @@ func parseTemplate(strtmpl string, obj interface{}) ([]byte, error) {
 
 func AuthenticatorConfigMapName(clusterName string) string {
 	return fmt.Sprintf("%s-auth-config", clusterName)
+}
+
+func Labels() map[string]string {
+	return map[string]string{"component": "aws-iam-authenticator"}
 }

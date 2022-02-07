@@ -16,12 +16,12 @@ package addons
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/controller/substrate/cluster"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -29,14 +29,12 @@ type KubeProxy struct {
 }
 
 func (k *KubeProxy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.Cluster.Address == nil {
+	if !substrate.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	client, err := KubeClientFor(ctx, substrate)
-	if errors.Is(err, ErrWaitingForSubstrateEndpoint) {
-		return reconcile.Result{Requeue: true}, nil
-	} else if err != nil {
-		return reconcile.Result{}, err
+	client, err := kubeconfig.ClientSetFromFile(*substrate.Status.Cluster.KubeConfig)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("creating Kube client from admin config, %w", err)
 	}
 	config := cluster.DefaultClusterConfig(substrate)
 	if err := proxy.EnsureProxyAddon(&config.ClusterConfiguration, &config.LocalAPIEndpoint, client); err != nil {

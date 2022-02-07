@@ -32,14 +32,14 @@ type SecurityGroup struct {
 }
 
 func (s *SecurityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.VPCID == nil {
+	if substrate.Status.Infrastructure.VPCID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	securityGroup, err := s.ensure(ctx, substrate)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	substrate.Status.SecurityGroupID = securityGroup.GroupId
+	substrate.Status.Infrastructure.SecurityGroupID = securityGroup.GroupId
 	if _, err := s.EC2.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: securityGroup.GroupId,
 		IpPermissions: []*ec2.IpPermission{{
@@ -71,7 +71,7 @@ func (s *SecurityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrat
 	createSecurityGroupOutput, err := s.EC2.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
 		Description:       aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
 		GroupName:         discovery.Name(substrate),
-		VpcId:             substrate.Status.VPCID,
+		VpcId:             substrate.Status.Infrastructure.VPCID,
 		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeSecurityGroup, discovery.Name(substrate)),
 	})
 	if err != nil {

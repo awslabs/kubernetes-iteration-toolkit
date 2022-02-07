@@ -32,24 +32,24 @@ type InternetGateway struct {
 }
 
 func (i *InternetGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.VPCID == nil || substrate.Status.PublicRouteTableID == nil {
+	if substrate.Status.Infrastructure.VPCID == nil || substrate.Status.Infrastructure.PublicRouteTableID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	internetGateway, err := i.ensure(ctx, substrate)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	if _, err := i.EC2.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{InternetGatewayId: internetGateway.InternetGatewayId, VpcId: substrate.Status.VPCID}); err != nil {
+	if _, err := i.EC2.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{InternetGatewayId: internetGateway.InternetGatewayId, VpcId: substrate.Status.Infrastructure.VPCID}); err != nil {
 		if err.(awserr.Error).Code() == "Resource.AlreadyAssociated" {
-			logging.FromContext(ctx).Infof("Found internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.VPCID))
+			logging.FromContext(ctx).Infof("Found internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
 		} else {
 			return reconcile.Result{}, fmt.Errorf("attaching internet gateway, %w", err)
 		}
 	} else {
-		logging.FromContext(ctx).Infof("Created internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.VPCID))
+		logging.FromContext(ctx).Infof("Created internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
 	}
 	if _, err := i.EC2.CreateRouteWithContext(ctx, &ec2.CreateRouteInput{
-		RouteTableId:         substrate.Status.PublicRouteTableID,
+		RouteTableId:         substrate.Status.Infrastructure.PublicRouteTableID,
 		DestinationCidrBlock: aws.String("0.0.0.0/0"),
 		GatewayId:            internetGateway.InternetGatewayId,
 	}); err != nil {

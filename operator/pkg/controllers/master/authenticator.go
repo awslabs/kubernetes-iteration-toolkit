@@ -20,7 +20,7 @@ import (
 
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/awsprovider/iam"
-	"github.com/awslabs/kit/operator/pkg/utils/iamauthenticator"
+	"github.com/awslabs/kit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -49,27 +49,20 @@ func (c *Controller) ensureDaemonSet(ctx context.Context, controlPlane *v1alpha1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-authenticator", controlPlane.ClusterName()),
 			Namespace: controlPlane.Namespace,
-			Labels:    authenticatorLabels(),
+			Labels:    iamauthenticator.Labels(),
 		},
 		Spec: appsv1.DaemonSetSpec{
 			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
-			Selector:       &metav1.LabelSelector{MatchLabels: authenticatorLabels()},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: authenticatorLabels()},
-				Spec: iamauthenticator.PodSpec(func(spec v1.PodSpec) v1.PodSpec {
-					spec.NodeSelector = APIServerLabels(controlPlane.ClusterName())
-					spec.Volumes = append(spec.Volumes, v1.Volume{Name: "config",
-						VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{
-							LocalObjectReference: v1.LocalObjectReference{Name: iamauthenticator.AuthenticatorConfigMapName(controlPlane.ClusterName())},
-						}},
-					})
-					return spec
-				}),
-			},
+			Selector:       &metav1.LabelSelector{MatchLabels: iamauthenticator.Labels()},
+			Template: iamauthenticator.PodSpec(func(spec v1.PodSpec) v1.PodSpec {
+				spec.NodeSelector = APIServerLabels(controlPlane.ClusterName())
+				spec.Volumes = append(spec.Volumes, v1.Volume{Name: "config",
+					VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{
+						LocalObjectReference: v1.LocalObjectReference{Name: iamauthenticator.AuthenticatorConfigMapName(controlPlane.ClusterName())},
+					}},
+				})
+				return spec
+			}),
 		},
 	}))
-}
-
-func authenticatorLabels() map[string]string {
-	return map[string]string{"component": "aws-iam-authenticator"}
 }

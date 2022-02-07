@@ -37,7 +37,7 @@ type LaunchTemplate struct {
 }
 
 func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.SecurityGroupID == nil {
+	if substrate.Status.Infrastructure.SecurityGroupID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/eks/optimized-ami/1.21/amazon-linux-2-arm64/recommended/image_id")})
@@ -58,7 +58,7 @@ func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 		ImageId:            parameterOutput.Parameter.Value,
 		IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{Name: discovery.Name(substrate)},
 		Monitoring:         &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
-		SecurityGroupIds:   []*string{substrate.Status.SecurityGroupID},
+		SecurityGroupIds:   []*string{substrate.Status.Infrastructure.SecurityGroupID},
 		// aws s3 sync sometimes fails to sync small changes in a file, so we use --exact-timestamps
 		// refer: https://github.com/aws/aws-cli/issues/3273
 		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`#!/bin/bash

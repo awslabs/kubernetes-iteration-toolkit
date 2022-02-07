@@ -29,11 +29,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/awslabs/kit/operator/pkg/utils/iamauthenticator"
+	"github.com/awslabs/kit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -44,6 +43,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"knative.dev/pkg/logging"
+	"knative.dev/pkg/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -103,6 +103,7 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
 	logging.FromContext(ctx).Infof("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
+	substrate.Status.Cluster.KubeConfig = ptr.String(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigFile))
 	return reconcile.Result{}, nil
 }
 
@@ -294,21 +295,15 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 }
 
 func (c *Config) staticPodSpecForAuthenticator(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	authenticatorPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "aws-iam-authenticator",
-			Namespace: "kube-system",
-			Labels:    map[string]string{"component": "aws-iam-authenticator"},
-		},
-		Spec: iamauthenticator.PodSpec(func(spec v1.PodSpec) v1.PodSpec {
-			spec.Volumes = append(spec.Volumes, v1.Volume{
-				Name:         "config",
-				VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: authenticatorConfigDir}},
-			})
-			return spec
-		}),
-	}
-	serialized, err := kubeadmutil.MarshalToYaml(authenticatorPod, v1.SchemeGroupVersion)
+	podTemplateSpec := iamauthenticator.PodSpec(func(spec v1.PodSpec) v1.PodSpec {
+		spec.Volumes = append(spec.Volumes, v1.Volume{Name: "config",
+			VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: authenticatorConfigDir}},
+		})
+		return spec
+	})
+	podTemplateSpec.ObjectMeta.Namespace = "kube-system"
+	serialized, err := kubeadmutil.MarshalToYaml(
+		&v1.Pod{ObjectMeta: podTemplateSpec.ObjectMeta, Spec: podTemplateSpec.Spec}, v1.SchemeGroupVersion)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config map manifest, %w", err)
 	}

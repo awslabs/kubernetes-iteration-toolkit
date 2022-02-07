@@ -37,8 +37,8 @@ func (v *VPC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
 	if len(describeVpcsOutput.Vpcs) > 0 {
-		substrate.Status.VPCID = describeVpcsOutput.Vpcs[0].VpcId
-		logging.FromContext(ctx).Infof("Found vpc %s", aws.StringValue(substrate.Status.VPCID))
+		substrate.Status.Infrastructure.VPCID = describeVpcsOutput.Vpcs[0].VpcId
+		logging.FromContext(ctx).Infof("Found vpc %s", aws.StringValue(substrate.Status.Infrastructure.VPCID))
 		return reconcile.Result{}, nil
 	}
 	createVpcOutput, err := v.EC2.CreateVpc(&ec2.CreateVpcInput{
@@ -48,8 +48,8 @@ func (v *VPC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)
 	}
-	substrate.Status.VPCID = createVpcOutput.Vpc.VpcId
-	logging.FromContext(ctx).Infof("Created vpc %s", aws.StringValue(substrate.Status.VPCID))
+	substrate.Status.Infrastructure.VPCID = createVpcOutput.Vpc.VpcId
+	logging.FromContext(ctx).Infof("Created vpc %s", aws.StringValue(substrate.Status.Infrastructure.VPCID))
 	return reconcile.Result{}, err
 }
 

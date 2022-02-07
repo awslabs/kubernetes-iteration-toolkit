@@ -59,6 +59,7 @@ func NewController(ctx context.Context) *Controller {
 			&cluster.InstanceProfile{IAM: IAM},
 			&cluster.Instance{EC2: EC2},
 			&cluster.Config{S3: s3.New(session), STS: sts.New(session), S3Uploader: s3manager.NewUploader(session)},
+			&cluster.Readiness{},
 			&addons.RBAC{},
 			&addons.KubeProxy{},
 		},

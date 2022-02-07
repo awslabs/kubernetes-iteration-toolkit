@@ -16,11 +16,11 @@ package addons
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -28,14 +28,12 @@ type RBAC struct {
 }
 
 func (r *RBAC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.Cluster.Address == nil {
+	if !substrate.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	client, err := KubeClientFor(ctx, substrate)
-	if errors.Is(err, ErrWaitingForSubstrateEndpoint) {
-		return reconcile.Result{Requeue: true}, nil
-	} else if err != nil {
-		return reconcile.Result{}, err
+	client, err := kubeconfig.ClientSetFromFile(*substrate.Status.Cluster.KubeConfig)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("creating Kube client from admin config, %w", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
 	if err := node.AllowBootstrapTokensToPostCSRs(client); err != nil {
