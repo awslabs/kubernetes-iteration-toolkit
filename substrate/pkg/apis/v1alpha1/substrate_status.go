@@ -38,3 +38,11 @@ type SubstrateStatus struct {
 	Infrastructure InfrastructureStatus `json:"infrastructure,omitempty"`
 	Conditions     apis.Conditions      `json:"conditions,omitempty"`
 }
+
+func (s *SubstrateStatus) GetConditions() apis.Conditions {
+	return s.Conditions
+}
+
+func (s *SubstrateStatus) SetConditions(conditions apis.Conditions) {
+	s.Conditions = conditions
+}

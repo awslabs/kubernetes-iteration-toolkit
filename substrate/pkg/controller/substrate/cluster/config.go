@@ -281,7 +281,7 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 	configMap, err := iamauthenticator.Config(ctx, substrate.Name, substrate.Namespace,
 		aws.StringValue(discovery.Name(substrate, tenantControlPlaneNodeRole)), aws.StringValue(identity.Account))
 	if err != nil {
-		return err
+		return fmt.Errorf("creating authenticator config, %w", err)
 	}
 	logging.FromContext(ctx).Infof("Created config map for authenticator")
 	configDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), authenticatorConfigDir)
@@ -295,13 +295,13 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 }
 
 func (c *Config) staticPodSpecForAuthenticator(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	podTemplateSpec := iamauthenticator.PodSpec(func(spec v1.PodSpec) v1.PodSpec {
-		spec.Volumes = append(spec.Volumes, v1.Volume{Name: "config",
+	podTemplateSpec := iamauthenticator.PodSpec(func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
+		template.ObjectMeta.Namespace = "kube-system"
+		template.Spec.Volumes = append(template.Spec.Volumes, v1.Volume{Name: "config",
 			VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: authenticatorConfigDir}},
 		})
-		return spec
+		return template
 	})
-	podTemplateSpec.ObjectMeta.Namespace = "kube-system"
 	serialized, err := kubeadmutil.MarshalToYaml(
 		&v1.Pod{ObjectMeta: podTemplateSpec.ObjectMeta, Spec: podTemplateSpec.Spec}, v1.SchemeGroupVersion)
 	if err != nil {

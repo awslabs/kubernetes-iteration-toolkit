@@ -37,15 +37,15 @@ func (r *RBAC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (recon
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
 	if err := node.AllowBootstrapTokensToPostCSRs(client); err != nil {
-		return reconcile.Result{}, fmt.Errorf("error allowing bootstrap tokens to post CSRs, %w", err)
+		return reconcile.Result{}, fmt.Errorf("bootstrap tokens to post CSRs, %w", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
 	if err := node.AutoApproveNodeBootstrapTokens(client); err != nil {
-		return reconcile.Result{}, fmt.Errorf("error auto-approving node bootstrap tokens, %w", err)
+		return reconcile.Result{}, fmt.Errorf("node bootstrap tokens, %w", err)
 	}
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
 	if err := node.AutoApproveNodeCertificateRotation(client); err != nil {
-		return reconcile.Result{}, fmt.Errorf("err AutoApproveNodeCertificateRotation, %w", err)
+		return reconcile.Result{}, fmt.Errorf("node certs rotation, %w", err)
 	}
 	return reconcile.Result{}, nil
 }

@@ -16,9 +16,9 @@ package imageprovider
 
 var (
 	imageTags = map[string]string{
-		"1.19": KubeVersion119Tag,
-		"1.20": KubeVersion120Tag,
-		"1.21": KubeVersion121Tag,
+		"1.19": kubeVersion119Tag,
+		"1.20": kubeVersion120Tag,
+		"1.21": kubeVersion121Tag,
 	}
 )
 
@@ -28,41 +28,41 @@ func IsKubeVersionSupported(version string) bool {
 }
 
 const (
-	KubeVersion119Tag = "v1.19.13-eks-1-19-9"
-	KubeVersion120Tag = "v1.20.7-eks-1-20-6"
-	KubeVersion121Tag = "v1.21.2-eks-1-21-4"
-
-	RepositoryName = "public.ecr.aws/eks-distro/"
+	kubeVersion119Tag = "v1.19.13-eks-1-19-9"
+	kubeVersion120Tag = "v1.20.7-eks-1-20-6"
+	kubeVersion121Tag = "v1.21.2-eks-1-21-4"
+	repositoryName    = "public.ecr.aws/eks-distro/"
+	busyBoxImage      = "public.ecr.aws/docker/library/busybox:stable"
 )
 
 func APIServer(version string) string {
-	return RepositoryName + "kubernetes/kube-apiserver:" + imageTags[version]
+	return repositoryName + "kubernetes/kube-apiserver:" + imageTags[version]
 }
 
 func KubeControllerManager(version string) string {
-	return RepositoryName + "kubernetes/kube-controller-manager:" + imageTags[version]
+	return repositoryName + "kubernetes/kube-controller-manager:" + imageTags[version]
 }
 
 func KubeScheduler(version string) string {
-	return RepositoryName + "kubernetes/kube-scheduler:" + imageTags[version]
+	return repositoryName + "kubernetes/kube-scheduler:" + imageTags[version]
 }
 
 func KubeProxy(version string) string {
-	return RepositoryName + "kubernetes/kube-proxy:" + imageTags[version]
+	return repositoryName + "kubernetes/kube-proxy:" + imageTags[version]
 }
 
 func ETCD() string {
-	return RepositoryName + "etcd-io/etcd:v3.4.16-eks-1-21-4"
+	return repositoryName + "etcd-io/etcd:v3.4.16-eks-1-21-4"
 }
 
 func CoreDNS() string {
-	return RepositoryName + "coredns/coredns:v1.8.3-eks-1-20-4"
+	return repositoryName + "coredns/coredns:v1.8.3-eks-1-20-4"
 }
 
 func AWSIamAuthenticator() string {
-	return RepositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.3-eks-1-21-8"
+	return repositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.3-eks-1-21-8"
 }
 
 func BusyBox() string {
-	return "public.ecr.aws/docker/library/busybox:stable"
+	return busyBoxImage
 }

@@ -34,11 +34,11 @@ func (k *KubeProxy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 	}
 	client, err := kubeconfig.ClientSetFromFile(*substrate.Status.Cluster.KubeConfig)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("creating Kube client from admin config, %w", err)
+		return reconcile.Result{}, fmt.Errorf("creating client, %w", err)
 	}
 	config := cluster.DefaultClusterConfig(substrate)
 	if err := proxy.EnsureProxyAddon(&config.ClusterConfiguration, &config.LocalAPIEndpoint, client); err != nil {
-		return reconcile.Result{Requeue: true}, fmt.Errorf("deploying kube-proxy addon, %w", err)
+		return reconcile.Result{Requeue: true}, fmt.Errorf("ensuring kube-proxy addon, %w", err)
 	}
 	return reconcile.Result{}, nil
 }

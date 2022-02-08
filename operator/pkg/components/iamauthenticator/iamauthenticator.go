@@ -48,7 +48,7 @@ func Config(ctx context.Context, name, ns, instanceRole, accountID string) (*v1.
 	return configMap, nil
 }
 
-type Options func(v1.PodSpec) v1.PodSpec
+type Options func(v1.PodTemplateSpec) v1.PodTemplateSpec
 
 func PodSpec(opts ...Options) v1.PodTemplateSpec {
 	podTemplateSpec := v1.PodTemplateSpec{
@@ -111,7 +111,7 @@ func PodSpec(opts ...Options) v1.PodTemplateSpec {
 		},
 	}
 	for _, opt := range opts {
-		podTemplateSpec.Spec = opt(podTemplateSpec.Spec)
+		podTemplateSpec = opt(podTemplateSpec)
 	}
 	return podTemplateSpec
 }

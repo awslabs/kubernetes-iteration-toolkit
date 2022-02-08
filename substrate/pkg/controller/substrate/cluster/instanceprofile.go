@@ -31,15 +31,15 @@ type InstanceProfile struct {
 	IAM *iam.IAM
 }
 
-type roleInfo struct {
-	objectName      *string
-	policyDocument  *string
+type role struct {
+	name            *string
+	policy          *string
 	managedPolicies []string
 }
 
 func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	for _, desired := range desiredRolesFor(substrate) {
-		result, err := i.create(ctx, desired.objectName, desired.policyDocument, desired.managedPolicies)
+		result, err := i.create(ctx, desired.name, desired.policy, desired.managedPolicies)
 		if err != nil {
 			return result, err
 		}
@@ -47,7 +47,7 @@ func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substr
 	return reconcile.Result{}, nil
 }
 
-func (i *InstanceProfile) create(ctx context.Context, resourceName, policyDocument *string, managedPolicies []string) (reconcile.Result, error) {
+func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *string, managedPolicies []string) (reconcile.Result, error) {
 	// Role
 	if _, err := i.IAM.CreateRole(&iam.CreateRoleInput{RoleName: resourceName, AssumeRolePolicyDocument: aws.String(`{
 	"Version": "2012-10-17",
@@ -68,12 +68,11 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policyDocume
 		logging.FromContext(ctx).Infof("Created role %s", aws.StringValue(resourceName))
 	}
 	// Policy
-	if policyDocument != nil {
-		if _, err := i.IAM.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{RoleName: resourceName, PolicyName: resourceName, PolicyDocument: policyDocument}); err != nil {
+	if policy != nil {
+		if _, err := i.IAM.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{RoleName: resourceName, PolicyName: resourceName, PolicyDocument: policy}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("adding policy to role, %w", err)
-		} else {
-			logging.FromContext(ctx).Infof("Created policy %s for %s", aws.StringValue(resourceName), aws.StringValue(resourceName))
 		}
+		logging.FromContext(ctx).Infof("Created policy %s for %s", aws.StringValue(resourceName), aws.StringValue(resourceName))
 	}
 	// Managed Policies
 	for _, policy := range managedPolicies {
@@ -105,7 +104,7 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policyDocume
 
 func (i *InstanceProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	for _, desired := range desiredRolesFor(substrate) {
-		result, err := i.delete(ctx, desired.objectName, desired.policyDocument, desired.managedPolicies)
+		result, err := i.delete(ctx, desired.name, desired.policy, desired.managedPolicies)
 		if err != nil {
 			return result, err
 		}
@@ -113,9 +112,9 @@ func (i *InstanceProfile) Delete(ctx context.Context, substrate *v1alpha1.Substr
 	return reconcile.Result{}, nil
 }
 
-func (i *InstanceProfile) delete(ctx context.Context, resourceName, policyDocument *string, managedPolicies []string) (reconcile.Result, error) {
+func (i *InstanceProfile) delete(ctx context.Context, resourceName, policy *string, managedPolicies []string) (reconcile.Result, error) {
 	// Policy
-	if policyDocument != nil {
+	if policy != nil {
 		if _, err := i.IAM.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{RoleName: resourceName, PolicyName: resourceName}); err != nil {
 			if err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
 				return reconcile.Result{}, fmt.Errorf("removing policy from role, %w", err)
@@ -161,10 +160,10 @@ func (i *InstanceProfile) delete(ctx context.Context, resourceName, policyDocume
 	return reconcile.Result{}, nil
 }
 
-func desiredRolesFor(substrate *v1alpha1.Substrate) []roleInfo {
-	return []roleInfo{{
+func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
+	return []role{{
 		// Roles and policies attached to the substrate node
-		objectName: discovery.Name(substrate), policyDocument: aws.String(`{
+		name: discovery.Name(substrate), policy: aws.String(`{
 			"Version": "2012-10-17",
 			"Statement": [
 				{
@@ -200,7 +199,7 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []roleInfo {
 		},
 	}, {
 		// Roles and policies attached to the nodes provisioned by Karpenter
-		objectName: discovery.Name(substrate, tenantControlPlaneNodeRole),
+		name: discovery.Name(substrate, tenantControlPlaneNodeRole),
 		managedPolicies: []string{
 			"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
 			"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
