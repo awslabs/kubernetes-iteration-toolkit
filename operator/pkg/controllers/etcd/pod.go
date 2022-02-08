@@ -26,6 +26,7 @@ import (
 	"github.com/awslabs/kit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -115,6 +116,20 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 					},
 				},
 			}},
+			LivenessProbe: &v1.Probe{
+				Handler: v1.Handler{
+					HTTPGet: &v1.HTTPGetAction{
+						Host:   "127.0.0.1",
+						Scheme: v1.URISchemeHTTP,
+						Path:   "/health",
+						Port:   intstr.FromInt(2381),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       5,
+				TimeoutSeconds:      5,
+				FailureThreshold:    5,
+			},
 		}},
 		Volumes: []v1.Volume{{
 			Name: "etcd-data",
