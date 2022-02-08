@@ -76,7 +76,7 @@ var _ = Describe("ControlPlane", func() {
 			Namespace: "default",
 		}, Spec: v1alpha1.ControlPlaneSpec{
 			Master: v1alpha1.MasterSpec{APIServer: &v1alpha1.Component{Replicas: 1}},
-			Etcd:   v1alpha1.Etcd{Component: v1alpha1.Component{Replicas: 3, Spec: nil}, PersistentVolumeClaimSpec: nil}}}
+			Etcd:   v1alpha1.Etcd{Component: v1alpha1.Component{Replicas: 3}}}}
 	})
 	AfterEach(func() {
 		ExpectCleanedUp(kubeClient)

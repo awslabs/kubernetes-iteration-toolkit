@@ -17,13 +17,13 @@ package etcd
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"knative.dev/pkg/ptr"
 )
 
 func DefaultPersistentVolumeClaimSpec() *v1.PersistentVolumeClaimSpec {
-	storageClassName := "kit-gp3"
 	return &v1.PersistentVolumeClaimSpec{
-		AccessModes:      []v1.PersistentVolumeAccessMode{"ReadWriteOnce"},
-		StorageClassName: &storageClassName,
+		AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		StorageClassName: ptr.String("kit-gp3"),
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{"storage": resource.MustParse("40Gi")},
 		},

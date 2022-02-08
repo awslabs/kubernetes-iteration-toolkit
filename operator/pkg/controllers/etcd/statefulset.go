@@ -53,21 +53,11 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelsFor(controlPlane.ClusterName()),
 			},
-			PodManagementPolicy: appsv1.ParallelPodManagement,
-			ServiceName:         ServiceNameFor(controlPlane.ClusterName()),
-			Replicas:            aws.Int32(int32(controlPlane.Spec.Etcd.Replicas)),
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labelsFor(controlPlane.ClusterName()),
-				},
-				Spec: podSpec,
-			},
-			VolumeClaimTemplates: []v1.PersistentVolumeClaim{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "etcd-data",
-				},
-				Spec: persistentVolumeClaimSpec,
-			}},
+			PodManagementPolicy:  appsv1.ParallelPodManagement,
+			ServiceName:          ServiceNameFor(controlPlane.ClusterName()),
+			Replicas:             aws.Int32(int32(controlPlane.Spec.Etcd.Replicas)),
+			Template:             v1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labelsFor(controlPlane.ClusterName())}, Spec: podSpec},
+			VolumeClaimTemplates: []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "etcd-data"}, Spec: persistentVolumeClaimSpec}},
 		},
 	}))
 }

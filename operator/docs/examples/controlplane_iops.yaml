@@ -5,9 +5,11 @@ metadata:
 spec:
   kubernetesVersion: "1.21"
   etcd:
-    storageSpec:
-      storageClassName: "ebs-sc"
-      size: "40Gi"
+    persistentVolumeClaimSpec:
+      storageClassName: "kit-io1"
+      resources:
+        requests:
+          storage: 200Gi
   master:
     apiServer:
       spec:
