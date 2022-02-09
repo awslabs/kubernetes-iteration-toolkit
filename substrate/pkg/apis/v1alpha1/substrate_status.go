@@ -14,17 +14,35 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	"knative.dev/pkg/apis"
+)
+
 type ClusterStatus struct {
 	Address               *string `json:"address,omitempty"`
+	KubeConfig            *string `json:"kubeConfig,omitempty"`
 	LaunchTemplateVersion *string `json:"launchTemplateVersion,omitempty"`
 }
 
+type InfrastructureStatus struct {
+	VPCID               *string  `json:"vpcID,omitempty"`
+	PrivateRouteTableID *string  `json:"privateRouteTableID,omitempty"`
+	PublicRouteTableID  *string  `json:"publicRouteTableID,omitempty"`
+	SecurityGroupID     *string  `json:"securityGroupID,omitempty"`
+	PrivateSubnetIDs    []string `json:"privateSubnetIDs,omitempty"`
+	PublicSubnetIDs     []string `json:"publicSubnetIDs,omitempty"`
+}
+
 type SubstrateStatus struct {
-	Cluster             ClusterStatus `json:"cluster,omitempty"`
-	VPCID               *string       `json:"vpcID,omitempty"`
-	PrivateRouteTableID *string       `json:"privateRouteTableID,omitempty"`
-	PublicRouteTableID  *string       `json:"publicRouteTableID,omitempty"`
-	SecurityGroupID     *string       `json:"securityGroupID,omitempty"`
-	PrivateSubnetIDs    []string      `json:"privateSubnetIDs,omitempty"`
-	PublicSubnetIDs     []string      `json:"publicSubnetIDs,omitempty"`
+	Cluster        ClusterStatus        `json:"cluster,omitempty"`
+	Infrastructure InfrastructureStatus `json:"infrastructure,omitempty"`
+	Conditions     apis.Conditions      `json:"conditions,omitempty"`
+}
+
+func (s *SubstrateStatus) GetConditions() apis.Conditions {
+	return s.Conditions
+}
+
+func (s *SubstrateStatus) SetConditions(conditions apis.Conditions) {
+	s.Conditions = conditions
 }

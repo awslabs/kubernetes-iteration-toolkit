@@ -42,7 +42,7 @@ func Apply(cmd *cobra.Command, args []string) {
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1alpha1.SubstrateSpec{
 			VPC:          &v1alpha1.VPCSpec{CIDR: "10.0.0.0/16"},
-			InstanceType: aws.String("t4g.micro"),
+			InstanceType: aws.String("r6g.medium"),
 			Subnets: []*v1alpha1.SubnetSpec{
 				{Zone: "us-west-2a", CIDR: "10.0.1.0/24"},
 				{Zone: "us-west-2b", CIDR: "10.0.2.0/24"},

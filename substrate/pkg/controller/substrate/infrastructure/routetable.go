@@ -32,19 +32,19 @@ type RouteTable struct {
 }
 
 func (r *RouteTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.VPCID == nil {
+	if substrate.Status.Infrastructure.VPCID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	publicRouteTable, err := r.ensure(ctx, substrate, discovery.Name(substrate, "public"))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	substrate.Status.PublicRouteTableID = publicRouteTable.RouteTableId
+	substrate.Status.Infrastructure.PublicRouteTableID = publicRouteTable.RouteTableId
 	privateRouteTable, err := r.ensure(ctx, substrate, discovery.Name(substrate, "private"))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	substrate.Status.PrivateRouteTableID = privateRouteTable.RouteTableId
+	substrate.Status.Infrastructure.PrivateRouteTableID = privateRouteTable.RouteTableId
 	return reconcile.Result{}, nil
 }
 
@@ -58,7 +58,7 @@ func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 		return describeRouteTablesOutput.RouteTables[0], nil
 	}
 	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
-		VpcId:             substrate.Status.VPCID,
+		VpcId:             substrate.Status.Infrastructure.VPCID,
 		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeRouteTable, discovery.Name(substrate)),
 	})
 	if err != nil {

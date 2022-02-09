@@ -28,35 +28,43 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/awslabs/kit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
-	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"knative.dev/pkg/logging"
+	"knative.dev/pkg/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
-	clusterCertsBasePath = "/tmp/"
-	kubeconfigPath       = "/etc/kubernetes"
-	certPKIPath          = "/etc/kubernetes/pki"
-	clusterManifestPath  = "/etc/kubernetes/manifests"
-	kubeletSystemdPath   = "/etc/systemd/system"
-	kubeletConfigPath    = "/var/lib/kubelet/"
-	kubernetesVersionTag = "v1.21.2-eks-1-21-4"
-	imageRepository      = "public.ecr.aws/eks-distro/kubernetes"
-	etcdVersionTag       = "v3.4.16-eks-1-21-7"
-	etcdImageRepository  = "public.ecr.aws/eks-distro/etcd-io"
+	ClusterCertsBasePath       = "/tmp/"
+	kubeconfigPath             = "/etc/kubernetes"
+	certPKIPath                = "/etc/kubernetes/pki"
+	clusterManifestPath        = "/etc/kubernetes/manifests"
+	kubeletSystemdPath         = "/etc/systemd/system"
+	kubeletConfigPath          = "/var/lib/kubelet/"
+	authenticatorConfigDir     = "/etc/aws-iam-authenticator"
+	kubernetesVersionTag       = "v1.21.2-eks-1-21-4"
+	imageRepository            = "public.ecr.aws/eks-distro/kubernetes"
+	etcdVersionTag             = "v3.4.16-eks-1-21-7"
+	etcdImageRepository        = "public.ecr.aws/eks-distro/etcd-io"
+	tenantControlPlaneNodeRole = "tenant-controlplane-node-role"
 )
 
 type Config struct {
 	S3         *s3.S3
+	STS        *sts.STS
 	S3Uploader *s3manager.Uploader
 }
 
@@ -69,7 +77,7 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		return reconcile.Result{}, fmt.Errorf("ensuring S3 bucket, %w", err)
 	}
 	// create all configs file
-	cfg := defaultClusterConfig(substrate)
+	cfg := DefaultClusterConfig(substrate)
 	if err := c.generateCerts(cfg, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("generating certs, %w", err)
 	}
@@ -82,12 +90,20 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 	if err := c.kubeletSystemService(cfg, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("generating kubelet service config, %w", err)
 	}
+	// deploy aws IAM authenticator
+	if err := c.ensureAuthenticatorConfig(ctx, substrate); err != nil {
+		return reconcile.Result{}, fmt.Errorf("generating authenticator config, %w", err)
+	}
+	if err := c.staticPodSpecForAuthenticator(ctx, substrate); err != nil {
+		return reconcile.Result{}, fmt.Errorf("generating authenticator config, %w", err)
+	}
 	// upload to s3 bucket
 	if err := c.S3Uploader.UploadWithIterator(ctx, NewDirectoryIterator(
-		aws.StringValue(discovery.Name(substrate)), path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))); err != nil {
+		aws.StringValue(discovery.Name(substrate)), path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))); err != nil {
 		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
 	logging.FromContext(ctx).Infof("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
+	substrate.Status.Cluster.KubeConfig = ptr.String(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigFile))
 	return reconcile.Result{}, nil
 }
 
@@ -105,7 +121,7 @@ func (c *Config) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 	} else {
 		logging.FromContext(ctx).Infof("Deleted S3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
-	return reconcile.Result{}, os.RemoveAll(path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))
+	return reconcile.Result{}, os.RemoveAll(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))
 }
 
 func ErrNoSuchBucket(err error) bool {
@@ -118,8 +134,8 @@ func ErrNoSuchBucket(err error) bool {
 }
 
 func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	cfg.CertificatesDir = path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), certPKIPath)
-	certTree, err := certsphase.GetDefaultCertList().AsMap().CertTree()
+	cfg.CertificatesDir = path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), certPKIPath)
+	certTree, err := certs.GetDefaultCertList().AsMap().CertTree()
 	if err != nil {
 		return err
 	}
@@ -127,12 +143,12 @@ func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alph
 		return fmt.Errorf("error creating cert tree, %w", err)
 	}
 	// create private and public keys for service accounts
-	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.PublicKeyAlgorithm())
+	return certs.CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir, cfg.ClusterConfiguration.PublicKeyAlgorithm())
 }
 
 func (c *Config) kubeConfigs(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
 	// Generate Kube config files for master components
-	kubeConfigDir := path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigPath)
+	kubeConfigDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigPath)
 	for _, kubeConfigFileName := range []string{
 		kubeadmconstants.AdminKubeConfigFileName,
 		kubeadmconstants.KubeletKubeConfigFileName,
@@ -146,10 +162,10 @@ func (c *Config) kubeConfigs(cfg *kubeadm.InitConfiguration, substrate *v1alpha1
 }
 
 func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	manifestDir := path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath)
+	manifestDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath)
 	// etcd phase adds cfg.CertificatesDir to static pod yaml for pods to read the certs from
 	cfg.CertificatesDir = certPKIPath
-	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(
+	if err := etcd.CreateLocalEtcdStaticPodManifestFile(
 		manifestDir, "", cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false); err != nil {
 		return fmt.Errorf("error creating local etcd static pod manifest file %w", err)
 	}
@@ -157,7 +173,7 @@ func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, subs
 		kubeadmconstants.KubeAPIServer,
 		kubeadmconstants.KubeControllerManager,
 		kubeadmconstants.KubeScheduler} {
-		err := controlplane.CreateStaticPodFiles(path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath), "",
+		err := controlplane.CreateStaticPodFiles(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath), "",
 			&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false, componentName)
 		if err != nil {
 			return fmt.Errorf("creating static pod file for %v, %w", componentName, err)
@@ -181,7 +197,7 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 }
 
 func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	localDir := path.Join(clusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
+	localDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
 	if _, err := os.Stat(localDir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -190,21 +206,20 @@ func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate 
 			return err
 		}
 	}
-	if err := ioutil.WriteFile(path.Join(localDir, "kubelet.service"), []byte(`[Unit]
+	if err := ioutil.WriteFile(path.Join(localDir, "kubelet.service"), []byte(fmt.Sprintf(`[Unit]
 After=docker.service iptables-restore.service
 Requires=docker.service
 
 [Service]
-ExecStart=/usr/bin/kubelet --address=127.0.0.1 --pod-manifest-path=/etc/kubernetes/manifests --cgroup-driver=systemd  --container-runtime=docker
-Restart=always`,
-	), 0644); err != nil {
+ExecStart=/usr/bin/kubelet --hostname-override=%s --address=127.0.0.1 --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1 --node-labels=kit.aws/substrate=control-plane
+Restart=always`, substrate.Name)), 0644); err != nil {
 		return fmt.Errorf("writing kubelet configuration, %w", err)
 	}
 	return nil
 }
 
-func defaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfiguration {
-	defaultStaticConfig, err := configutil.DefaultedStaticInitConfiguration()
+func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfiguration {
+	defaultStaticConfig, err := config.DefaultedStaticInitConfiguration()
 	runtime.Must(err)
 	// etcd specific config
 	defaultStaticConfig.ClusterConfiguration.KubernetesVersion = kubernetesVersionTag
@@ -234,7 +249,15 @@ func defaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 	defaultStaticConfig.APIServer.ExtraArgs = map[string]string{
 		"advertise-address": masterElasticIP,
 		"secure-port":       "443",
+		"authentication-token-webhook-config-file": "/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 	}
+	defaultStaticConfig.APIServer.ExtraVolumes = []kubeadm.HostPathMount{{
+		Name:      "authenticator-config",
+		HostPath:  "/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
+		MountPath: "/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
+		ReadOnly:  true,
+		PathType:  v1.HostPathFileOrCreate,
+	}}
 	if defaultStaticConfig.Scheduler.ExtraArgs == nil {
 		defaultStaticConfig.Scheduler.ExtraArgs = map[string]string{}
 	}
@@ -248,6 +271,47 @@ func defaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 		},
 	}
 	return defaultStaticConfig
+}
+
+func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	identity, err := c.STS.GetCallerIdentityWithContext(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("getting caller identity, %w", err)
+	}
+	configMap, err := iamauthenticator.Config(ctx, substrate.Name, substrate.Namespace,
+		aws.StringValue(discovery.Name(substrate, tenantControlPlaneNodeRole)), aws.StringValue(identity.Account))
+	if err != nil {
+		return fmt.Errorf("creating authenticator config, %w", err)
+	}
+	logging.FromContext(ctx).Infof("Created config map for authenticator")
+	configDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), authenticatorConfigDir)
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory, %w", err)
+	}
+	if err := ioutil.WriteFile(path.Join(configDir, "config.yaml"), []byte(configMap.Data["config.yaml"]), 0644); err != nil {
+		return fmt.Errorf("writing authenticator config, %w", err)
+	}
+	return nil
+}
+
+func (c *Config) staticPodSpecForAuthenticator(ctx context.Context, substrate *v1alpha1.Substrate) error {
+	podTemplateSpec := iamauthenticator.PodSpec(func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
+		template.ObjectMeta.Namespace = "kube-system"
+		template.Spec.Volumes = append(template.Spec.Volumes, v1.Volume{Name: "config",
+			VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: authenticatorConfigDir}},
+		})
+		return template
+	})
+	serialized, err := kubeadmutil.MarshalToYaml(
+		&v1.Pod{ObjectMeta: podTemplateSpec.ObjectMeta, Spec: podTemplateSpec.Spec}, v1.SchemeGroupVersion)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config map manifest, %w", err)
+	}
+	if err := ioutil.WriteFile(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)),
+		clusterManifestPath, "aws-iam-authenticator.yaml"), serialized, 0644); err != nil {
+		return fmt.Errorf("writing authenticator pod yaml, %w", err)
+	}
+	return nil
 }
 
 // DirectoryIterator represents an iterator of a specified directory

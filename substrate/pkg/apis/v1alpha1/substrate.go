@@ -17,7 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"knative.dev/pkg/apis"
 )
 
 type SubstrateSpec struct {
@@ -49,4 +51,16 @@ type SubnetSpec struct {
 	Zone   string
 	CIDR   string
 	Public bool
+}
+
+var (
+	substrateConditionSet = apis.NewLivingConditionSet()
+)
+
+func (s *Substrate) IsReady() bool {
+	return substrateConditionSet.Manage(&s.Status).GetCondition(apis.ConditionReady).IsTrue()
+}
+
+func (s *Substrate) Ready() {
+	s.Status.SetConditions([]apis.Condition{{Type: apis.ConditionReady, Status: v1.ConditionTrue}})
 }

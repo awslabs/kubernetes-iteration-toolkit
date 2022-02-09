@@ -128,7 +128,7 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
 			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
 			UserData: ptr.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
-				dataplane.Spec.ClusterName, v1alpha1.SchemeGroupVersion.Group, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
+				dataplane.Spec.ClusterName, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
 		},
 		LaunchTemplateName: ptr.String(TemplateName(dataplane.Spec.ClusterName)),
 		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),
@@ -207,7 +207,7 @@ var (
 	userData = `
 #!/bin/bash
 yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
-/etc/eks/bootstrap.sh %s.%s \
+/etc/eks/bootstrap.sh %s \
     --dns-cluster-ip %s \
 	--kubelet-extra-args '--node-labels=kit.sh/provisioned=true' \
 	--b64-cluster-ca %s \

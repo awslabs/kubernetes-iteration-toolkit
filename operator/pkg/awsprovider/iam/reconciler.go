@@ -96,7 +96,7 @@ func (c *Controller) Finalize(ctx context.Context, controlPlane *apis.ControlPla
 		if _, err = c.iam.DetachRolePolicyWithContext(ctx, &iam.DetachRolePolicyInput{
 			PolicyArn: aws.String(policy),
 			RoleName:  aws.String(KitNodeRoleNameFor(controlPlane.ClusterName())),
-		}); err != nil {
+		}); err != nil && !errors.IsIAMObjectDoNotExist(err) {
 			return fmt.Errorf("detaching policy from role, %w", err)
 		}
 	}

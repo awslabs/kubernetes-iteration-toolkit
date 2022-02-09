@@ -34,7 +34,9 @@ type Subnets struct {
 }
 
 func (s *Subnets) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.VPCID == nil || substrate.Status.PrivateRouteTableID == nil || substrate.Status.PublicRouteTableID == nil {
+	if substrate.Status.Infrastructure.VPCID == nil ||
+		substrate.Status.Infrastructure.PrivateRouteTableID == nil ||
+		substrate.Status.Infrastructure.PublicRouteTableID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	subnets := make([]*ec2.Subnet, len(substrate.Spec.Subnets))
@@ -50,9 +52,11 @@ func (s *Subnets) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 			continue
 		}
 		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
-			substrate.Status.PublicSubnetIDs = append(substrate.Status.PublicSubnetIDs, aws.StringValue(subnet.SubnetId))
+			substrate.Status.Infrastructure.PublicSubnetIDs = append(substrate.Status.Infrastructure.PublicSubnetIDs,
+				aws.StringValue(subnet.SubnetId))
 		} else {
-			substrate.Status.PrivateSubnetIDs = append(substrate.Status.PrivateSubnetIDs, aws.StringValue(subnet.SubnetId))
+			substrate.Status.Infrastructure.PrivateSubnetIDs = append(substrate.Status.Infrastructure.PrivateSubnetIDs,
+				aws.StringValue(subnet.SubnetId))
 		}
 	}
 	return reconcile.Result{}, nil
@@ -63,12 +67,14 @@ func (s *Subnets) ensure(ctx context.Context, substrate *v1alpha1.Substrate, sub
 	if err != nil {
 		return nil, err
 	}
-	routeTableID := substrate.Status.PrivateRouteTableID
+	routeTableID := substrate.Status.Infrastructure.PrivateRouteTableID
 	if subnetSpec.Public {
-		routeTableID = substrate.Status.PublicRouteTableID
+		routeTableID = substrate.Status.Infrastructure.PublicRouteTableID
 	}
 	if _, err := s.EC2.AssociateRouteTableWithContext(ctx, &ec2.AssociateRouteTableInput{RouteTableId: routeTableID, SubnetId: subnet.SubnetId}); err != nil {
-		return nil, fmt.Errorf("associating route table with subnet, %w", err)
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() != "Resource.AlreadyAssociated" {
+			return nil, fmt.Errorf("associating route table with subnet, %w", err)
+		}
 	}
 	logging.FromContext(ctx).Infof("Ensured association of route table %s to subnet %s", aws.StringValue(routeTableID), aws.StringValue(subnet.SubnetId))
 	if !subnetSpec.Public {
@@ -95,7 +101,7 @@ func (s *Subnets) ensureSubnet(ctx context.Context, substrate *v1alpha1.Substrat
 	createSubnetsOutput, err := s.EC2.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
 		AvailabilityZone:  aws.String(subnetSpec.Zone),
 		CidrBlock:         aws.String(subnetSpec.CIDR),
-		VpcId:             substrate.Status.VPCID,
+		VpcId:             substrate.Status.Infrastructure.VPCID,
 		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeSubnet, name),
 	})
 	if err != nil {

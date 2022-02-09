@@ -32,7 +32,7 @@ type Instance struct {
 }
 
 func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if len(substrate.Status.PublicSubnetIDs) == 0 || substrate.Status.Cluster.LaunchTemplateVersion == nil {
+	if len(substrate.Status.Infrastructure.PublicSubnetIDs) == 0 || substrate.Status.Cluster.LaunchTemplateVersion == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate)})
@@ -52,7 +52,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		}
 	}
 	overrides := []*ec2.FleetLaunchTemplateOverridesRequest{}
-	for _, subnet := range substrate.Status.PublicSubnetIDs {
+	for _, subnet := range substrate.Status.Infrastructure.PublicSubnetIDs {
 		overrides = append(overrides, &ec2.FleetLaunchTemplateOverridesRequest{SubnetId: aws.String(subnet)})
 	}
 	createFleetOutput, err := i.EC2.CreateFleetWithContext(ctx, &ec2.CreateFleetInput{
