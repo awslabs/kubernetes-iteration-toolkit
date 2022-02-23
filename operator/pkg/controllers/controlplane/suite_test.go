@@ -76,7 +76,7 @@ var _ = Describe("ControlPlane", func() {
 			Namespace: "default",
 		}, Spec: v1alpha1.ControlPlaneSpec{
 			Master: v1alpha1.MasterSpec{APIServer: &v1alpha1.Component{Replicas: 1}},
-			Etcd:   &v1alpha1.Component{}}}
+			Etcd:   v1alpha1.Etcd{Component: v1alpha1.Component{Replicas: 3}}}}
 	})
 	AfterEach(func() {
 		ExpectCleanedUp(kubeClient)
@@ -133,7 +133,7 @@ func ExpectReconcileWithInjectedService(ctx context.Context, controlPlane *v1alp
 
 func patchControlPlaneService(ctx context.Context, controlPlane *v1alpha1.ControlPlane) {
 	svc := &v1.Service{}
-	Expect(kubeClient.Get(ctx, types.NamespacedName{controlPlane.Namespace, master.ServiceNameFor(controlPlane.Name)}, svc)).To(Succeed())
+	Expect(kubeClient.Get(ctx, types.NamespacedName{Namespace: controlPlane.Namespace, Name: master.ServiceNameFor(controlPlane.Name)}, svc)).To(Succeed())
 	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{Hostname: "localhost"}}
 	Expect(kubeClient.Status().Update(ctx, svc)).To(Succeed())
 }

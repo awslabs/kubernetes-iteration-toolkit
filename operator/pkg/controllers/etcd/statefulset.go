@@ -32,9 +32,17 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 	// Generate the default pod spec for the given control plane, if user has
 	// provided custom config for the etcd pod spec, patch this user
 	// provided config to the default spec
-	etcdSpec, err := patch.PodSpec(podSpecFor(controlPlane), controlPlane.Spec.Etcd.Spec)
+	podSpec, err := patch.PodSpec(podSpecFor(controlPlane), controlPlane.Spec.Etcd.Spec)
 	if err != nil {
 		return fmt.Errorf("failed to patch pod spec, %w", err)
+	}
+
+	// Generate the default volume claim template spec for the given control plane, if user has
+	// provided custom config for the etcd volume template spec, patch this user
+	// provided config to the default spec
+	persistentVolumeClaimSpec, err := patch.PersistentVolumeClaimSpec(DefaultPersistentVolumeClaimSpec(), controlPlane.Spec.Etcd.PersistentVolumeClaimSpec)
+	if err != nil {
+		return fmt.Errorf("failed to patch persistent volume claim spec %w", err)
 	}
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.StatefulSet{}, object.WithOwner(controlPlane, &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,15 +53,11 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelsFor(controlPlane.ClusterName()),
 			},
-			PodManagementPolicy: appsv1.ParallelPodManagement,
-			ServiceName:         ServiceNameFor(controlPlane.ClusterName()),
-			Replicas:            aws.Int32(int32(controlPlane.Spec.Etcd.Replicas)),
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labelsFor(controlPlane.ClusterName()),
-				},
-				Spec: etcdSpec,
-			},
+			PodManagementPolicy:  appsv1.ParallelPodManagement,
+			ServiceName:          ServiceNameFor(controlPlane.ClusterName()),
+			Replicas:             aws.Int32(int32(controlPlane.Spec.Etcd.Replicas)),
+			Template:             v1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labelsFor(controlPlane.ClusterName())}, Spec: podSpec},
+			VolumeClaimTemplates: []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "etcd-data"}, Spec: persistentVolumeClaimSpec}},
 		},
 	}))
 }

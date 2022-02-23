@@ -58,7 +58,7 @@ func (c *Controller) getClusterEndpoint(ctx context.Context, nn types.Namespaced
 
 func GetClusterEndpoint(ctx context.Context, client client.Client, nn types.NamespacedName) (string, error) {
 	svc := &v1.Service{}
-	if err := client.Get(ctx, types.NamespacedName{nn.Namespace, ServiceNameFor(nn.Name)}, svc); err != nil {
+	if err := client.Get(ctx, types.NamespacedName{Namespace: nn.Namespace, Name: ServiceNameFor(nn.Name)}, svc); err != nil {
 		if errors.IsNotFound(err) {
 			return "", fmt.Errorf("getting control plane endpoint, %w", errors.WaitingForSubResources)
 		}

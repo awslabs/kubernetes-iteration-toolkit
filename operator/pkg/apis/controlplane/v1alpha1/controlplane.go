@@ -44,7 +44,12 @@ type ControlPlaneList struct {
 type ControlPlaneSpec struct {
 	KubernetesVersion string     `json:"kubernetesVersion,omitempty"`
 	Master            MasterSpec `json:"master,omitempty"`
-	Etcd              *Component `json:"etcd,omitempty"`
+	Etcd              Etcd       `json:"etcd,omitempty"`
+}
+
+type Etcd struct {
+	Component                 `json:",inline"`
+	PersistentVolumeClaimSpec *v1.PersistentVolumeClaimSpec `json:"persistentVolumeClaimSpec,omitempty"`
 }
 
 // MasterSpec provides a way for the user to configure master instances and

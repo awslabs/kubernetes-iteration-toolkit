@@ -95,7 +95,7 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 	if err != nil {
 		return fmt.Errorf("getting security group for control plane nodes, %w", err)
 	}
-	clusterEndpoint, err := master.GetClusterEndpoint(ctx, c.kubeclient, types.NamespacedName{dataplane.Namespace, dataplane.Spec.ClusterName})
+	clusterEndpoint, err := master.GetClusterEndpoint(ctx, c.kubeclient, types.NamespacedName{Namespace: dataplane.Namespace, Name: dataplane.Spec.ClusterName})
 	if err != nil {
 		return fmt.Errorf("getting cluster endpoint, %w", err)
 	}
@@ -155,7 +155,7 @@ func (c *Controller) amiID(ctx context.Context, dataplane *v1alpha1.DataPlane) (
 
 func (c *Controller) desiredKubernetesVersion(ctx context.Context, dataplane *v1alpha1.DataPlane) (string, error) {
 	cp := &cpv1alpha1.ControlPlane{}
-	if err := c.kubeclient.Get(ctx, types.NamespacedName{dataplane.GetNamespace(), dataplane.Spec.ClusterName}, cp); err != nil {
+	if err := c.kubeclient.Get(ctx, types.NamespacedName{Namespace: dataplane.GetNamespace(), Name: dataplane.Spec.ClusterName}, cp); err != nil {
 		return "", fmt.Errorf("getting control plane object, %w", err)
 	}
 	return cp.Spec.KubernetesVersion, nil

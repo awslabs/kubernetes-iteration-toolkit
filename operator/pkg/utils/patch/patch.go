@@ -23,6 +23,23 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
 
+// VolumeClaimTemplateSpec returns the merged VolumeClaimTemplate spes
+func PersistentVolumeClaimSpec(defaultSpec, patch *v1.PersistentVolumeClaimSpec) (v1.PersistentVolumeClaimSpec, error) {
+	if patch == nil {
+		return *defaultSpec, nil
+	}
+	merged, err := mergePatch(defaultSpec, patch, v1.PersistentVolumeClaimSpec{})
+	if err != nil {
+		return v1.PersistentVolumeClaimSpec{}, err
+	}
+	result := &v1.PersistentVolumeClaimSpec{}
+
+	if err := json.Unmarshal(merged, result); err != nil {
+		return v1.PersistentVolumeClaimSpec{}, fmt.Errorf("unmarshalling merged patch to persistentVolumeClaimSpec, %w", err)
+	}
+	return *result, nil
+}
+
 // PodSpec will merge the patch with the default pod spec and return the merged podSpec object
 func PodSpec(defaultSpec, patch *v1.PodSpec) (v1.PodSpec, error) {
 	if patch == nil {
