@@ -62,6 +62,7 @@ func NewController(ctx context.Context) *Controller {
 			&cluster.Readiness{},
 			&addons.RBAC{},
 			&addons.KubeProxy{},
+			&addons.DNS{},
 		},
 	}
 }
