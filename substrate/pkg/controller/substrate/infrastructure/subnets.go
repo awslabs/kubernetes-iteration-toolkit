@@ -99,9 +99,8 @@ func (s *Subnets) ensureSubnet(ctx context.Context, substrate *v1alpha1.Substrat
 		return describeSubnetsOutput.Subnets[0], nil
 
 	}
-	// these tags are required by ELB controller to discover these subnets to configure ELB
+	// tag required by ELB controller to discover these subnets to configure ELB
 	tags := []*ec2.Tag{
-		{Key: aws.String("kubernetes.io/cluster/" + substrate.Name), Value: aws.String("shared")},
 		{Key: aws.String("kubernetes.io/role/elb"), Value: aws.String("1")},
 	}
 	if subnetSpec.Public {
