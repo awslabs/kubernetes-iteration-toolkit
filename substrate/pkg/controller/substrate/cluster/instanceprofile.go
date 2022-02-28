@@ -283,7 +283,7 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 		},
 	}, {
 		// Roles and policies attached to the nodes provisioned by Karpenter
-		name: discovery.Name(substrate, tenantControlPlaneNodeRole),
+		name: discovery.Name(substrate, TenantControlPlaneNodeRole),
 		managedPolicies: []string{
 			"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
 			"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",

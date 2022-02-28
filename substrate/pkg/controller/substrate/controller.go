@@ -63,6 +63,7 @@ func NewController(ctx context.Context) *Controller {
 			&addons.RBAC{},
 			&addons.KubeProxy{},
 			&addons.DNS{},
+			&addons.HelmCharts{},
 		},
 	}
 }

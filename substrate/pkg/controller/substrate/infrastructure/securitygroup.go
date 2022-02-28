@@ -48,6 +48,7 @@ func (s *SecurityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 			ToPort:     aws.Int64(8443),
 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
 		}, {
+			// Allow all traffic within this security group
 			IpProtocol:       aws.String("-1"),
 			FromPort:         aws.Int64(-1),
 			ToPort:           aws.Int64(-1),

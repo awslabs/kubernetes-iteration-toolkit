@@ -50,6 +50,7 @@ import (
 const (
 	ClusterCertsBasePath       = "/tmp/"
 	kubeconfigPath             = "/etc/kubernetes"
+	kubeconfigFile             = "etc/kubernetes/admin.conf"
 	certPKIPath                = "/etc/kubernetes/pki"
 	clusterManifestPath        = "/etc/kubernetes/manifests"
 	kubeletSystemdPath         = "/etc/systemd/system"
@@ -59,7 +60,7 @@ const (
 	imageRepository            = "public.ecr.aws/eks-distro/kubernetes"
 	etcdVersionTag             = "v3.4.16-eks-1-21-7"
 	etcdImageRepository        = "public.ecr.aws/eks-distro/etcd-io"
-	tenantControlPlaneNodeRole = "tenant-controlplane-node-role"
+	TenantControlPlaneNodeRole = "tenant-controlplane-node-role"
 )
 
 type Config struct {
@@ -287,7 +288,7 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 		return fmt.Errorf("getting caller identity, %w", err)
 	}
 	configMap, err := iamauthenticator.Config(ctx, substrate.Name, substrate.Namespace,
-		aws.StringValue(discovery.Name(substrate, tenantControlPlaneNodeRole)), aws.StringValue(identity.Account))
+		aws.StringValue(discovery.Name(substrate, TenantControlPlaneNodeRole)), aws.StringValue(identity.Account))
 	if err != nil {
 		return fmt.Errorf("creating authenticator config, %w", err)
 	}

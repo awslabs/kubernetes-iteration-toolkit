@@ -29,10 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	kubeconfigFile = "etc/kubernetes/admin.conf"
-)
-
 // Readiness checks if the substrate API server endpoint it ready and sets the
 // ready status on the *v1alpha1.Substrate object indicating other controllers
 // like kube-proxy, rbac to proceed
