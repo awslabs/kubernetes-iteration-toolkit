@@ -67,7 +67,7 @@ func (h *HelmCharts) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		errs[i] = h.ensure(charts[i], substrate)
 	})
 	if err := multierr.Combine(errs...); err != nil {
-		return reconcile.Result{Requeue: true}, err
+		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
 }
