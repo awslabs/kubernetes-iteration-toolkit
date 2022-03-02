@@ -6,7 +6,7 @@ require (
 	github.com/ahmetb/gen-crd-api-reference-docs v0.2.0
 	github.com/fzipp/gocyclo v0.0.0-20150627053110-6acd4345c835
 	github.com/golangci/golangci-lint v1.31.0
-	github.com/google/ko v0.8.3
+	github.com/google/ko v0.9.3
 	github.com/mikefarah/yq/v4 v4.6.1
 	github.com/mitchellh/golicense v0.2.0
 	github.com/onsi/ginkgo v1.16.4
