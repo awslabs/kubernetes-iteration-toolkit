@@ -44,3 +44,38 @@ jobs:
           charts_dir: operator/charts
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+  release-cli:
+    strategy:
+      matrix:
+        os: ["darwin"]
+        arch: ["amd64"]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/go/bin/
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    - name: Set env
+      run: |
+        echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+    - uses: actions/setup-go@v2
+      with:
+        go-version: '1.17.1'
+    - name: Build the KIT CLI
+      run: |
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ./bin/kitcli ./cmd/
+        zip ./bin/kitcli_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip -j ./bin/kitcli
+      working-directory: substrate
+    - name: Attach the binary to release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: "./substrate/bin/kitcli_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -51,7 +51,7 @@ apply: ## Apply the controller into your ~/.kube/config cluster
 		$(HELM_OPTS) \
 		--set controller.image=ko://github.com/awslabs/kit/operator/cmd/controller \
 		--set webhook.image=ko://github.com/awslabs/kit/operator/cmd/webhook \
-		| KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit $(WITH_GOFLAGS) ko apply --bare -f -
+		| KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit $(WITH_GOFLAGS) ko apply --platform=linux/arm64,linux/amd64 --bare -f -
     
 delete: ## Delete the controller from your ~/.kube/config cluster
 	helm template kit charts/kit-operator --namespace $(KIT_NAMESPACE) \
@@ -70,8 +70,8 @@ docs:
 		-template-dir $(shell go env GOMODCACHE)/github.com/ahmetb/gen-crd-api-reference-docs@v0.3.0/template
 
 publish: ## Generate release manifests and publish a versioned container image.
-	yq e -i ".controller.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-operator ko publish --bare -t $(RELEASE_VERSION) ./cmd/controller)\"" charts/kit-operator/values.yaml
-	yq e -i ".webhook.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-webhook ko publish --bare -t $(RELEASE_VERSION) ./cmd/webhook)\"" charts/kit-operator/values.yaml
+	yq e -i ".controller.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-operator ko publish --platform=linux/arm64,linux/amd64 --bare -t $(RELEASE_VERSION) ./cmd/controller)\"" charts/kit-operator/values.yaml
+	yq e -i ".webhook.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-webhook ko publish --platform=linux/arm64,linux/amd64 -t $(RELEASE_VERSION) ./cmd/webhook)\"" charts/kit-operator/values.yaml
 	yq e -i '.version = "$(subst v,,${RELEASE_VERSION})"' charts/kit-operator/Chart.yaml
 
 toolchain: ## Install developer toolchain

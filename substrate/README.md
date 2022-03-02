@@ -1,4 +1,12 @@
 # KITCLI
+
+## Installing KITCLI
+
+```bash
+brew tap awslabs/kit https://github.com/awslabs/kubernetes-iteration-toolkit.git
+brew install kitcli
+```
+
 ## Usage
 
 ```sh
