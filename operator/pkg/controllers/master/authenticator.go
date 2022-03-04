@@ -38,7 +38,7 @@ func (c *Controller) reconcileAuthenticator(ctx context.Context, controlPlane *v
 	if err != nil {
 		return fmt.Errorf("getting config for authenticator, %w", err)
 	}
-	if err := c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, configMap); err != nil {
+	if err := c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, object.WithOwner(controlPlane, configMap)); err != nil {
 		return fmt.Errorf("creating config map for authenticator, %w", err)
 	}
 	return c.ensureDaemonSet(ctx, controlPlane)

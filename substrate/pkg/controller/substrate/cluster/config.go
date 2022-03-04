@@ -50,6 +50,7 @@ import (
 const (
 	ClusterCertsBasePath       = "/tmp/"
 	kubeconfigPath             = "/etc/kubernetes"
+	kubeconfigFile             = "etc/kubernetes/admin.conf"
 	certPKIPath                = "/etc/kubernetes/pki"
 	clusterManifestPath        = "/etc/kubernetes/manifests"
 	kubeletSystemdPath         = "/etc/systemd/system"
@@ -59,7 +60,7 @@ const (
 	imageRepository            = "public.ecr.aws/eks-distro/kubernetes"
 	etcdVersionTag             = "v3.4.16-eks-1-21-7"
 	etcdImageRepository        = "public.ecr.aws/eks-distro/etcd-io"
-	tenantControlPlaneNodeRole = "tenant-controlplane-node-role"
+	TenantControlPlaneNodeRole = "tenant-controlplane-node-role"
 )
 
 type Config struct {
@@ -221,9 +222,17 @@ Restart=always`, substrate.Name)), 0644); err != nil {
 func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfiguration {
 	defaultStaticConfig, err := config.DefaultedStaticInitConfiguration()
 	runtime.Must(err)
-	// etcd specific config
 	defaultStaticConfig.ClusterConfiguration.KubernetesVersion = kubernetesVersionTag
 	defaultStaticConfig.ClusterConfiguration.ImageRepository = imageRepository
+	// In ECR coreDNS images are tagged as "v1.8.4-eks-1-21-9", EnsureDNSAddon
+	// in kubeadm validates existing coreDNS image version by parsing the image
+	// tags. It validates  in coreDNS library if the version is supported.
+	// Versions in coreDNS library are in the format `1.8.4` and it fails to
+	// validate. To get around this issue using the image from k8s.gcr.io which
+	// are tagged in format `v1.8.4`
+	defaultStaticConfig.ClusterConfiguration.DNS.ImageRepository = "k8s.gcr.io/coredns"
+	defaultStaticConfig.ClusterConfiguration.DNS.ImageTag = "v1.8.6"
+	// etcd specific config
 	defaultStaticConfig.Etcd.Local = &kubeadm.LocalEtcd{
 		ImageMeta:      kubeadm.ImageMeta{ImageRepository: etcdImageRepository, ImageTag: etcdVersionTag},
 		ServerCertSANs: []string{"localhost", "127.0.0.1"},
@@ -242,13 +251,13 @@ func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 	// master specific config
 	masterElasticIP := aws.StringValue(substrate.Status.Cluster.Address)
 	defaultStaticConfig.LocalAPIEndpoint.AdvertiseAddress = masterElasticIP
-	defaultStaticConfig.LocalAPIEndpoint.BindPort = 443
-	defaultStaticConfig.ControlPlaneEndpoint = masterElasticIP + ":443"
+	defaultStaticConfig.LocalAPIEndpoint.BindPort = 8443
+	defaultStaticConfig.ControlPlaneEndpoint = masterElasticIP + ":8443"
 	defaultStaticConfig.APIServer.CertSANs = []string{masterElasticIP, substrate.Name,
 		"kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local", "10.96.0.1"}
 	defaultStaticConfig.APIServer.ExtraArgs = map[string]string{
-		"advertise-address": masterElasticIP,
-		"secure-port":       "443",
+		"advertise-address": "0.0.0.0",
+		"secure-port":       "8443",
 		"authentication-token-webhook-config-file": "/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 	}
 	defaultStaticConfig.APIServer.ExtraVolumes = []kubeadm.HostPathMount{{
@@ -279,7 +288,7 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 		return fmt.Errorf("getting caller identity, %w", err)
 	}
 	configMap, err := iamauthenticator.Config(ctx, substrate.Name, substrate.Namespace,
-		aws.StringValue(discovery.Name(substrate, tenantControlPlaneNodeRole)), aws.StringValue(identity.Account))
+		aws.StringValue(discovery.Name(substrate, TenantControlPlaneNodeRole)), aws.StringValue(identity.Account))
 	if err != nil {
 		return fmt.Errorf("creating authenticator config, %w", err)
 	}

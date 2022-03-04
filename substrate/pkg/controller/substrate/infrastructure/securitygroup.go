@@ -44,9 +44,15 @@ func (s *SecurityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 		GroupId: securityGroup.GroupId,
 		IpPermissions: []*ec2.IpPermission{{
 			IpProtocol: aws.String("tcp"),
-			FromPort:   aws.Int64(443),
-			ToPort:     aws.Int64(443),
+			FromPort:   aws.Int64(8443),
+			ToPort:     aws.Int64(8443),
 			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String("0.0.0.0/0")}},
+		}, {
+			// Allow all traffic within this security group
+			IpProtocol:       aws.String("-1"),
+			FromPort:         aws.Int64(-1),
+			ToPort:           aws.Int64(-1),
+			UserIdGroupPairs: []*ec2.UserIdGroupPair{{GroupId: securityGroup.GroupId}},
 		}},
 	}); err != nil {
 		if err.(awserr.Error).Code() != "InvalidPermission.Duplicate" {
@@ -72,7 +78,7 @@ func (s *SecurityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrat
 		Description:       aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
 		GroupName:         discovery.Name(substrate),
 		VpcId:             substrate.Status.Infrastructure.VPCID,
-		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeSecurityGroup, discovery.Name(substrate)),
+		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeSecurityGroup, discovery.Name(substrate), &ec2.Tag{Key: aws.String("kubernetes.io/cluster/" + substrate.Name), Value: aws.String("owned")}),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating security group, %w", err)
