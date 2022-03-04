@@ -32,7 +32,8 @@ type Environment struct {
 func New() *Environment {
 	return &Environment{
 		Environment: envtest.Environment{
-			CRDDirectoryPaths: []string{crdFilePath()},
+			CRDDirectoryPaths:     []string{crdFilePath()},
+			BinaryAssetsDirectory: "/usr/local/bin/kubebuilder-assets",
 		},
 	}
 }
