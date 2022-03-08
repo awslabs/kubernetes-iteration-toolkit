@@ -12,9 +12,9 @@ clusterctl init --infrastructure aws --kubeconfig bootstrap.kubeconfig
 # Create Cluster
 kubectl apply --kubeconfig bootstrap.kubeconfig -f ./substrate.yaml
 kubectl get cluster substrate -w --kubeconfig bootstrap.kubeconfig
-
-# Pivot Cluster
 clusterctl get kubeconfig substrate --kubeconfig bootstrap.kubeconfig >substrate.kubeconfig
 kubectl apply -f https://docs.projectcalico.org/v3.21/manifests/calico.yaml --kubeconfig substrate.kubeconfig
+
+# Pivot Cluster
 clusterctl init --infrastructure aws --kubeconfig substrate.kubeconfig
 clusterctl move --kubeconfig bootstrap.kubeconfig --to-kubeconfig substrate.kubeconfig
