@@ -121,7 +121,7 @@ chmod a+x /etc/kit/sync.sh
 		if err.(awserr.Error).Code() != "InvalidLaunchTemplateName.AlreadyExistsException" {
 			return reconcile.Result{}, fmt.Errorf("creating launch template, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found launch template %s", aws.StringValue(discovery.Name(substrate)))
+		logging.FromContext(ctx).Debugf("Found launch template %s", aws.StringValue(discovery.Name(substrate)))
 	} else {
 		logging.FromContext(ctx).Infof("Created launch template %s", aws.StringValue(discovery.Name(substrate)))
 	}

@@ -36,7 +36,7 @@ func (a *Address) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 		return reconcile.Result{}, fmt.Errorf("describing addresses, %w", err)
 	}
 	if len(addressesOutput.Addresses) > 0 {
-		logging.FromContext(ctx).Infof("Found address %s", aws.StringValue(addressesOutput.Addresses[0].PublicIp))
+		logging.FromContext(ctx).Debugf("Found address %s", aws.StringValue(addressesOutput.Addresses[0].PublicIp))
 		substrate.Status.Cluster.Address = addressesOutput.Addresses[0].PublicIp
 		return reconcile.Result{}, nil
 	}

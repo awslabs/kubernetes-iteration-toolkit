@@ -103,8 +103,9 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		aws.StringValue(discovery.Name(substrate)), path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))); err != nil {
 		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
-	logging.FromContext(ctx).Infof("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
+	logging.FromContext(ctx).Debugf("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
 	substrate.Status.Cluster.KubeConfig = ptr.String(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigFile))
+	logging.FromContext(ctx).Infof("To access substrate cluster, export KUBECONFIG=%s", aws.StringValue(substrate.Status.Cluster.KubeConfig))
 	return reconcile.Result{}, nil
 }
 
@@ -190,7 +191,7 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 		if err.(awserr.Error).Code() != s3.ErrCodeBucketAlreadyOwnedByYou {
 			return fmt.Errorf("creating S3 bucket, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
+		logging.FromContext(ctx).Debugf("Found s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	} else {
 		logging.FromContext(ctx).Infof("Created s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
@@ -292,7 +293,7 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 	if err != nil {
 		return fmt.Errorf("creating authenticator config, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Created config map for authenticator")
+	logging.FromContext(ctx).Debugf("Created config map for authenticator")
 	configDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), authenticatorConfigDir)
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("failed to create directory, %w", err)

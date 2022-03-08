@@ -24,18 +24,16 @@ import (
 	"knative.dev/pkg/logging"
 )
 
-func init() {
-	rootCmd.LocalFlags().StringVar(&options.File, "name", "", "Name for the environment")
-	rootCmd.LocalFlags().StringVarP(&options.File, "file", "f", "", "Configuration file for the environment")
-	rootCmd.AddCommand(&cobra.Command{
+func deleteCommand() *cobra.Command {
+	return &cobra.Command{
 		Use:   "delete",
 		Short: "Delete the environment",
 		Long:  ``,
-		Run:   Delete,
-	})
+		Run:   delete,
+	}
 }
 
-func Delete(cmd *cobra.Command, args []string) {
+func delete(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	start := time.Now()
 	name := "test-substrate"
@@ -45,5 +43,5 @@ func Delete(cmd *cobra.Command, args []string) {
 		logging.FromContext(ctx).Error(err.Error())
 		return
 	}
-	logging.FromContext(ctx).Infof("Deleted substrate %s after %s", name, time.Since(start))
+	logging.FromContext(ctx).Debugf("Deleted substrate %s after %s", name, time.Since(start))
 }

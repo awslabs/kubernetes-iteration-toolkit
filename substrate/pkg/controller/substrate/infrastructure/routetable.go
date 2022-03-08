@@ -54,7 +54,7 @@ func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 		return nil, fmt.Errorf("describing route tables, %w", err)
 	}
 	if len(describeRouteTablesOutput.RouteTables) > 0 {
-		logging.FromContext(ctx).Infof("Found route table %s", aws.StringValue(name))
+		logging.FromContext(ctx).Debugf("Found route table %s", aws.StringValue(name))
 		return describeRouteTablesOutput.RouteTables[0], nil
 	}
 	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{

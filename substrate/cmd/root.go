@@ -17,33 +17,83 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"knative.dev/pkg/logging"
 )
 
 func main() {
-	ctx := context.Background()
-	logger, _ := zap.NewDevelopment(zap.WithCaller(false))
-	ctx = logging.WithLogger(ctx, logger.Sugar())
-	runtime.Must(rootCmd.ExecuteContext(ctx))
+	rootCmd := newRootCmd(os.Args[1:])
+	logLevel := zapcore.InfoLevel
+	if options.debug {
+		logLevel = zapcore.DebugLevel
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	logger := zap.New(zapcore.NewCore(zapcore.NewConsoleEncoder(zapcore.EncoderConfig{MessageKey: "message"}),
+		customLogWriteTo(ctx, os.Stdout), zap.LevelEnablerFunc(func(level zapcore.Level) bool {
+			return level >= logLevel
+		}),
+	))
+	runtime.Must(rootCmd.ExecuteContext(logging.WithLogger(ctx, logger.Sugar())))
 }
 
-var rootCmd = &cobra.Command{
-	Use:   "kitctl",
-	Short: "A tool to provision Kubernetes cluster using kit-operator",
-	Long: `kitctl help users provision Kubernetes clustes using kit-operator.
-It also supports configuring the cloud provider environment to get started easily`,
+func newRootCmd(args []string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "kitctl",
+		Short: "A tool to provision Kubernetes cluster using kit-operator",
+		Long: `kitctl help users provision Kubernetes clustes using kit-operator.
+		It also configures the cloud provider environment to get started easily`,
+	}
+	flags := cmd.PersistentFlags()
+	options.addFlags(flags)
+	if err := flags.Parse(args); err != nil {
+		panic(err)
+	}
+	// Add subcommands
+	cmd.AddCommand(bootstrapCommand())
+	cmd.AddCommand(deleteCommand())
+	return cmd
 }
 
-var options = Options{}
+var options = &Options{}
 
 type Options struct {
-	File string
+	file  string
+	debug bool
+	help  bool
 }
 
-func init() {
-	rootCmd.PersistentFlags().StringVarP(&options.File, "file", "f", "", "Configuration file for the environment")
+func (o *Options) addFlags(fs *pflag.FlagSet) {
+	fs.StringVarP(&o.file, "file", "f", "", "Configuration file for the environment")
+	fs.BoolVarP(&o.debug, "debug", "", false, "enable debug logs")
+	fs.BoolVar(&o.help, "help", false, "help flag")
+}
+
+func customLogWriteTo(ctx context.Context, w io.Writer) *os.File {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create pipe, %v", err))
+	}
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_, err := io.Copy(w, reader)
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	}(ctx)
+	return writer
 }

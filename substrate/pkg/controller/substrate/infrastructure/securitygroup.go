@@ -58,7 +58,7 @@ func (s *SecurityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 		if err.(awserr.Error).Code() != "InvalidPermission.Duplicate" {
 			return reconcile.Result{}, fmt.Errorf("authorizing security group ingress, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found ingress rules for security group %s", aws.StringValue(discovery.Name(substrate)))
+		logging.FromContext(ctx).Debugf("Found ingress rules for security group %s", aws.StringValue(discovery.Name(substrate)))
 	} else {
 		logging.FromContext(ctx).Infof("Created ingress rules for security group %s", aws.StringValue(discovery.Name(substrate)))
 	}
@@ -71,7 +71,7 @@ func (s *SecurityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrat
 		return nil, fmt.Errorf("describing security groups, %w", err)
 	}
 	if len(describeSecurityGroupsOutput.SecurityGroups) > 0 {
-		logging.FromContext(ctx).Infof("Found security group %s", aws.StringValue(discovery.Name(substrate)))
+		logging.FromContext(ctx).Debugf("Found security group %s", aws.StringValue(discovery.Name(substrate)))
 		return describeSecurityGroupsOutput.SecurityGroups[0], nil
 	}
 	createSecurityGroupOutput, err := s.EC2.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{

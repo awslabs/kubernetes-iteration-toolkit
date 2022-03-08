@@ -41,12 +41,12 @@ func (i *InternetGateway) Create(ctx context.Context, substrate *v1alpha1.Substr
 	}
 	if _, err := i.EC2.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{InternetGatewayId: internetGateway.InternetGatewayId, VpcId: substrate.Status.Infrastructure.VPCID}); err != nil {
 		if err.(awserr.Error).Code() == "Resource.AlreadyAssociated" {
-			logging.FromContext(ctx).Infof("Found internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
+			logging.FromContext(ctx).Debugf("Found internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
 		} else {
 			return reconcile.Result{}, fmt.Errorf("attaching internet gateway, %w", err)
 		}
 	} else {
-		logging.FromContext(ctx).Infof("Created internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
+		logging.FromContext(ctx).Debugf("Created internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
 	}
 	if _, err := i.EC2.CreateRouteWithContext(ctx, &ec2.CreateRouteInput{
 		RouteTableId:         substrate.Status.Infrastructure.PublicRouteTableID,
@@ -55,7 +55,7 @@ func (i *InternetGateway) Create(ctx context.Context, substrate *v1alpha1.Substr
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating route for internet gateway, %w", err)
 	} else {
-		logging.FromContext(ctx).Infof("Ensured route for internet gateway %s", aws.StringValue(internetGateway.InternetGatewayId))
+		logging.FromContext(ctx).Debugf("Ensured route for internet gateway %s", aws.StringValue(internetGateway.InternetGatewayId))
 	}
 	return reconcile.Result{}, nil
 }
@@ -66,7 +66,7 @@ func (i *InternetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substr
 		return nil, fmt.Errorf("describing internet gateways, %w", err)
 	}
 	if len(descrbeInternetGatewaysOutput.InternetGateways) > 0 {
-		logging.FromContext(ctx).Infof("Found internet gateway %s", substrate.Name)
+		logging.FromContext(ctx).Debugf("Found internet gateway %s", substrate.Name)
 		return descrbeInternetGatewaysOutput.InternetGateways[0], nil
 	}
 	createInternetGatewayOutput, err := i.EC2.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
