@@ -52,11 +52,9 @@ func (s *Subnets) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 			continue
 		}
 		if aws.BoolValue(subnet.MapPublicIpOnLaunch) {
-			substrate.Status.Infrastructure.PublicSubnetIDs = append(substrate.Status.Infrastructure.PublicSubnetIDs,
-				aws.StringValue(subnet.SubnetId))
+			substrate.Status.Infrastructure.PublicSubnetIDs = append(substrate.Status.Infrastructure.PublicSubnetIDs, aws.StringValue(subnet.SubnetId))
 		} else {
-			substrate.Status.Infrastructure.PrivateSubnetIDs = append(substrate.Status.Infrastructure.PrivateSubnetIDs,
-				aws.StringValue(subnet.SubnetId))
+			substrate.Status.Infrastructure.PrivateSubnetIDs = append(substrate.Status.Infrastructure.PrivateSubnetIDs, aws.StringValue(subnet.SubnetId))
 		}
 	}
 	return reconcile.Result{}, nil
@@ -97,21 +95,16 @@ func (s *Subnets) ensureSubnet(ctx context.Context, substrate *v1alpha1.Substrat
 	if len(describeSubnetsOutput.Subnets) > 0 {
 		logging.FromContext(ctx).Debugf("Found subnet %s", aws.StringValue(name))
 		return describeSubnetsOutput.Subnets[0], nil
-
 	}
 	// tag required by ELB controller to discover these subnets to configure ELB
-	tags := []*ec2.Tag{
-		{Key: aws.String("kubernetes.io/role/elb"), Value: aws.String("1")},
-	}
-	if subnetSpec.Public {
-		// these tags are required by Karpenter controller to discover these subnets to provision new node
-		tags = append(tags, &ec2.Tag{Key: aws.String("karpenter.sh/discovery"), Value: aws.String(substrate.Name)})
-	}
 	createSubnetsOutput, err := s.EC2.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
-		AvailabilityZone:  aws.String(subnetSpec.Zone),
-		CidrBlock:         aws.String(subnetSpec.CIDR),
-		VpcId:             substrate.Status.Infrastructure.VPCID,
-		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeSubnet, name, tags...),
+		AvailabilityZone: aws.String(subnetSpec.Zone),
+		CidrBlock:        aws.String(subnetSpec.CIDR),
+		VpcId:            substrate.Status.Infrastructure.VPCID,
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeSubnet),
+			Tags:         append(discovery.Tags(substrate, name), &ec2.Tag{Key: aws.String("kubernetes.io/role/elb"), Value: aws.String("1")}),
+		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating subnet, %w", err)

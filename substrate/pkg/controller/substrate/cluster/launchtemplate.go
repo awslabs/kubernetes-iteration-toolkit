@@ -115,7 +115,10 @@ chmod a+x /etc/kit/sync.sh
 	}
 	if _, err := l.EC2.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateName: discovery.Name(substrate),
-		TagSpecifications:  discovery.Tags(substrate, ec2.ResourceTypeLaunchTemplate, discovery.Name(substrate)),
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeLaunchTemplate),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+		}},
 		LaunchTemplateData: launchTemplateData,
 	}); err != nil {
 		if err.(awserr.Error).Code() != "InvalidLaunchTemplateName.AlreadyExistsException" {
@@ -139,7 +142,7 @@ chmod a+x /etc/kit/sync.sh
 		return reconcile.Result{}, fmt.Errorf("creating launch template version, %w", err)
 	}
 	substrate.Status.Cluster.LaunchTemplateVersion = aws.String(fmt.Sprint(aws.Int64Value(launchTemplateVersionOutput.LaunchTemplateVersion.VersionNumber)))
-	logging.FromContext(ctx).Infof("Created launch template version %s for %s", aws.StringValue(substrate.Status.Cluster.LaunchTemplateVersion), aws.StringValue(discovery.Name(substrate)))
+	logging.FromContext(ctx).Infof("Ensured launch template version %s for %s", aws.StringValue(substrate.Status.Cluster.LaunchTemplateVersion), aws.StringValue(discovery.Name(substrate)))
 	return reconcile.Result{}, nil
 }
 

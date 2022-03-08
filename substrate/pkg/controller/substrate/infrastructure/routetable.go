@@ -58,8 +58,11 @@ func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, 
 		return describeRouteTablesOutput.RouteTables[0], nil
 	}
 	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
-		VpcId:             substrate.Status.Infrastructure.VPCID,
-		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeRouteTable, discovery.Name(substrate)),
+		VpcId: substrate.Status.Infrastructure.VPCID,
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeRouteTable),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating route table, %w", err)

@@ -75,10 +75,13 @@ func (s *SecurityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrat
 		return describeSecurityGroupsOutput.SecurityGroups[0], nil
 	}
 	createSecurityGroupOutput, err := s.EC2.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
-		Description:       aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
-		GroupName:         discovery.Name(substrate),
-		VpcId:             substrate.Status.Infrastructure.VPCID,
-		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeSecurityGroup, discovery.Name(substrate), &ec2.Tag{Key: aws.String("kubernetes.io/cluster/" + substrate.Name), Value: aws.String("owned")}),
+		Description: aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
+		GroupName:   discovery.Name(substrate),
+		VpcId:       substrate.Status.Infrastructure.VPCID,
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeSecurityGroup),
+			Tags:         append(discovery.Tags(substrate, discovery.Name(substrate)), &ec2.Tag{Key: aws.String("kubernetes.io/cluster/" + substrate.Name), Value: aws.String("owned")}),
+		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating security group, %w", err)

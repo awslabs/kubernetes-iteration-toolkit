@@ -70,7 +70,10 @@ func (i *InternetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substr
 		return descrbeInternetGatewaysOutput.InternetGateways[0], nil
 	}
 	createInternetGatewayOutput, err := i.EC2.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
-		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeInternetGateway, discovery.Name(substrate)),
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeInternetGateway),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating internet gateway, %w", err)

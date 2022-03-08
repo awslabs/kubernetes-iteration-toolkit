@@ -68,8 +68,11 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 			DefaultTargetCapacityType: aws.String(ec2.DefaultTargetCapacityTypeOnDemand),
 			TotalTargetCapacity:       aws.Int64(1),
 		},
-		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeInstance, discovery.Name(substrate)),
-		OnDemandOptions:   &ec2.OnDemandOptionsRequest{AllocationStrategy: aws.String(ec2.FleetOnDemandAllocationStrategyLowestPrice)},
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeInstance),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+		}},
+		OnDemandOptions: &ec2.OnDemandOptionsRequest{AllocationStrategy: aws.String(ec2.FleetOnDemandAllocationStrategyLowestPrice)},
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating fleet, %w", err)

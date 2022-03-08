@@ -22,5 +22,5 @@ import (
 )
 
 func Name(substrate *v1alpha1.Substrate, suffixes ...string) *string {
-	return aws.String(strings.Join(append([]string{"kit", substrate.Name}, suffixes...), "-"))
+	return aws.String(strings.Join(append([]string{substrate.Name}, suffixes...), "-"))
 }

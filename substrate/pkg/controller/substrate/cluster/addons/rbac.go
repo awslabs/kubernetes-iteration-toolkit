@@ -28,7 +28,7 @@ type RBAC struct {
 }
 
 func (r *RBAC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if !substrate.IsReady() {
+	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	client, err := kubeconfig.ClientSetFromFile(*substrate.Status.Cluster.KubeConfig)
