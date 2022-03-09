@@ -213,7 +213,7 @@ After=docker.service iptables-restore.service
 Requires=docker.service
 
 [Service]
-ExecStart=/usr/bin/kubelet --hostname-override=%s --address=127.0.0.1 --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1 --node-labels=kit.aws/substrate=control-plane
+ExecStart=/usr/bin/kubelet --hostname-override=%s --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1 --node-labels=kit.aws/substrate=control-plane
 Restart=always`, substrate.Name)), 0644); err != nil {
 		return fmt.Errorf("writing kubelet configuration, %w", err)
 	}
