@@ -30,7 +30,7 @@ jobs:
   build-cli:
     strategy:
       matrix:
-        os: ["darwin"]
+        os: ["darwin", "linux"]
         arch: ["amd64"]
     runs-on: ubuntu-latest
     steps:
