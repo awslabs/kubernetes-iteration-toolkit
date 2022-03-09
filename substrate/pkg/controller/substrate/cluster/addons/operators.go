@@ -21,7 +21,6 @@ import (
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/controller/substrate/cluster"
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
-	"github.com/awslabs/kit/substrate/pkg/utils/json"
 	"go.uber.org/multierr"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -35,11 +34,17 @@ import (
 type HelmCharts struct {
 }
 
+const (
+	kitOperatorChart     = "https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/kit-operator-0.0.5/kit-operator-0.0.5.tgz"
+	karpenterChart       = "https://charts.karpenter.sh/karpenter-0.5.5.tgz"
+	awsVPCCNIChart       = "https://aws.github.io/eks-charts/aws-vpc-cni-1.1.13.tgz"
+	awsEBSCSIDriverChart = "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-aws-ebs-csi-driver-2.6.3/aws-ebs-csi-driver-2.6.3.tgz"
+	awsLBControllerChart = "https://aws.github.io/eks-charts/aws-load-balancer-controller-1.4.0.tgz"
+)
+
 type chart struct {
-	namespace string
-	name      string
-	location  string
-	values    json.Value
+	location, namespace, name string
+	values                    map[string]interface{}
 }
 
 func (h *HelmCharts) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
@@ -47,53 +52,15 @@ func (h *HelmCharts) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		return reconcile.Result{Requeue: true}, nil
 	}
 	charts := []*chart{
-		{
-			namespace: "kube-system",
-			name:      "aws-vpc-cni",
-			location:  "https://aws.github.io/eks-charts/aws-vpc-cni-1.1.13.tgz",
-		},
-		{
-			namespace: "kit",
-			name:      "kit-operator",
-			location:  "https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/kit-operator-0.0.5/kit-operator-0.0.5.tgz",
-		},
-		{
-			namespace: "karpenter",
-			name:      "karpenter",
-			location:  "https://charts.karpenter.sh/karpenter-0.5.5.tgz",
-			values: json.Value{
-				"controller": json.Value{
-					"clusterName": substrate.Name, "clusterEndpoint": fmt.Sprintf("https://%s:8443", *substrate.Status.Cluster.Address),
-					"resources": json.Value{
-						"requests": json.Value{
-							"cpu": "100m",
-						},
-					},
-				},
-				"aws": json.Value{
-					"defaultInstanceProfile": discovery.Name(substrate, cluster.TenantControlPlaneNodeRole),
-				},
-			},
-		},
-		{
-			namespace: "kube-system",
-			name:      "aws-ebs-csi-driver",
-			location:  "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-aws-ebs-csi-driver-2.6.3/aws-ebs-csi-driver-2.6.3.tgz",
-			values: json.Value{
-				"controller": json.Value{
-					"replicaCount": "1",
-				},
-			},
-		},
-		{
-			namespace: "kube-system",
-			name:      "aws-load-balancer-controller",
-			location:  "https://aws.github.io/eks-charts/aws-load-balancer-controller-1.4.0.tgz",
-			values: json.Value{
-				"clusterName":  substrate.Name,
-				"replicaCount": "1",
-			},
-		},
+		{awsVPCCNIChart, "kube-system", "aws-vpc-cni", nil},
+		{kitOperatorChart, "kit", "kit-operator", nil},
+		{karpenterChart, "karpenter", "karpenter", map[string]interface{}{
+			"controller": map[string]interface{}{
+				"clusterName": substrate.Name, "clusterEndpoint": fmt.Sprintf("https://%s:8443", *substrate.Status.Cluster.Address),
+				"resources": map[string]interface{}{"requests": map[string]interface{}{"cpu": "100m"}}},
+			"aws": map[string]interface{}{"defaultInstanceProfile": discovery.Name(substrate, cluster.TenantControlPlaneNodeRole)}}},
+		{awsEBSCSIDriverChart, "kube-system", "aws-ebs-csi-driver", map[string]interface{}{"controller": map[string]interface{}{"replicaCount": "1"}}},
+		{awsLBControllerChart, "kube-system", "aws-load-balancer-controller", map[string]interface{}{"clusterName": substrate.Name, "replicaCount": "1"}},
 	}
 	errs := make([]error, len(charts))
 	workqueue.ParallelizeUntil(ctx, len(charts), len(charts), func(i int) {
