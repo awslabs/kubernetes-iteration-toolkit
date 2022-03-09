@@ -2,6 +2,15 @@ apiVersion: v1
 entries:
   kit-operator:
   - apiVersion: v2
+    created: "2022-03-09T21:11:43.947590636Z"
+    description: A Helm chart for https://github.com/awslabs/kubernetes-iteration-toolkit/.
+    digest: 2651d0df56bb5e7aa7982a9fae209b931a58384e75fcd41d2b703c183b125344
+    name: kit-operator
+    type: application
+    urls:
+    - https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/kit-operator-0.0.7/kit-operator-0.0.7.tgz
+    version: 0.0.7
+  - apiVersion: v2
     created: "2022-03-09T06:14:22.212148699Z"
     description: A Helm chart for https://github.com/awslabs/kubernetes-iteration-toolkit/.
     digest: 202f0914576da903049ac4b4b136d1f4455f8b12713c8a1a6c2b413277232ca5
