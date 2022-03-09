@@ -43,5 +43,5 @@ func delete(cmd *cobra.Command, args []string) {
 		logging.FromContext(ctx).Error(err.Error())
 		return
 	}
-	logging.FromContext(ctx).Debugf("Deleted substrate %s after %s", name, time.Since(start))
+	logging.FromContext(ctx).Infof("Deleted substrate %s after %s", name, time.Since(start))
 }
