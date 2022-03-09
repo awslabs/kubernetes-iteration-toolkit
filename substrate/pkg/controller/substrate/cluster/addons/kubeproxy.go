@@ -38,7 +38,7 @@ func (k *KubeProxy) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 	}
 	config := cluster.DefaultClusterConfig(substrate)
 	if err := proxy.EnsureProxyAddon(&config.ClusterConfiguration, &config.LocalAPIEndpoint, client); err != nil {
-		return reconcile.Result{Requeue: true}, fmt.Errorf("ensuring kube-proxy addon, %w", err)
+		return reconcile.Result{}, fmt.Errorf("ensuring kube-proxy addon, %w", err)
 	}
 	return reconcile.Result{}, nil
 }

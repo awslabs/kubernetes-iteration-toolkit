@@ -63,7 +63,7 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *stri
 		if err.(awserr.Error).Code() != iam.ErrCodeEntityAlreadyExistsException {
 			return reconcile.Result{}, fmt.Errorf("creating role, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found role %s", aws.StringValue(resourceName))
+		logging.FromContext(ctx).Debugf("Found role %s", aws.StringValue(resourceName))
 	} else {
 		logging.FromContext(ctx).Infof("Created role %s", aws.StringValue(resourceName))
 	}
@@ -79,14 +79,14 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *stri
 		if _, err := i.IAM.AttachRolePolicyWithContext(ctx, &iam.AttachRolePolicyInput{RoleName: resourceName, PolicyArn: aws.String(policy)}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("attaching role policy %w", err)
 		}
-		logging.FromContext(ctx).Infof("Ensured managed policy %s for %s", policy, aws.StringValue(resourceName))
+		logging.FromContext(ctx).Debugf("Ensured managed policy %s for %s", policy, aws.StringValue(resourceName))
 	}
 	// Profile
 	if _, err := i.IAM.CreateInstanceProfileWithContext(ctx, &iam.CreateInstanceProfileInput{InstanceProfileName: resourceName}); err != nil {
 		if err.(awserr.Error).Code() != iam.ErrCodeEntityAlreadyExistsException {
 			return reconcile.Result{}, fmt.Errorf("creating instance profile, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found instance profile %s", aws.StringValue(resourceName))
+		logging.FromContext(ctx).Debugf("Found instance profile %s", aws.StringValue(resourceName))
 	} else {
 		logging.FromContext(ctx).Infof("Created instance profile %s", aws.StringValue(resourceName))
 	}
@@ -95,7 +95,7 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *stri
 		if err.(awserr.Error).Code() != iam.ErrCodeLimitExceededException {
 			return reconcile.Result{}, fmt.Errorf("adding role to instance profile, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Found role %s on instance profile %s", aws.StringValue(resourceName), aws.StringValue(resourceName))
+		logging.FromContext(ctx).Debugf("Found role %s on instance profile %s", aws.StringValue(resourceName), aws.StringValue(resourceName))
 	} else {
 		logging.FromContext(ctx).Infof("Added role %s to instance profile %s", aws.StringValue(resourceName), aws.StringValue(resourceName))
 	}

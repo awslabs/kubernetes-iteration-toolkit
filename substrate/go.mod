@@ -8,6 +8,7 @@ require (
 	github.com/imdario/mergo v0.3.12
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/spf13/cobra v1.3.0
+	github.com/spf13/pflag v1.0.5
 	go.uber.org/multierr v1.7.0
 	go.uber.org/zap v1.19.1
 	helm.sh/helm/v3 v3.8.0

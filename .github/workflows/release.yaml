@@ -70,12 +70,12 @@ jobs:
         go-version: '1.17.1'
     - name: Build the KIT CLI
       run: |
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ./bin/kitcli ./cmd/
-        zip ./bin/kitcli_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip -j ./bin/kitcli
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ./bin/kitctl ./cmd/
+        zip ./bin/kitctl_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip -j ./bin/kitctl
       working-directory: substrate
     - name: Attach the binary to release
       uses: softprops/action-gh-release@v1
       with:
-        files: "./substrate/bin/kitcli_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip"
+        files: "./substrate/bin/kitctl_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
