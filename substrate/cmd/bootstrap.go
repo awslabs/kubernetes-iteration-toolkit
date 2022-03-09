@@ -51,6 +51,7 @@ func bootstrap(cmd *cobra.Command, args []string) {
 	start := time.Now()
 	// TODO make substrate name configurable
 	name := "test-substrate"
+	logging.FromContext(ctx).Infof("Starting bootstrap of %q", name)
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1alpha1.SubstrateSpec{
@@ -69,5 +70,5 @@ func bootstrap(cmd *cobra.Command, args []string) {
 		logging.FromContext(ctx).Error(err.Error())
 		return
 	}
-	logging.FromContext(ctx).Infof("✅ Bootstrap finished, substrate name %s time taken %s", name, time.Since(start))
+	logging.FromContext(ctx).Infof("✅ Bootstrapped %q after %s", name, time.Since(start))
 }
