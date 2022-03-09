@@ -71,7 +71,7 @@ docs:
 
 publish: ## Generate release manifests and publish a versioned container image.
 	yq e -i ".controller.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-operator ko publish --platform=linux/arm64,linux/amd64 --bare -t $(RELEASE_VERSION) ./cmd/controller)\"" charts/kit-operator/values.yaml
-	yq e -i ".webhook.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-webhook ko publish --platform=linux/arm64,linux/amd64 -t $(RELEASE_VERSION) ./cmd/webhook)\"" charts/kit-operator/values.yaml
+	yq e -i ".webhook.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-webhook ko publish --platform=linux/arm64,linux/amd64 --bare -t $(RELEASE_VERSION) ./cmd/webhook)\"" charts/kit-operator/values.yaml
 	yq e -i '.version = "$(subst v,,${RELEASE_VERSION})"' charts/kit-operator/Chart.yaml
 
 toolchain: ## Install developer toolchain
