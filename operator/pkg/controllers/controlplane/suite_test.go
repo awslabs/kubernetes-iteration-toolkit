@@ -47,6 +47,10 @@ func (f *fakeAccountProvider) ID() (string, error) {
 	return "fakeAccountID", nil
 }
 
+func (f *fakeAccountProvider) Region() string {
+	return "fakeRegion"
+}
+
 type fakeIAMProvider struct{}
 
 func (f *fakeIAMProvider) Reconcile(_ context.Context, _ *v1alpha1.ControlPlane) error { return nil }
