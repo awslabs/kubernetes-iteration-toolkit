@@ -59,7 +59,7 @@ func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 		IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{Name: discovery.Name(substrate)},
 		Monitoring:         &ec2.LaunchTemplatesMonitoringRequest{Enabled: aws.Bool(true)},
 		SecurityGroupIds:   []*string{substrate.Status.Infrastructure.SecurityGroupID},
-		// aws s3 sync sometimes fails to sync small changes in a file, so we use --exact-timestamps
+		// TODO aws s3 sync sometimes fails to sync small changes in a file, so we should use --exact-timestamps
 		// refer: https://github.com/aws/aws-cli/issues/3273
 		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`#!/bin/bash
 cat <<EOF | sudo tee /etc/docker/daemon.json
@@ -98,7 +98,7 @@ while [ true ]; do
     echo "\$(date) Syncing S3 files for \$dir"
     mkdir -p \$dir
     existing_checksum=\$(ls -alR \$dir | md5sum)
-    aws s3 sync --exact-timestamps s3://%[1]s/tmp/%[1]s\$dir "\$dir"
+    aws s3 sync s3://%[1]s/tmp/%[1]s\$dir "\$dir"
     new_checksum=\$(ls -alR \$dir | md5sum)
     if [ "\$new_checksum" != "\$existing_checksum" ]; then
 		echo "Successfully synced from S3 \$dir"
