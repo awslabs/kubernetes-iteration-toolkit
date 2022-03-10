@@ -73,7 +73,6 @@ spec:
       kit.aws/substrate: ${SUBSTRATE_CLUSTER_NAME}
   ttlSecondsAfterEmpty: 30
 EOF
-EOF
 ```
 
 ### Provision a Kubernetes cluster control plane
@@ -84,7 +83,12 @@ apiVersion: kit.k8s.sh/v1alpha1
 kind: ControlPlane
 metadata:
   name: ${GUEST_CLUSTER_NAME} # Desired Cluster name
-spec: {}
+spec:
+  etcd:
+    replicas: 3
+  master:
+    apiServer:
+      replicas: 1
 EOF
 ```
 
