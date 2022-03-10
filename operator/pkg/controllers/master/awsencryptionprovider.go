@@ -16,7 +16,7 @@ import (
 
 func (c *Controller) reconcileEncryptionProviderConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	providerConfig := defaultProviderConfig
-	if controlPlane.Spec.Master.KMSKeyARN == nil {
+	if controlPlane.Spec.Master.KMSKeyARN != nil {
 		providerConfig = awsEncryptionConfig
 	}
 	configMap, err := object.GenerateConfigMap(providerConfig, struct{ ConfigMapName, Namespace string }{
@@ -24,7 +24,7 @@ func (c *Controller) reconcileEncryptionProviderConfig(ctx context.Context, cont
 		Namespace:     controlPlane.Namespace,
 	})
 	if err != nil {
-		return fmt.Errorf("generating cloud config, %w", err)
+		return fmt.Errorf("generating provider config, %w", err)
 	}
 	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, object.WithOwner(controlPlane, configMap))
 }
