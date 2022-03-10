@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kit/operator/pkg/utils/functional"
+	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kit/operator/pkg/utils/object"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -20,7 +21,7 @@ func (c *Controller) reconcileEncryptionProviderConfig(ctx context.Context, cont
 		providerConfig = awsEncryptionConfig
 	}
 	configMap, err := object.GenerateConfigMap(providerConfig, struct{ ConfigMapName, Namespace string }{
-		ConfigMapName: EncryptionProviderConfigMapName(controlPlane.ClusterName()),
+		ConfigMapName: EncryptionProviderConfigName(controlPlane.ClusterName()),
 		Namespace:     controlPlane.Namespace,
 	})
 	if err != nil {
@@ -47,9 +48,12 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{Labels: providerLabels(controlPlane.ClusterName())},
 					Spec: v1.PodSpec{
+						PriorityClassName: "system-node-critical",
+						Tolerations:       []v1.Toleration{{Operator: v1.TolerationOpExists}},
+						NodeSelector:      nodeSelector(controlPlane.ClusterName()),
 						Containers: []v1.Container{{
 							Name:    "aws-encryption-provider",
-							Image:   "TODO",
+							Image:   imageprovider.AWSEncryptionProvider(),
 							Command: []string{"/aws-encryption-provider"},
 							Args: []string{
 								"--key=" + aws.StringValue(controlPlane.Spec.Master.KMSKeyARN),
@@ -92,7 +96,7 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 	)
 }
 
-func EncryptionProviderConfigMapName(clusterName string) string {
+func EncryptionProviderConfigName(clusterName string) string {
 	return fmt.Sprintf("%s-encryption-provider-config", clusterName)
 }
 
@@ -108,14 +112,14 @@ metadata:
   name: {{ .ConfigMapName }}
   namespace: {{ .Namespace }}
 data:
-  provider.config: |
-	apiVersion: apiserver.config.k8s.io/v1
-	kind: EncryptionConfiguration
-	resources:
-	- resources:
-		- secrets
-		providers:
-		- identity: {}
+  encryption-configuration.yaml: |
+    apiVersion: apiserver.config.k8s.io/v1
+    kind: EncryptionConfiguration
+    resources:
+      - resources:
+        - secrets
+        providers:
+        - identity: {}
 `
 	awsEncryptionConfig = `
 apiVersion: v1
@@ -124,18 +128,18 @@ metadata:
   name: {{ .ConfigMapName }}
   namespace: {{ .Namespace }}
 data:
-  provider.config: |
-	apiVersion: apiserver.config.k8s.io/v1
-	kind: EncryptionConfiguration
-	resources:
-	- resources:
-		- secrets
-		providers:
-		- kms:
-			name: aws-encryption-provider
-			endpoint: unix:///var/run/kmsplugin/socket.sock
-			cachesize: 50000
-			timeout: 3s
-		- identity: {}
+  encryption-configuration.yaml: |
+    apiVersion: apiserver.config.k8s.io/v1
+    kind: EncryptionConfiguration
+    resources:
+      - resources:
+        - secrets
+        providers:
+        - kms:
+            name: aws-encryption-provider
+            endpoint: unix:///var/run/kmsplugin/socket.sock
+            cachesize: 10000
+            timeout: 3s
+        - identity: {}
 `
 )

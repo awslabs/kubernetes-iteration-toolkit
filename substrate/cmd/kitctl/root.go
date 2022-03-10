@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -66,13 +67,17 @@ func newRootCmd(args []string) *cobra.Command {
 var options = &Options{}
 
 type Options struct {
-	file  string
-	debug bool
-	help  bool
+	file          string
+	debug         bool
+	substrateName string
+	help          bool
 }
 
 func (o *Options) addFlags(fs *pflag.FlagSet) {
+	u, err := user.Current()
+	runtime.Must(err)
 	fs.StringVarP(&o.file, "file", "f", "", "Configuration file for the environment")
+	fs.StringVarP(&o.substrateName, "name", "n", fmt.Sprintf("kitctl-%s", u.Username), "name for the environment")
 	fs.BoolVarP(&o.debug, "debug", "", false, "enable debug logs")
 	fs.BoolVar(&o.help, "help", false, "help flag")
 }

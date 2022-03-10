@@ -200,6 +200,9 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
 					ReadOnly:  true,
 				}, {
+					Name:      "var-run-kmsplugin",
+					MountPath: "/var/run/kmsplugin/",
+				}, {
 					Name:      "aws-provider-encryption-config",
 					MountPath: "/etc/kubernetes/aws-encryption-provider",
 					ReadOnly:  true,
@@ -364,11 +367,18 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				},
 			},
 		}, {
-			Name: "aws-provider-encryption-config",
+			Name: "var-run-kmsplugin",
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
-					Path: "/etc/kubernetes/aws-encryption-provider",
-					Type: &hostPathDirectory,
+					Path: "/var/run/kmsplugin/",
+					Type: &hostPathDirectoryOrCreate,
+				},
+			},
+		}, {
+			Name: "aws-provider-encryption-config",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{Name: EncryptionProviderConfigName(controlPlane.ClusterName())},
 				},
 			},
 		}},
