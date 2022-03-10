@@ -142,6 +142,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--tls-cert-file=/etc/kubernetes/pki/apiserver/apiserver.crt",
 					"--tls-private-key-file=/etc/kubernetes/pki/apiserver/apiserver.key",
 					"--authentication-token-webhook-config-file=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
+					"--encryption-provider-config=/etc/kubernetes/aws-encryption-provider/encryption-configuration.yaml",
 				},
 				Env: []v1.EnvVar{{
 					Name: "NODE_IP",
@@ -197,6 +198,10 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				}, {
 					Name:      "authenticator-config",
 					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
+					ReadOnly:  true,
+				}, {
+					Name:      "aws-provider-encryption-config",
+					MountPath: "/etc/kubernetes/aws-encryption-provider",
 					ReadOnly:  true,
 				}},
 				LivenessProbe: &v1.Probe{
@@ -355,6 +360,14 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
 					Path: "/var/aws-iam-authenticator/kubeconfig/",
+					Type: &hostPathDirectory,
+				},
+			},
+		}, {
+			Name: "aws-provider-encryption-config",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/etc/kubernetes/aws-encryption-provider",
 					Type: &hostPathDirectory,
 				},
 			},

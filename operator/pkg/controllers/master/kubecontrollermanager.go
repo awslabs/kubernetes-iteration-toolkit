@@ -40,7 +40,7 @@ func (c *Controller) reconcileKCMCloudConfig(ctx context.Context, controlPlane *
 	if err != nil {
 		return fmt.Errorf("generating cloud config, %w", err)
 	}
-	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, configMap)
+	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, object.WithOwner(controlPlane, configMap))
 }
 
 func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
