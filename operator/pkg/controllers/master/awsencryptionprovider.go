@@ -18,7 +18,7 @@ import (
 func (c *Controller) reconcileEncryptionProviderConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	providerConfig := defaultProviderConfig
 	if controlPlane.Spec.Master.KMSKeyARN != nil {
-		providerConfig = awsEncryptionConfig
+		providerConfig = encryptionEnabledConfig
 	}
 	configMap, err := object.GenerateConfigMap(providerConfig, struct{ ConfigMapName, Namespace string }{
 		ConfigMapName: EncryptionProviderConfigName(controlPlane.ClusterName()),
@@ -120,7 +120,7 @@ data:
         providers:
         - identity: {}
 `
-	awsEncryptionConfig = `
+	encryptionEnabledConfig = `
 apiVersion: v1
 kind: ConfigMap
 metadata:
