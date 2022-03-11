@@ -94,7 +94,6 @@ func IAMClient(sess *session.Session) *IAM {
 
 type AccountMetadata interface {
 	ID() (string, error)
-	Region() string
 }
 
 type AccountInfo struct {
@@ -107,8 +106,4 @@ func (a *AccountInfo) ID() (string, error) {
 		return "", fmt.Errorf("getting instance metadata, %v", err)
 	}
 	return doc.AccountID, nil
-}
-
-func (a *AccountInfo) Region() string {
-	return aws.StringValue(a.Session.Config.Region)
 }

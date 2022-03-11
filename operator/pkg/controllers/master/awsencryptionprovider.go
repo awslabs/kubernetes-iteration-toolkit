@@ -57,7 +57,6 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 							Command: []string{"/aws-encryption-provider"},
 							Args: []string{
 								"--key=" + aws.StringValue(controlPlane.Spec.Master.KMSKeyARN),
-								"--region=" + c.cloudProvider.Region(),
 								"--listen=/var/run/kmsplugin/socket.sock",
 							},
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},

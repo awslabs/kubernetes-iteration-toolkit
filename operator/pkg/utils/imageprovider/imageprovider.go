@@ -64,6 +64,7 @@ func AWSIamAuthenticator() string {
 }
 
 func AWSEncryptionProvider() string {
+	// TODO update this to released version
 	return "public.ecr.aws/kit/aws-encryption-provider:0.0.1"
 }
 
