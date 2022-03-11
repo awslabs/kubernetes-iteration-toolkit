@@ -16,7 +16,8 @@ To get started make sure you have admin access to AWS.
 ### Bootstrap an environment in AWS to run Kubernetes clusters using kit-operator
 
 ```bash
-kitctl bootstrap
+export AWS_REGION=us-west-2
+kitctl bootstrap -n substrate-$(whoami) # Environment name
 ```
 > Set KUBECONFIG to access the environment with the kubeconfig location provided from this command
 
@@ -24,7 +25,7 @@ kitctl bootstrap
 
 ```bash
 GUEST_CLUSTER_NAME=foo # Desired Cluster name
-SUBSTRATE_CLUSTER_NAME=test-substrate
+SUBSTRATE_CLUSTER_NAME=substrate-$(whoami)
 ```
 
 ```bash
