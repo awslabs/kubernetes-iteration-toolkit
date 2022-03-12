@@ -20,10 +20,10 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
-	apis "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/awsprovider"
-	"github.com/awslabs/kit/operator/pkg/errors"
-	"github.com/awslabs/kit/operator/pkg/kubeprovider"
+	apis "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/awsprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/kubeprovider"
 	"go.uber.org/zap"
 
 	"knative.dev/pkg/ptr"

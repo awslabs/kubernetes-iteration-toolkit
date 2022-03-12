@@ -2,7 +2,7 @@ RELEASE_REPO ?= public.ecr.aws/i7d3g4r4/kit-operator
 RELEASE_VERSION ?= $(shell git describe --tags --always)
 
 ## Inject the app version into project.Version
-LDFLAGS ?= "-ldflags=-X=github.com/awslabs/kit/operator/pkg/utils/project.Version=$(RELEASE_VERSION)"
+LDFLAGS ?= "-ldflags=-X=github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/project.Version=$(RELEASE_VERSION)"
 GOFLAGS ?= "$(LDFLAGS)"
 WITH_GOFLAGS = GOFLAGS=$(GOFLAGS)
 WITH_RELEASE_REPO = KO_DOCKER_REPO=$(RELEASE_REPO)
@@ -49,8 +49,8 @@ licenses: ## Verifies dependency licenses and requires GITHUB_TOKEN to be set
 apply: ## Apply the controller into your ~/.kube/config cluster
 	helm template --include-crds kit charts/kit-operator --namespace $(KIT_NAMESPACE) \
 		$(HELM_OPTS) \
-		--set controller.image=ko://github.com/awslabs/kit/operator/cmd/controller \
-		--set webhook.image=ko://github.com/awslabs/kit/operator/cmd/webhook \
+		--set controller.image=ko://github.com/awslabs/kubernetes-iteration-toolkit/operator/cmd/controller \
+		--set webhook.image=ko://github.com/awslabs/kubernetes-iteration-toolkit/operator/cmd/webhook \
 		| KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit $(WITH_GOFLAGS) ko apply --platform=linux/arm64,linux/amd64 --bare -f -
     
 delete: ## Delete the controller from your ~/.kube/config cluster

@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"

@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/errors"
-	"github.com/awslabs/kit/operator/pkg/results"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/results"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"

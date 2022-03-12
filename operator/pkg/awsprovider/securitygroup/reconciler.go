@@ -19,9 +19,9 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/kit/operator/pkg/awsprovider"
-	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	cpinstances "github.com/awslabs/kit/operator/pkg/utils/instances"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/awsprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/kubeprovider"
+	cpinstances "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/instances"
 	"knative.dev/pkg/ptr"
 )
 

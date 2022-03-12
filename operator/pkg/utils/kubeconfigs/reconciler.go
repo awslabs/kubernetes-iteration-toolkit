@@ -18,12 +18,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/errors"
-	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	"github.com/awslabs/kit/operator/pkg/utils/keypairs"
-	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/secrets"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/keypairs"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/secrets"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"

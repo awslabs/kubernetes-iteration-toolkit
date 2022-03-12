@@ -18,8 +18,8 @@ import (
 	"context"
 	"flag"
 
-	cpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	dpv1alpha1 "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
+	cpv1alpha1 "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	dpv1alpha1 "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/dataplane/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"knative.dev/pkg/configmap"

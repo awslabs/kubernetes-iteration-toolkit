@@ -17,9 +17,9 @@ package addons
 import (
 	"context"
 
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/kubeprovider"
-	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/kubeprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"

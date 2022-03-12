@@ -17,7 +17,7 @@ package controlplane
 import (
 	"context"
 
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 )
 
 type Controller interface {

@@ -15,8 +15,8 @@ limitations under the License.
 package scheme
 
 import (
-	cp "github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	dp "github.com/awslabs/kit/operator/pkg/apis/dataplane/v1alpha1"
+	cp "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	dp "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/dataplane/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
