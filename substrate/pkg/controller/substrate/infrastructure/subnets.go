@@ -98,13 +98,10 @@ func (s *Subnets) ensureSubnet(ctx context.Context, substrate *v1alpha1.Substrat
 	}
 	// tag required by ELB controller to discover these subnets to configure ELB
 	createSubnetsOutput, err := s.EC2.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
-		AvailabilityZone: aws.String(subnetSpec.Zone),
-		CidrBlock:        aws.String(subnetSpec.CIDR),
-		VpcId:            substrate.Status.Infrastructure.VPCID,
-		TagSpecifications: []*ec2.TagSpecification{{
-			ResourceType: aws.String(ec2.ResourceTypeSubnet),
-			Tags:         append(discovery.Tags(substrate, name), &ec2.Tag{Key: aws.String("kubernetes.io/role/elb"), Value: aws.String("1")}),
-		}},
+		AvailabilityZone:  aws.String(subnetSpec.Zone),
+		CidrBlock:         aws.String(subnetSpec.CIDR),
+		VpcId:             substrate.Status.Infrastructure.VPCID,
+		TagSpecifications: []*ec2.TagSpecification{{ResourceType: aws.String(ec2.ResourceTypeSubnet), Tags: discovery.Tags(substrate, name)}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating subnet, %w", err)

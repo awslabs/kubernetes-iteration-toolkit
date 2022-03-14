@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/utils/helm"
+	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type AWSLoadBalancer struct{}
+type AWSLoadBalancer struct {
+	EC2 *ec2.EC2
+}
 
 func (l *AWSLoadBalancer) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if !substrate.Status.IsReady() {
@@ -27,6 +32,13 @@ func (l *AWSLoadBalancer) Create(ctx context.Context, substrate *v1alpha1.Substr
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
 	}
+	if _, err := l.EC2.CreateTagsWithContext(ctx, &ec2.CreateTagsInput{
+		Resources: aws.StringSlice(substrate.Status.Infrastructure.PublicSubnetIDs),
+		Tags:      []*ec2.Tag{{Key: aws.String("kubernetes.io/role/elb"), Value: aws.String("1")}},
+	}); err != nil {
+		return reconcile.Result{}, fmt.Errorf("tagging resources, %w", err)
+	}
+	logging.FromContext(ctx).Debug("Tagged subnets with %s=%s", "kubernetes.io/role/elb", "1")
 	return reconcile.Result{}, nil
 }
 

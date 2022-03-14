@@ -11,6 +11,7 @@ import (
 	"github.com/awslabs/kit/substrate/pkg/utils/discovery"
 	"github.com/awslabs/kit/substrate/pkg/utils/helm"
 	"github.com/awslabs/kit/substrate/pkg/utils/kubectl"
+	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -76,10 +77,12 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("tagging resources, %w", err)
 	}
+	logging.FromContext(ctx).Debug("Tagged subnets and security groups with %s=%s", "karpenter.sh/discovery", substrate.Name)
 	// Apply Provisioner
 	if err := client.ApplyYAML(ctx, []byte(fmt.Sprintf(provisioner, substrate.Name))); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying provisioner, %w", err)
 	}
+	logging.FromContext(ctx).Debug("Applied default provisioner")
 	return reconcile.Result{}, nil
 }
 
