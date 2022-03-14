@@ -18,8 +18,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
-	"github.com/awslabs/kit/substrate/pkg/controller/substrate/cluster"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/controller/substrate/cluster"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"

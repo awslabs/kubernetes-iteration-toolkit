@@ -19,8 +19,8 @@ import (
 	"os/user"
 	"time"
 
-	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
-	"github.com/awslabs/kit/substrate/pkg/controller/substrate"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/controller/substrate"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"

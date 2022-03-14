@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
-	"github.com/awslabs/kit/substrate/pkg/utils/helm"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/helm"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 

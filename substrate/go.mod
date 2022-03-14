@@ -1,10 +1,10 @@
-module github.com/awslabs/kit/substrate
+module github.com/awslabs/kubernetes-iteration-toolkit/substrate
 
 go 1.17
 
 require (
 	github.com/aws/aws-sdk-go v1.43.8
-	github.com/awslabs/kit/operator v0.0.0-00010101000000-000000000000
+	github.com/awslabs/kubernetes-iteration-toolkit/operator v0.0.0-20220314194613-591115b03ecd
 	github.com/imdario/mergo v0.3.12
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/spf13/cobra v1.3.0
@@ -157,7 +157,6 @@ require (
 )
 
 replace (
-	github.com/awslabs/kit/operator => ../operator
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => k8s.io/api v0.23.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.23.4
