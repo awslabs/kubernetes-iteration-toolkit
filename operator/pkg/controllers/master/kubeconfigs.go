@@ -19,11 +19,11 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
-	"github.com/awslabs/kit/operator/pkg/utils/kubeconfigs"
-	"github.com/awslabs/kit/operator/pkg/utils/object"
-	"github.com/awslabs/kit/operator/pkg/utils/secrets"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	pkiutil "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/pki"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/kubeconfigs"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/secrets"
 	"go.uber.org/zap"
 
 	v1 "k8s.io/api/core/v1"

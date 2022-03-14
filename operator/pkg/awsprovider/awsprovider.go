@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/awslabs/kit/operator/pkg/utils/project"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/project"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"

@@ -17,7 +17,7 @@ package v1alpha1
 import (
 	"context"
 
-	"github.com/awslabs/kit/operator/pkg/apis/config"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/config"
 )
 
 // SetDefaults for the ControlPlane, this gets called by the kit-webhook pod

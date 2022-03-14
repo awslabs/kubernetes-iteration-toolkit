@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/awslabs/kit/operator/pkg/errors"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

@@ -15,8 +15,8 @@ limitations under the License.
 package secrets
 
 import (
-	pkiutil "github.com/awslabs/kit/operator/pkg/pki"
-	"github.com/awslabs/kit/operator/pkg/utils/object"
+	pkiutil "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/pki"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "k8s.io/api/core/v1"
