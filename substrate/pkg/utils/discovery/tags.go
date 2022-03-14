@@ -26,14 +26,11 @@ const (
 	OwnerTagKey = "kit.aws/substrate"
 )
 
-func Tags(substrate *v1alpha1.Substrate, resource string, name *string, additionalTags ...*ec2.Tag) []*ec2.TagSpecification {
-	return []*ec2.TagSpecification{{
-		ResourceType: aws.String(resource),
-		Tags: append([]*ec2.Tag{
-			{Key: aws.String(OwnerTagKey), Value: aws.String(substrate.Name)},
-			{Key: aws.String("Name"), Value: name},
-		}, additionalTags...),
-	}}
+func Tags(substrate *v1alpha1.Substrate, name *string) []*ec2.Tag {
+	return []*ec2.Tag{
+		{Key: aws.String(OwnerTagKey), Value: aws.String(substrate.Name)},
+		{Key: aws.String("Name"), Value: name},
+	}
 }
 
 func Filters(substrate *v1alpha1.Substrate, optionalName ...*string) (filters []*ec2.Filter) {

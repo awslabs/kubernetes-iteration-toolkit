@@ -39,12 +39,14 @@ import (
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
+
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func NewController(ctx context.Context) *Controller {
 	session := session.Must(session.NewSession(&aws.Config{STSRegionalEndpoint: endpoints.RegionalSTSEndpoint}))
 	session.Handlers.Build.PushBack(request.MakeAddToUserAgentFreeFormHandler("kit.sh"))
+
 	EC2 := ec2.New(session)
 	IAM := iam.New(session)
 	return &Controller{
@@ -60,10 +62,15 @@ func NewController(ctx context.Context) *Controller {
 			&cluster.Instance{EC2: EC2},
 			&cluster.Config{S3: s3.New(session), STS: sts.New(session), S3Uploader: s3manager.NewUploader(session)},
 			&cluster.Readiness{},
-			&addons.RBAC{},
+			&addons.AWSEBSCSIDriver{},
+			&addons.AWSLoadBalancer{EC2: EC2},
+			&addons.AWSVPCCNI{},
+			&addons.CoreDNS{},
+			&addons.Karpenter{EC2: EC2},
+			&addons.KITOperator{},
 			&addons.KubeProxy{},
-			&addons.DNS{},
-			&addons.HelmCharts{},
+			&addons.RBAC{},
+			&addons.Tekton{},
 		},
 	}
 }
@@ -82,7 +89,7 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 	ctx, cancel := context.WithCancel(ctx)
 	var errs = make([]error, len(c.Resources))
 	workqueue.ParallelizeUntil(ctx, len(c.Resources), len(c.Resources), func(i int) {
-		for {
+		for ctx.Err() == nil {
 			resource := c.Resources[i]
 			c.RLock()
 			mutable := substrate.DeepCopy()

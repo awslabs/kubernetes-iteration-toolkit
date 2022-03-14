@@ -72,7 +72,7 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *stri
 		if _, err := i.IAM.PutRolePolicyWithContext(ctx, &iam.PutRolePolicyInput{RoleName: resourceName, PolicyName: resourceName, PolicyDocument: policy}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("adding policy to role, %w", err)
 		}
-		logging.FromContext(ctx).Infof("Created policy %s for %s", aws.StringValue(resourceName), aws.StringValue(resourceName))
+		logging.FromContext(ctx).Infof("Ensured policy %s for %s", aws.StringValue(resourceName), aws.StringValue(resourceName))
 	}
 	// Managed Policies
 	for _, policy := range managedPolicies {

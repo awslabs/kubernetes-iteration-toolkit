@@ -15,12 +15,15 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
+	"os/user"
 	"time"
 
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kit/substrate/pkg/controller/substrate"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"knative.dev/pkg/logging"
 )
 
@@ -36,8 +39,9 @@ func deleteCommand() *cobra.Command {
 func delete(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	start := time.Now()
-	name := "test-substrate"
-	logging.FromContext(ctx).Infof("Starting cleanup of %q", name)
+	u, err := user.Current()
+	runtime.Must(err)
+	name := fmt.Sprintf("kitctl-%s", u.Username)
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: name, DeletionTimestamp: &metav1.Time{Time: time.Now()}},
 	}); err != nil {

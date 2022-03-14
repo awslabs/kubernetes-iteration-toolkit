@@ -15,7 +15,9 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
+	"os/user"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -23,6 +25,7 @@ import (
 	"github.com/awslabs/kit/substrate/pkg/controller/substrate"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"knative.dev/pkg/logging"
 )
 
@@ -49,9 +52,9 @@ func bootstrap(cmd *cobra.Command, args []string) {
 	}
 	ctx := cmd.Context()
 	start := time.Now()
-	// TODO make substrate name configurable
-	name := "test-substrate"
-	logging.FromContext(ctx).Infof("Starting bootstrap of %q", name)
+	u, err := user.Current()
+	runtime.Must(err)
+	name := fmt.Sprintf("kitctl-%s", u.Username)
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1alpha1.SubstrateSpec{

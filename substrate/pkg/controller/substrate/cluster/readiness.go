@@ -23,9 +23,13 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"knative.dev/pkg/apis"
+	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -63,7 +67,8 @@ func (r *Readiness) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		return reconcile.Result{}, fmt.Errorf("getting response result, %w", err)
 	}
 	if string(result) == "ok" {
-		substrate.Ready()
+		substrate.Status.SetCondition(apis.Condition{Type: apis.ConditionReady, Status: v1.ConditionTrue})
+		logging.FromContext(ctx).Infof("To access cluster run -\n\n \texport KUBECONFIG=%s\n", aws.StringValue(substrate.Status.Cluster.KubeConfig))
 		return reconcile.Result{}, nil
 	}
 	return reconcile.Result{}, fmt.Errorf("api server not yet ready status is %v", string(result))

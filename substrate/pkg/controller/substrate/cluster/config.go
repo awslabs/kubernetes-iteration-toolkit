@@ -105,7 +105,6 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 	}
 	logging.FromContext(ctx).Debugf("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
 	substrate.Status.Cluster.KubeConfig = ptr.String(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigFile))
-	logging.FromContext(ctx).Infof("To access substrate cluster run -\n \texport KUBECONFIG=%s", aws.StringValue(substrate.Status.Cluster.KubeConfig))
 	return reconcile.Result{}, nil
 }
 

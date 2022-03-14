@@ -42,8 +42,11 @@ func (v *VPC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 		return reconcile.Result{}, nil
 	}
 	createVpcOutput, err := v.EC2.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock:         aws.String(substrate.Spec.VPC.CIDR),
-		TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeVpc, discovery.Name(substrate)),
+		CidrBlock: aws.String(substrate.Spec.VPC.CIDR),
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeVpc),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+		}},
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)

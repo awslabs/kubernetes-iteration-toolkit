@@ -25,11 +25,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type DNS struct {
-}
+type CoreDNS struct{}
 
-func (d *DNS) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if !substrate.IsReady() {
+func (d *CoreDNS) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
+	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	client, err := kubeconfig.ClientSetFromFile(*substrate.Status.Cluster.KubeConfig)
@@ -42,6 +41,6 @@ func (d *DNS) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 	return reconcile.Result{}, nil
 }
 
-func (d *DNS) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {
+func (d *CoreDNS) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }

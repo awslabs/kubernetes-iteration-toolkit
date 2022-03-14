@@ -40,7 +40,12 @@ func (a *Address) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 		substrate.Status.Cluster.Address = addressesOutput.Addresses[0].PublicIp
 		return reconcile.Result{}, nil
 	}
-	addressOutput, err := a.EC2.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{TagSpecifications: discovery.Tags(substrate, ec2.ResourceTypeElasticIp, discovery.Name(substrate))})
+	addressOutput, err := a.EC2.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeElasticIp),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+		}},
+	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("allocating address, %w", err)
 	}

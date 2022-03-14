@@ -18,6 +18,10 @@ import (
 	"knative.dev/pkg/apis"
 )
 
+var (
+	substrateConditionSet = apis.NewLivingConditionSet()
+)
+
 type ClusterStatus struct {
 	Address               *string `json:"address,omitempty"`
 	KubeConfig            *string `json:"kubeConfig,omitempty"`
@@ -45,4 +49,16 @@ func (s *SubstrateStatus) GetConditions() apis.Conditions {
 
 func (s *SubstrateStatus) SetConditions(conditions apis.Conditions) {
 	s.Conditions = conditions
+}
+
+func (s *SubstrateStatus) GetCondition(condition apis.ConditionType) *apis.Condition {
+	return substrateConditionSet.Manage(s).GetCondition(condition)
+}
+
+func (s *SubstrateStatus) SetCondition(condition apis.Condition) {
+	substrateConditionSet.Manage(s).SetCondition(condition)
+}
+
+func (s *SubstrateStatus) IsReady() bool {
+	return substrateConditionSet.Manage(s).IsHappy()
 }
