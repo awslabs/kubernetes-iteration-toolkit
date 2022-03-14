@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/awslabs/kit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kit/operator/pkg/utils/functional"
-	"github.com/awslabs/kit/operator/pkg/utils/imageprovider"
-	"github.com/awslabs/kit/operator/pkg/utils/object"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/functional"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,8 +90,7 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 					},
 				},
 			},
-		},
-		),
+		}),
 	)
 }
 

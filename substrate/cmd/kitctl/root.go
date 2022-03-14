@@ -77,7 +77,7 @@ func (o *Options) addFlags(fs *pflag.FlagSet) {
 	u, err := user.Current()
 	runtime.Must(err)
 	fs.StringVarP(&o.file, "file", "f", "", "Configuration file for the environment")
-	fs.StringVarP(&o.name, "name", "n", fmt.Sprintf("kitctl-%s", u.Username), "name for the environment")
+	fs.StringVarP(&o.name, "name", "n", fmt.Sprintf("kitctl-%s", u.Username), "Name for the environment")
 	fs.BoolVarP(&o.debug, "debug", "", false, "enable debug logs")
 	fs.BoolVar(&o.help, "help", false, "help flag")
 }
