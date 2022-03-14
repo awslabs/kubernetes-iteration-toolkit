@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 )
 
 func Name(substrate *v1alpha1.Substrate, suffixes ...string) *string {

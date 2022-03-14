@@ -6,8 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/awslabs/kit/substrate/pkg/apis/v1alpha1"
-	"github.com/awslabs/kit/substrate/pkg/utils/helm"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/helm"
 	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
