@@ -39,7 +39,6 @@ import (
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
-	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -100,7 +99,6 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 			}
 			result, err := f(ctx, mutable)
 			if err != nil {
-				logging.FromContext(ctx).Debugf("Reconciling %s, error %v", reflect.ValueOf(resource).Elem().Type(), err)
 				errs[i] = fmt.Errorf("reconciling %s, %w", reflect.ValueOf(resource).Elem().Type(), err)
 				cancel()
 				return

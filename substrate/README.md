@@ -17,7 +17,7 @@ To get started make sure you have admin access to AWS.
 
 ```bash
 export AWS_REGION=us-west-2
-kitctl bootstrap <kitctl-$(whoami)> # Optional environment name
+kitctl bootstrap kitctl-$(whoami) # Optional environment name
 ```
 > Set KUBECONFIG to access the environment with the kubeconfig location provided from this command
 
@@ -106,7 +106,7 @@ kubectl delete controlplane ${GUEST_CLUSTER_NAME}
 - To clean up the AWS environment
 
 ```bash
-kitctl delete <kitctl-$(whoami)> # Optional environment name
+kitctl delete kitctl-$(whoami) # Optional environment name
 ```
 
 ### Debug logs
