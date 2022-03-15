@@ -36,12 +36,13 @@ func deleteCommand() *cobra.Command {
 func delete(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	start := time.Now()
-	logging.FromContext(ctx).Infof("Starting cleanup of %q", options.name)
+	name := parseName(ctx, args)
+	logging.FromContext(ctx).Infof("Starting cleanup of %q", name)
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
-		ObjectMeta: metav1.ObjectMeta{Name: options.name, DeletionTimestamp: &metav1.Time{Time: time.Now()}},
+		ObjectMeta: metav1.ObjectMeta{Name: name, DeletionTimestamp: &metav1.Time{Time: time.Now()}},
 	}); err != nil {
 		logging.FromContext(ctx).Error(err.Error())
 		return
 	}
-	logging.FromContext(ctx).Infof("Deleted substrate %s after %s", options.name, time.Since(start))
+	logging.FromContext(ctx).Infof("Deleted substrate %s after %s", name, time.Since(start))
 }

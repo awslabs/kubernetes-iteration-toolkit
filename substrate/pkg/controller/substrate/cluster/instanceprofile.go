@@ -270,7 +270,13 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 						"cognito-idp:DescribeUserPoolClient",
 						"acm:ListCertificates",
 						"acm:DescribeCertificate",
-						"ssm:GetParameter"
+						"ssm:GetParameter",
+						"autoscaling:CreateOrUpdateTags",
+						"autoscaling:CreateAutoScalingGroup",
+						"autoscaling:DeleteAutoScalingGroup",
+						"autoscaling:UpdateAutoScalingGroup",
+						"autoscaling:SetDesiredCapacity",
+						"autoscaling:DescribeAutoScalingGroups"
 					],
 					"Resource": ["*"]
 				}

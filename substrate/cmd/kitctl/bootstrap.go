@@ -49,9 +49,10 @@ func bootstrap(cmd *cobra.Command, args []string) {
 	}
 	ctx := cmd.Context()
 	start := time.Now()
-	logging.FromContext(ctx).Infof("Starting bootstrap of %q", options.name)
+	name := parseName(ctx, args)
+	logging.FromContext(ctx).Infof("Starting bootstrap of %q", name)
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
-		ObjectMeta: metav1.ObjectMeta{Name: options.name},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: v1alpha1.SubstrateSpec{
 			VPC:          &v1alpha1.VPCSpec{CIDR: "10.0.0.0/16"},
 			InstanceType: aws.String("r6g.large"),
@@ -68,5 +69,5 @@ func bootstrap(cmd *cobra.Command, args []string) {
 		logging.FromContext(ctx).Error(err.Error())
 		return
 	}
-	logging.FromContext(ctx).Infof("✅ Bootstrapped %q after %s", options.name, time.Since(start))
+	logging.FromContext(ctx).Infof("✅ Bootstrapped %q after %s", name, time.Since(start))
 }

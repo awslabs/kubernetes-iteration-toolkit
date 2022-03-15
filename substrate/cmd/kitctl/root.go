@@ -1,6 +1,4 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -13,6 +11,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package main
 
 import (
@@ -20,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/user"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -69,15 +67,11 @@ var options = &Options{}
 type Options struct {
 	file  string
 	debug bool
-	name  string
 	help  bool
 }
 
 func (o *Options) addFlags(fs *pflag.FlagSet) {
-	u, err := user.Current()
-	runtime.Must(err)
 	fs.StringVarP(&o.file, "file", "f", "", "Configuration file for the environment")
-	fs.StringVarP(&o.name, "name", "n", fmt.Sprintf("kitctl-%s", u.Username), "Name for the environment")
 	fs.BoolVarP(&o.debug, "debug", "", false, "enable debug logs")
 	fs.BoolVar(&o.help, "help", false, "help flag")
 }
