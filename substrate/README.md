@@ -16,7 +16,8 @@ To get started make sure you have admin access to AWS.
 ### Bootstrap an environment in AWS to run Kubernetes clusters using kit-operator
 
 ```bash
-kitctl bootstrap
+export AWS_REGION=us-west-2
+kitctl bootstrap kitctl-$(whoami) # Optional environment name
 ```
 > Set KUBECONFIG to access the environment with the kubeconfig location provided from this command
 
@@ -24,7 +25,7 @@ kitctl bootstrap
 
 ```bash
 GUEST_CLUSTER_NAME=foo # Desired Cluster name
-SUBSTRATE_CLUSTER_NAME=test-substrate
+SUBSTRATE_CLUSTER_NAME=kitctl-$(whoami)
 ```
 
 ```bash
@@ -105,7 +106,7 @@ kubectl delete controlplane ${GUEST_CLUSTER_NAME}
 - To clean up the AWS environment
 
 ```bash
-kitctl helps provision an AWS infrastructure environment to deploy Kubernetes clusters using kit-operator. It runs a single node kubernetes cluster with all the required controllers like Karpeneter, KIT-operator, ELB controller and EBS CSI Driver to manage the lifecycle of clusters. kitctl also creates the necessary delete
+kitctl delete kitctl-$(whoami) # Optional environment name
 ```
 
 ### Debug logs

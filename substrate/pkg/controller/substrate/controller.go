@@ -39,7 +39,6 @@ import (
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
-
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 

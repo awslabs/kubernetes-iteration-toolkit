@@ -63,6 +63,11 @@ func AWSIamAuthenticator() string {
 	return repositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.3-eks-1-21-8"
 }
 
+func AWSEncryptionProvider() string {
+	// TODO update this to released version
+	return "public.ecr.aws/kit/aws-encryption-provider:0.0.1"
+}
+
 func BusyBox() string {
 	return busyBoxImage
 }

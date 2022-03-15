@@ -270,7 +270,13 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 						"cognito-idp:DescribeUserPoolClient",
 						"acm:ListCertificates",
 						"acm:DescribeCertificate",
-						"ssm:GetParameter"
+						"ssm:GetParameter",
+						"autoscaling:CreateOrUpdateTags",
+						"autoscaling:CreateAutoScalingGroup",
+						"autoscaling:DeleteAutoScalingGroup",
+						"autoscaling:UpdateAutoScalingGroup",
+						"autoscaling:SetDesiredCapacity",
+						"autoscaling:DescribeAutoScalingGroups"
 					],
 					"Resource": ["*"]
 				}
@@ -283,7 +289,19 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 		},
 	}, {
 		// Roles and policies attached to the nodes provisioned by Karpenter
-		name: discovery.Name(substrate, TenantControlPlaneNodeRole),
+		name: discovery.Name(substrate, TenantControlPlaneNodeRole), policy: aws.String(`{
+			"Version": "2012-10-17",
+			"Statement": [
+				{
+					"Effect": "Allow",
+					"Action": [
+						"kms:Encrypt",
+						"kms:Decrypt"
+					],
+					"Resource": ["*"]
+				}
+			]
+		}`),
 		managedPolicies: []string{
 			"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
 			"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
