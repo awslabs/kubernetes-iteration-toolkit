@@ -56,7 +56,7 @@ type Etcd struct {
 // custom flags for components running on master nodes like apiserver, KCM and
 // scheduler.
 type MasterSpec struct {
-	KeyId             *string    `json:"keyId,omitempty"`
+	KMSKeyID          *string    `json:"kmsKeyId,omitempty"`
 	Scheduler         *Component `json:"scheduler,omitempty"`
 	ControllerManager *Component `json:"controllerManager,omitempty"`
 	APIServer         *Component `json:"apiServer,omitempty"`

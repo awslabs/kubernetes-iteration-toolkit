@@ -31,7 +31,7 @@ import (
 
 func (c *Controller) reconcileEncryptionProviderConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	providerConfig := defaultProviderConfig
-	if controlPlane.Spec.Master.KeyId != nil {
+	if controlPlane.Spec.Master.KMSKeyID != nil {
 		providerConfig = encryptionEnabledConfig
 	}
 	configMap, err := object.GenerateConfigMap(providerConfig, struct{ ConfigMapName, Namespace string }{
@@ -45,7 +45,7 @@ func (c *Controller) reconcileEncryptionProviderConfig(ctx context.Context, cont
 }
 
 func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
-	if controlPlane.Spec.Master.KeyId == nil {
+	if controlPlane.Spec.Master.KMSKeyID == nil {
 		return nil
 	}
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
@@ -70,7 +70,7 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 							Image:   imageprovider.AWSEncryptionProvider(),
 							Command: []string{"/aws-encryption-provider"},
 							Args: []string{
-								"--key=" + aws.StringValue(controlPlane.Spec.Master.KeyId),
+								"--key=" + aws.StringValue(controlPlane.Spec.Master.KMSKeyID),
 								"--listen=/var/run/kmsplugin/socket.sock",
 							},
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
