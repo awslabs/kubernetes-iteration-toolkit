@@ -5236,7 +5236,7 @@ spec:
                             - containers
                           type: object
                       type: object
-                    kmskey:
+                    keyId:
                       type: string
                     scheduler:
                       properties:
