@@ -39,8 +39,17 @@ kind: Provisioner
 metadata:
   name: default
 spec:
+  requirements:
+  - key: kit.k8s.sh/app
+    operator: Exists
+  - key: kit.k8s.sh/control-plane-name
+    operator: Exists
+  kubeletConfiguration:
+    clusterDNS:
+      - "10.96.0.10"
   ttlSecondsAfterEmpty: 30
   provider:
+    instanceProfile: %[1]s-tenant-controlplane-node-role
     tags:
       kit.aws/substrate: %[1]s
     subnetSelector:
@@ -57,7 +66,7 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		Namespace:       "karpenter",
 		Name:            "karpenter",
 		Repository:      "https://charts.karpenter.sh",
-		Version:         "0.6.5",
+		Version:         "0.7.1",
 		CreateNamespace: true,
 		Values: map[string]interface{}{
 			"clusterName":     substrate.Name,
