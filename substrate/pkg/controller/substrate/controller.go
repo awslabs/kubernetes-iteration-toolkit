@@ -70,6 +70,7 @@ func NewController(ctx context.Context) *Controller {
 			&addons.KubeProxy{},
 			&addons.RBAC{},
 			&addons.Tekton{},
+			&addons.PrometheusStack{},
 		},
 	}
 }
