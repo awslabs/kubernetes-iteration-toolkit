@@ -79,3 +79,17 @@ jobs:
         files: "./substrate/bin/kitctl_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Update brew formulae
+      uses: mislav/bump-homebrew-formula-action@v1
+      with:
+        formula-name: kitctl
+        formula-path: kitctl.rb
+        homebrew-tap: prateekgogia/kubernetes-iteration-toolkit
+        base-branch: main
+        download-url: https://github.com/prateekgogia/kubernetes-iteration-toolkit/releases/download/${{ env.RELEASE_VERSION }}/kitctl_${{ env.RELEASE_VERSION }}_${{ matrix.os }}_${{ matrix.arch }}.zip
+        commit-message: |
+          Update kitctl to ${{ env.RELEASE_VERSION }}
+          Created by Github actions during Release CLI action
+      env:
+        # COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
