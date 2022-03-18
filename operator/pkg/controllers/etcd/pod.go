@@ -45,14 +45,14 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 			TopologyKey:       "topology.kubernetes.io/zone",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: labels(),
+				MatchLabels: labels,
 			},
 		}, {
 			MaxSkew:           int32(1),
 			TopologyKey:       "kubernetes.io/hostname",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: labels(),
+				MatchLabels: labels,
 			},
 		}},
 		Containers: []v1.Container{{
@@ -215,6 +215,6 @@ func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 }
 
 func nodeSelector(clusterName string) map[string]string {
-	return functional.UnionStringMaps(labels(),
+	return functional.UnionStringMaps(labels,
 		map[string]string{object.ControlPlaneLabelKey: clusterName, instanceTypeLabelKey: instanceTypeLabelDefaultValue})
 }
