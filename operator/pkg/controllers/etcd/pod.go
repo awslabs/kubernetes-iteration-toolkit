@@ -45,14 +45,14 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 			TopologyKey:       "topology.kubernetes.io/zone",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: labelsFor(controlPlane.ClusterName()),
+				MatchLabels: labels,
 			},
 		}, {
 			MaxSkew:           int32(1),
 			TopologyKey:       "kubernetes.io/hostname",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: labelsFor(controlPlane.ClusterName()),
+				MatchLabels: labels,
 			},
 		}},
 		Containers: []v1.Container{{
@@ -64,6 +64,9 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 			}, {
 				ContainerPort: 2380,
 				Name:          "etcd-peer",
+			}, {
+				ContainerPort: 2381,
+				Name:          "metrics",
 			}},
 			VolumeMounts: []v1.VolumeMount{{
 				Name:      "etcd-data",
@@ -89,7 +92,7 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 				"--advertise-client-urls=" + advertizeClusterURL(controlPlane),
 				"--initial-advertise-peer-urls=" + advertizePeerURL(controlPlane),
 				"--listen-client-urls=https://$(NODE_IP):2379,https://127.0.0.1:2379",
-				"--listen-metrics-urls=http://127.0.0.1:2381",
+				"--listen-metrics-urls=http://$(NODE_IP):2381,http://127.0.0.1:2381",
 				"--listen-peer-urls=https://$(NODE_IP):2380",
 				"--name=$(NODE_ID)",
 				"--peer-cert-file=/etc/kubernetes/pki/etcd/peer/peer.crt",
@@ -212,6 +215,6 @@ func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 }
 
 func nodeSelector(clusterName string) map[string]string {
-	return functional.UnionStringMaps(labelsFor(clusterName),
+	return functional.UnionStringMaps(labels,
 		map[string]string{object.ControlPlaneLabelKey: clusterName, instanceTypeLabelKey: instanceTypeLabelDefaultValue})
 }

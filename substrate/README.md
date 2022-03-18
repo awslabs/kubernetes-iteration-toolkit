@@ -39,6 +39,19 @@ spec:
 EOF
 ```
 
+### Accessing metrics from prometheus and grafana
+
+```bash
+kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090&
+kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 8080:80&
+```
+
+### Allowing API server to trust kubelet endpoints
+
+```bash
+kubectl certificate approve $(k get csr | grep "Pending" | awk '{print $1}')
+```
+
 ### cleanup
 
 - To remove the kubernetes cluster provisioned using kit-operator

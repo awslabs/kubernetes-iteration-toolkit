@@ -52,7 +52,7 @@ func (l *AWSLoadBalancer) Create(ctx context.Context, substrate *v1alpha1.Substr
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("tagging resources, %w", err)
 	}
-	logging.FromContext(ctx).Debug("Tagged subnets with %s=%s", "kubernetes.io/role/elb", "1")
+	logging.FromContext(ctx).Debugf("Tagged subnets with %s=%s", "kubernetes.io/role/elb", "1")
 	return reconcile.Result{}, nil
 }
 

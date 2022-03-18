@@ -31,11 +31,11 @@ func (c *Controller) reconcileService(ctx context.Context, controlPlane *v1alpha
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ServiceNameFor(controlPlane.ClusterName()),
 			Namespace: controlPlane.Namespace,
-			Labels:    labelsFor(controlPlane.ClusterName()),
+			Labels:    labels,
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP: v1.ClusterIPNone,
-			Selector:  labelsFor(controlPlane.ClusterName()),
+			Selector:  labels,
 			Ports: []v1.ServicePort{{
 				Port:       2380,
 				Name:       serverPortNameFor(controlPlane.ClusterName()),
@@ -63,8 +63,4 @@ func ServiceNameFor(clusterName string) string {
 	return fmt.Sprintf("%s-etcd", clusterName)
 }
 
-func labelsFor(clusterName string) map[string]string {
-	return map[string]string{
-		object.AppNameLabelKey: ServiceNameFor(clusterName),
-	}
-}
+var labels = map[string]string{object.AppNameLabelKey: "etcd"}

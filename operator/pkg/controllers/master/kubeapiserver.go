@@ -74,7 +74,7 @@ func APIServerDeploymentName(clusterName string) string {
 
 func APIServerLabels(clustername string) map[string]string {
 	return map[string]string{
-		object.AppNameLabelKey: APIServerDeploymentName(clustername),
+		object.AppNameLabelKey: "apiserver",
 	}
 }
 
@@ -112,6 +112,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 						v1.ResourceCPU: resource.MustParse("1"),
 					},
 				},
+				Ports: []v1.ContainerPort{{ContainerPort: 8080, Name: "metrics"}},
 				Args: []string{
 					"--advertise-address=$(NODE_IP)",
 					"--allow-privileged=true",
@@ -123,7 +124,8 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--etcd-certfile=/etc/kubernetes/pki/etcd/apiserver-etcd-client.crt",
 					"--etcd-keyfile=/etc/kubernetes/pki/etcd/apiserver-etcd-client.key",
 					"--etcd-servers=https://" + etcd.SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace) + ":2379",
-					"--insecure-port=0",
+					"--insecure-port=8080",
+					"--insecure-bind-address=$(NODE_IP)",
 					"--kubelet-client-certificate=/etc/kubernetes/pki/kubelet/apiserver-kubelet-client.crt",
 					"--kubelet-client-key=/etc/kubernetes/pki/kubelet/apiserver-kubelet-client.key",
 					"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
