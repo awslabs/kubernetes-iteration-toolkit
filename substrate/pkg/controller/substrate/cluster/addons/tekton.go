@@ -23,6 +23,125 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+var rbac = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/component: dashboard
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-dashboard
+  name: tekton-dashboard-kit
+rules:
+- apiGroups:
+  - kit.k8s.sh
+  resources:
+  - controlplanes
+  - dataplanes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  - secrets
+  - namespaces
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - "apiextensions.k8s.io"
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - "rbac.authorization.k8s.io"
+  resources:
+  - clusterroles
+  - clusterrolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - "apps"
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - karpenter.sh
+  resources:
+  - provisioners
+  verbs:
+  - get
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  - certificatesigningrequests/approval
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+  - patch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - signers
+  verbs:
+  - approve
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/component: dashboard
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-dashboard
+  name: tekton-dashboard-kit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-dashboard-kit
+subjects:
+- kind: ServiceAccount
+  name: tekton-dashboard
+  namespace: tekton-pipelines
+`
+
 type Tekton struct {
 }
 
@@ -42,6 +161,9 @@ func (t *Tekton) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		if err := client.Apply(ctx, file); err != nil {
 			return reconcile.Result{}, fmt.Errorf("applying tekton, %w", err)
 		}
+	}
+	if err := client.ApplyYAML(ctx, []byte(rbac)); err != nil {
+		return reconcile.Result{}, fmt.Errorf("applying tekton dashboard RBAC for KIT resources, %w", err)
 	}
 	return reconcile.Result{}, nil
 }
