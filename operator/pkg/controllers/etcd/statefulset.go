@@ -36,7 +36,10 @@ func (c *Controller) reconcileStatefulSet(ctx context.Context, controlPlane *v1a
 	if err != nil {
 		return fmt.Errorf("failed to patch pod spec, %w", err)
 	}
-
+	// If the custom node selector provided is "" skip adding the nodeselector to the pod
+	if value, ok := podSpec.NodeSelector[instanceTypeLabelKey]; ok && value == "" {
+		delete(podSpec.NodeSelector, instanceTypeLabelKey)
+	}
 	// Generate the default volume claim template spec for the given control plane, if user has
 	// provided custom config for the etcd volume template spec, patch this user
 	// provided config to the default spec
