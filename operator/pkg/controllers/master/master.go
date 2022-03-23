@@ -58,7 +58,6 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileKCMCloudConfig,
 		c.reconcileKCM,
 		c.reconcileScheduler,
-		c.reconcileAuthenticator,
 		c.iamController.Reconcile,
 		c.reconcileEncryptionProviderConfig,
 		c.reconcileEncryptionProvider,

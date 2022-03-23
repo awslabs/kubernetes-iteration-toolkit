@@ -38,6 +38,7 @@ type dataplane struct {
 	kubeClient     *kubeprovider.Client
 	launchTemplate *launchtemplate.Controller
 	instances      *instances.Controller
+	authenticator  *Authenticator
 }
 
 // NewController returns a controller for managing VPCs in AWS
@@ -52,6 +53,9 @@ func NewController(kubeClient client.Client, session *session.Session) *dataplan
 			awsprovider.AutoScalingClient(session),
 			kubeprovider.New(kubeClient),
 		),
+		authenticator: &Authenticator{kubeClient: kubeprovider.New(kubeClient),
+			cloudProvider: &awsprovider.AccountInfo{Session: session},
+		},
 	}
 }
 
@@ -80,6 +84,7 @@ func (d *dataplane) Reconcile(ctx context.Context, object controllers.Object) (r
 	for _, reconciler := range []reconciler{
 		d.launchTemplate.Reconcile,
 		d.instances.Reconcile,
+		d.authenticator.Reconcile,
 	} {
 		if err := reconciler(ctx, dp); err != nil {
 			return results.Failed, err
@@ -105,6 +110,7 @@ func (d *dataplane) Finalize(ctx context.Context, object controllers.Object) (*r
 	for _, reconciler := range []reconciler{
 		d.launchTemplate.Finalize,
 		d.instances.Finalize,
+		d.authenticator.Finalize,
 	} {
 		if err := reconciler(ctx, dp); err != nil {
 			return results.Failed, err

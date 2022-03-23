@@ -30,7 +30,7 @@ import (
 
 func Config(ctx context.Context, name, ns, instanceRole, accountID string) (*v1.ConfigMap, error) {
 	configMapBytes, err := parseTemplate(config, struct{ Name, ClusterName, Namespace, KitNodeRole, AWSAccountID, PrivateDNS, SessionName string }{
-		Name:         AuthenticatorConfigMapName(name),
+		Name:         ConfigMapName(name),
 		ClusterName:  name,
 		Namespace:    ns,
 		KitNodeRole:  instanceRole,
@@ -148,7 +148,7 @@ func parseTemplate(strtmpl string, obj interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func AuthenticatorConfigMapName(clusterName string) string {
+func ConfigMapName(clusterName string) string {
 	return fmt.Sprintf("%s-auth-config", clusterName)
 }
 

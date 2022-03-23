@@ -109,6 +109,10 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 	if err != nil {
 		return fmt.Errorf("getting ami id for worker nodes, %w", err)
 	}
+	instanceProfile := dataplane.Spec.InstanceProfile
+	if instanceProfile == "" {
+		instanceProfile = iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)
+	}
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
 			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{{
@@ -120,13 +124,11 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 					VolumeType:          ptr.String("gp3"),
 				}},
 			},
-			InstanceType: ptr.String("t2.xlarge"), // TODO get this from dataplane spec
-			ImageId:      ptr.String(amiID),
-			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				Name: aws.String(iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)),
-			},
-			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
-			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
+			InstanceType:       ptr.String("t2.xlarge"), // TODO get this from dataplane spec
+			ImageId:            ptr.String(amiID),
+			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{Name: aws.String(instanceProfile)},
+			Monitoring:         &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
+			SecurityGroupIds:   []*string{ptr.String(securityGroupID)},
 			UserData: ptr.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
 				dataplane.Spec.ClusterName, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
 		},

@@ -52,7 +52,8 @@ type DataPlaneSpec struct {
 	// InstanceTypes is an optional field thats lets user specify the instance
 	// types for worker nodes, defaults to instance types "t2.xlarge", "t3.xlarge" or "t3a.xlarge"
 	// +optional
-	InstanceTypes []string `json:"instanceTypes,omitempty"`
+	InstanceTypes   []string `json:"instanceTypes,omitempty"`
+	InstanceProfile string   `json:"instanceProfile,omitempty"`
 	// AllocationStrategy helps user define the strategy to provision worker nodes in EC2,
 	// defaults to "lowest-price"
 	// +optional

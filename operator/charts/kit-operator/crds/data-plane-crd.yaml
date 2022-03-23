@@ -42,6 +42,8 @@ spec:
                 description: ClusterName is used to connect the worker nodes to a
                   control plane clusterName.
                 type: string
+              instanceProfile:
+                type: string
               instanceTypes:
                 description: InstanceTypes is an optional field thats lets user specify
                   the instance types for worker nodes, defaults to instance types

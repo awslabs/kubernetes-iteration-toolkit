@@ -182,7 +182,7 @@ func createInstanceProfile(ctx context.Context, iamAPI *awsprovider.IAM, profile
 }
 
 func KitNodeRoleNameFor(clusterName string) string {
-	return fmt.Sprintf("KitDPRole-%s", clusterName)
+	return fmt.Sprintf("KitDP-%s", clusterName)
 }
 
 func KitNodeInstanceProfileNameFor(clusterName string) string {

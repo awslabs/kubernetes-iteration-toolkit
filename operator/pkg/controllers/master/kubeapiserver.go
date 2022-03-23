@@ -20,7 +20,9 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/controllers/etcd"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/functional"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
@@ -29,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -39,10 +42,12 @@ const (
 )
 
 func (c *Controller) reconcileApiServer(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
-	apiServerPodSpec := apiServerPodSpecFor(controlPlane)
+	apiServerPodSpec, err := c.podSpecFor(ctx, controlPlane)
+	if err != nil {
+		return fmt.Errorf("creating apiserver podspec %w", err)
+	}
 	if controlPlane.Spec.Master.APIServer != nil {
-		apiServerPodSpec, err = patch.PodSpec(&apiServerPodSpec, controlPlane.Spec.Master.APIServer.Spec)
-		if err != nil {
+		if apiServerPodSpec, err = patch.PodSpec(&apiServerPodSpec, controlPlane.Spec.Master.APIServer.Spec); err != nil {
 			return fmt.Errorf("patch api server pod spec, %w", err)
 		}
 	}
@@ -57,7 +62,7 @@ func (c *Controller) reconcileApiServer(ctx context.Context, controlPlane *v1alp
 					MatchLabels: APIServerLabels(controlPlane.ClusterName()),
 				},
 				Replicas: aws.Int32(int32(controlPlane.Spec.Master.APIServer.Replicas)),
-				Strategy: appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType},
+				Strategy: appsv1.DeploymentStrategy{Type: appsv1.RollingUpdateDeploymentStrategyType},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: APIServerLabels(controlPlane.ClusterName()),
@@ -78,9 +83,49 @@ func APIServerLabels(clustername string) map[string]string {
 	}
 }
 
-func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
+func (c *Controller) podSpecFor(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (v1.PodSpec, error) {
+	podSpec := defaultPodSpec(controlPlane)
+	authenticatorExists, err := c.authenticatorConfigExists(ctx, controlPlane)
+	if err != nil {
+		return v1.PodSpec{}, err
+	}
+	// authenticatorConfig is created as part of dataplane reconciliation. If
+	// there is no authconfig we don't want to block API server pod creation.
+	// Once, dataplane object is created auth config will be generated and we
+	// configure API server to mount the auth config.
+	if authenticatorExists {
+		// mount authenticator config volume to apiserver pod
+		hostPathDirectory := v1.HostPathDirectory
+		podSpec.Volumes = append(podSpec.Volumes, v1.Volume{Name: "authenticator-config",
+			VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{
+				Path: "/var/aws-iam-authenticator/kubeconfig/",
+				Type: &hostPathDirectory,
+			}},
+		})
+		podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, v1.VolumeMount{
+			Name:      "authenticator-config",
+			MountPath: "/var/aws-iam-authenticator/kubeconfig/",
+			ReadOnly:  true,
+		})
+		podSpec.Containers[0].Args = append(podSpec.Containers[0].Args,
+			"--authentication-token-webhook-config-file=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml")
+	}
+	return podSpec, nil
+}
+
+func (c *Controller) authenticatorConfigExists(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (bool, error) {
+	cm := &v1.ConfigMap{}
+	if err := c.kubeClient.Get(ctx, types.NamespacedName{
+		Namespace: controlPlane.Namespace, Name: iamauthenticator.ConfigMapName(controlPlane.ClusterName())}, cm); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func defaultPodSpec(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
-	hostPathDirectory := v1.HostPathDirectory
 	return v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
@@ -143,7 +188,6 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--service-cluster-ip-range=" + serviceClusterIPRange,
 					"--tls-cert-file=/etc/kubernetes/pki/apiserver/apiserver.crt",
 					"--tls-private-key-file=/etc/kubernetes/pki/apiserver/apiserver.key",
-					"--authentication-token-webhook-config-file=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 					"--encryption-provider-config=/etc/kubernetes/aws-encryption-provider/encryption-configuration.yaml",
 				},
 				Env: []v1.EnvVar{{
@@ -196,10 +240,6 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				}, {
 					Name:      "apiserver",
 					MountPath: "/etc/kubernetes/pki/apiserver",
-					ReadOnly:  true,
-				}, {
-					Name:      "authenticator-config",
-					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
 					ReadOnly:  true,
 				}, {
 					Name:      "var-run-kmsplugin",
@@ -358,14 +398,6 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 						Key:  "private",
 						Path: "apiserver.key",
 					}},
-				},
-			},
-		}, {
-			Name: "authenticator-config",
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: "/var/aws-iam-authenticator/kubeconfig/",
-					Type: &hostPathDirectory,
 				},
 			},
 		}, {
