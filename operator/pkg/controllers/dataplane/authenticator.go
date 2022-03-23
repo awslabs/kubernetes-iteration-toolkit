@@ -35,7 +35,7 @@ type Authenticator struct {
 	cloudProvider awsprovider.AccountMetadata
 }
 
-// Reconcile creates required configs for aws-iam-authenticator and stores them as secret in api server
+// Reconcile creates required configs for aws-iam-authenticator and stores them as secret in the host cluster
 func (a *Authenticator) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	accountID, err := a.cloudProvider.ID()
 	if err != nil {

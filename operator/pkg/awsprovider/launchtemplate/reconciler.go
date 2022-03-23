@@ -124,7 +124,7 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 					VolumeType:          ptr.String("gp3"),
 				}},
 			},
-			InstanceType:       ptr.String("t2.xlarge"), // TODO get this from dataplane spec
+			InstanceType:       ptr.String("t2.xlarge"),
 			ImageId:            ptr.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{Name: aws.String(instanceProfile)},
 			Monitoring:         &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},

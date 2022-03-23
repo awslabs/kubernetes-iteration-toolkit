@@ -115,11 +115,12 @@ func (c *Controller) podSpecFor(ctx context.Context, controlPlane *v1alpha1.Cont
 
 func (c *Controller) authenticatorConfigExists(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (bool, error) {
 	cm := &v1.ConfigMap{}
-	if err := c.kubeClient.Get(ctx, types.NamespacedName{
-		Namespace: controlPlane.Namespace, Name: iamauthenticator.ConfigMapName(controlPlane.ClusterName())}, cm); err != nil {
+	if err := c.kubeClient.Get(ctx, types.NamespacedName{Namespace: controlPlane.Namespace,
+		Name: iamauthenticator.ConfigMapName(controlPlane.ClusterName())}, cm); err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
+		return false, fmt.Errorf("getting authenticator config, %w", err)
 	}
 	return true, nil
 }
