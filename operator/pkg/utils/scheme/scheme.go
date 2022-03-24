@@ -18,6 +18,7 @@ import (
 	cp "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 	dp "github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/dataplane/v1alpha1"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -31,6 +32,7 @@ func init() {
 	_ = clientgoscheme.AddToScheme(SubstrateCluster)
 	_ = cp.AddToScheme(SubstrateCluster)
 	_ = dp.AddToScheme(SubstrateCluster)
+	_ = monitoringv1.AddToScheme(SubstrateCluster)
 
 	_ = clientgoscheme.AddToScheme(GuestCluster)
 }

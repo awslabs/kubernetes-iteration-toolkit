@@ -15,14 +15,11 @@ limitations under the License.
 package addons
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/helm"
-	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/kubectl"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -53,45 +50,9 @@ func (p *PrometheusStack) Create(ctx context.Context, substrate *v1alpha1.Substr
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
 	}
-	// configure podmonitors
-	client, err := kubectl.NewClient(*substrate.Status.Cluster.KubeConfig)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("initializing client, %w", err)
-	}
-	for _, name := range []string{"apiserver", "etcd"} {
-		var buf bytes.Buffer
-		tmpl := template.Must(template.New("Text").Parse(podMonitorTemplate))
-		err := tmpl.Execute(&buf, struct{ ComponentName string }{ComponentName: name})
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("error when executing template, %w", err)
-		}
-		if err := client.ApplyYAML(ctx, buf.Bytes()); err != nil {
-			return reconcile.Result{}, fmt.Errorf("applying pod monitors, %w", err)
-		}
-	}
 	return reconcile.Result{}, nil
 }
 
 func (p *PrometheusStack) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
-
-var podMonitorTemplate = `
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: {{ .ComponentName }}-pods
-  namespace: monitoring
-  labels:
-    release: kube-prometheus-stack
-spec:
-  jobLabel: {{ .ComponentName }}-guest
-  namespaceSelector:
-    matchNames:
-    - default
-  selector:
-    matchLabels:
-      kit.k8s.sh/app: {{ .ComponentName }}
-  podMetricsEndpoints:
-  - port: metrics
-`

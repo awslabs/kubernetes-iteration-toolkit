@@ -62,6 +62,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.iamController.Reconcile,
 		c.reconcileEncryptionProviderConfig,
 		c.reconcileEncryptionProvider,
+		c.reconcilePodmonitors,
 	} {
 		if err := reconcile(ctx, controlPlane); err != nil {
 			return err

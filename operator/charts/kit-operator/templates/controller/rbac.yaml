@@ -88,6 +88,17 @@ rules:
   - events
   verbs:
   - create
+- apiGroups:
+  - "monitoring.coreos.com"
+  resources:
+  - podmonitors
+  verbs:
+  - get
+  - create
+  - update
+  - list
+  - patch
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

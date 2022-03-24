@@ -49,6 +49,7 @@ func (c *Controller) reconcileCertificates(ctx context.Context, cp *v1alpha1.Con
 		controlPlaneCA: {
 			kubeAPIServerCertConfig(endpoint, nn),
 			kubeletClientCertConfig(nn),
+			prometheusClientCertConfig(nn),
 		},
 		frontProxyCA: {
 			kubeFrontProxyClient(nn),
@@ -121,6 +122,24 @@ func kubeFrontProxyClient(nn types.NamespacedName) *secrets.Request {
 			CommonName: "front-proxy-client",
 		},
 	}
+}
+
+// Certificate used by the Prometheus client to scrap API server
+func prometheusClientCertConfig(nn types.NamespacedName) *secrets.Request {
+	return &secrets.Request{
+		Name:      PrometheusClientCertsFor(nn.Name),
+		Namespace: nn.Namespace,
+		Type:      secrets.KeyWithSignedCert,
+		Config: &certutil.Config{
+			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			Organization: []string{"system:monitoring"},
+			CommonName:   "system:monitoring",
+		},
+	}
+}
+
+func PrometheusClientCertsFor(clusterName string) string {
+	return fmt.Sprintf("%s-prometheus-certs", clusterName)
 }
 
 func KubeAPIServerSecretNameFor(clusterName string) string {

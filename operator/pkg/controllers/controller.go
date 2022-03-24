@@ -23,7 +23,6 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/results"
 	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -59,7 +58,7 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		resource.GetObjectKind().SetGroupVersionKind(v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.ControlPlaneKind))
 	}
 	// 2. Copy object for merge patch base
-	persisted := resource.DeepCopyObject()
+	persisted := c.DeepCopy(resource)
 	// 3. Reconcile else finalize if object is deleted
 	result, reconcileErr := c.reconcile(ctx, resource, persisted)
 	// 4. Update Status using a merge patch, we want to set status even when reconcile errored
@@ -75,7 +74,7 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	return result, nil
 }
 
-func (c *GenericController) reconcile(ctx context.Context, resource Object, persisted runtime.Object) (reconcile.Result, error) {
+func (c *GenericController) reconcile(ctx context.Context, resource, persisted Object) (reconcile.Result, error) {
 	var result *reconcile.Result
 	var err error
 	existingFinalizers := resource.GetFinalizers()

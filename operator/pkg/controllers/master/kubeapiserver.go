@@ -112,7 +112,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 						v1.ResourceCPU: resource.MustParse("1"),
 					},
 				},
-				Ports: []v1.ContainerPort{{ContainerPort: 8080, Name: "metrics"}},
+				Ports: []v1.ContainerPort{{ContainerPort: 443, Name: "https"}},
 				Args: []string{
 					"--advertise-address=$(NODE_IP)",
 					"--allow-privileged=true",
@@ -124,8 +124,6 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--etcd-certfile=/etc/kubernetes/pki/etcd/apiserver-etcd-client.crt",
 					"--etcd-keyfile=/etc/kubernetes/pki/etcd/apiserver-etcd-client.key",
 					"--etcd-servers=https://" + etcd.SvcFQDN(controlPlane.ClusterName(), controlPlane.Namespace) + ":2379",
-					"--insecure-port=8080",
-					"--insecure-bind-address=$(NODE_IP)",
 					"--kubelet-client-certificate=/etc/kubernetes/pki/kubelet/apiserver-kubelet-client.crt",
 					"--kubelet-client-key=/etc/kubernetes/pki/kubelet/apiserver-kubelet-client.key",
 					"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
@@ -210,7 +208,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					ReadOnly:  true,
 				}},
 				LivenessProbe: &v1.Probe{
-					Handler: v1.Handler{
+					ProbeHandler: v1.ProbeHandler{
 						HTTPGet: &v1.HTTPGetAction{
 							Host:   "127.0.0.1",
 							Scheme: v1.URISchemeHTTPS,
@@ -224,7 +222,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					FailureThreshold:    5,
 				},
 				ReadinessProbe: &v1.Probe{
-					Handler: v1.Handler{
+					ProbeHandler: v1.ProbeHandler{
 						HTTPGet: &v1.HTTPGetAction{
 							Host:   "127.0.0.1",
 							Scheme: v1.URISchemeHTTPS,

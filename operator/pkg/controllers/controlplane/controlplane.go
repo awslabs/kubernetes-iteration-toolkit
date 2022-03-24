@@ -56,6 +56,14 @@ func (c *controlPlane) For() controllers.Object {
 	return &v1alpha1.ControlPlane{}
 }
 
+func (c *controlPlane) DeepCopy(obj controllers.Object) controllers.Object {
+	cp, ok := obj.(*v1alpha1.ControlPlane)
+	if !ok {
+		panic("expected control plane object")
+	}
+	return cp.DeepCopy()
+}
+
 // Reconcile will reconcile all the components running on the control plane
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
 	for _, resource := range []controlplane.Controller{

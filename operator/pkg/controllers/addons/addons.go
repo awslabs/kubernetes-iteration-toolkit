@@ -53,6 +53,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 	for _, resource := range []controlplane.Controller{
 		KubeProxyController(guestClusterClient, c.substrateClient),
 		CoreDNSController(guestClusterClient),
+		RBACController(guestClusterClient),
 	} {
 		if err := resource.Reconcile(ctx, controlPlane); err != nil {
 			return err
