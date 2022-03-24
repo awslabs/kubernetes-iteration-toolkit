@@ -34,7 +34,7 @@ func (l *KITOperator) Create(ctx context.Context, substrate *v1alpha1.Substrate)
 		Namespace:       "kit",
 		Name:            "kit-operator",
 		Repository:      "https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/kit-operator-0.0.8",
-		Version:         "0.0.8",
+		Version:         "0.0.10",
 		CreateNamespace: true,
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
