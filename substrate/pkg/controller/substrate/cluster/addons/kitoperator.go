@@ -33,7 +33,7 @@ func (l *KITOperator) Create(ctx context.Context, substrate *v1alpha1.Substrate)
 	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:       "kit",
 		Name:            "kit-operator",
-		Repository:      "https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/kit-operator-0.0.8",
+		Repository:      "https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/kit-operator-0.0.10",
 		Version:         "0.0.10",
 		CreateNamespace: true,
 	}); err != nil {
