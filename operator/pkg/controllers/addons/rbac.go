@@ -68,7 +68,7 @@ func (r *RBAC) clusterRoleBinding(ctx context.Context) error {
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
-			Name:     "system:monitoring",
+			Name:     "system:prometheus-monitoring",
 		},
 		Subjects: []rbacv1.Subject{{
 			APIGroup: rbacv1.GroupName,
