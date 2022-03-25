@@ -25,13 +25,9 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-)
-
-const (
-	instanceTypeLabelKey          = "node.kubernetes.io/instance-type"
-	instanceTypeLabelDefaultValue = "m5.16xlarge"
 )
 
 func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
@@ -133,6 +129,9 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 				TimeoutSeconds:      5,
 				FailureThreshold:    5,
 			},
+			Resources: v1.ResourceRequirements{Requests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("4Gi"),
+			}},
 		}},
 		Volumes: []v1.Volume{{
 			Name: "etcd-ca",
@@ -216,5 +215,5 @@ func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 
 func nodeSelector(clusterName string) map[string]string {
 	return functional.UnionStringMaps(labels,
-		map[string]string{object.ControlPlaneLabelKey: clusterName, instanceTypeLabelKey: instanceTypeLabelDefaultValue})
+		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }

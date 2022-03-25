@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/controllers/etcd"
-	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/functional"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/patch"
@@ -33,9 +32,7 @@ import (
 )
 
 const (
-	serviceClusterIPRange         = "10.96.0.0/12"
-	instanceTypeLabelKey          = "node.kubernetes.io/instance-type"
-	instanceTypeLabelDefaultValue = "m5.16xlarge"
+	serviceClusterIPRange = "10.96.0.0/12"
 )
 
 func (c *Controller) reconcileApiServer(ctx context.Context, controlPlane *v1alpha1.ControlPlane) (err error) {
@@ -86,7 +83,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		PriorityClassName:             "system-cluster-critical",
-		NodeSelector:                  apiserverNodeSelector(controlPlane.ClusterName()),
+		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
 		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
 			MaxSkew:           int32(1),
 			TopologyKey:       "topology.kubernetes.io/zone",
@@ -109,7 +106,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				Command: []string{"kube-apiserver"},
 				Resources: v1.ResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{
-						v1.ResourceCPU: resource.MustParse("1"),
+						v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("6Gi"),
 					},
 				},
 				Ports: []v1.ContainerPort{{ContainerPort: 443, Name: "https"}},
@@ -383,9 +380,4 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			},
 		}},
 	}
-}
-
-func apiserverNodeSelector(clusterName string) map[string]string {
-	return functional.UnionStringMaps(nodeSelector(clusterName),
-		map[string]string{instanceTypeLabelKey: instanceTypeLabelDefaultValue})
 }
