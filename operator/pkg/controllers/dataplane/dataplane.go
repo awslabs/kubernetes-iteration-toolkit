@@ -65,14 +65,6 @@ func (d *dataplane) For() controllers.Object {
 	return &v1alpha1.DataPlane{}
 }
 
-func (d *dataplane) DeepCopy(obj controllers.Object) controllers.Object {
-	dp, ok := obj.(*v1alpha1.DataPlane)
-	if !ok {
-		panic("expected data plane object")
-	}
-	return dp.DeepCopy()
-}
-
 type reconciler func(context.Context, *v1alpha1.DataPlane) (err error)
 
 // Reconcile will check if the resource exists is AWS if it does sync status,

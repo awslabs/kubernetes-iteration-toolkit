@@ -41,8 +41,6 @@ type Controller interface {
 	// For returns a default instantiation of the resource and is injected by
 	// data from the API Server at the start of the reconciliation loop.
 	For() Object
-	// DeepCopy returns a copy of the object provided
-	DeepCopy(Object) Object
 }
 
 // Webhook implements both a handler and path and can be attached to a webhook server.

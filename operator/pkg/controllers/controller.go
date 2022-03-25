@@ -23,6 +23,7 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/results"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -58,11 +59,11 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 		resource.GetObjectKind().SetGroupVersionKind(v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.ControlPlaneKind))
 	}
 	// 2. Copy object for merge patch base
-	persisted := c.DeepCopy(resource)
+	persisted := resource.DeepCopyObject()
 	// 3. Reconcile else finalize if object is deleted
 	result, reconcileErr := c.reconcile(ctx, resource, persisted)
 	// 4. Update Status using a merge patch, we want to set status even when reconcile errored
-	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil && !errors.IsNotFound(err) {
+	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted.(client.Object))); err != nil && !errors.IsNotFound(err) {
 		return *results.Failed, fmt.Errorf("status patch for %s, %w,", req.NamespacedName, err)
 	}
 	if reconcileErr != nil {
@@ -74,7 +75,7 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	return result, nil
 }
 
-func (c *GenericController) reconcile(ctx context.Context, resource, persisted Object) (reconcile.Result, error) {
+func (c *GenericController) reconcile(ctx context.Context, resource Object, persisted runtime.Object) (reconcile.Result, error) {
 	var result *reconcile.Result
 	var err error
 	existingFinalizers := resource.GetFinalizers()
@@ -99,7 +100,7 @@ func (c *GenericController) reconcile(ctx context.Context, resource, persisted O
 	}
 	// If the finalizers have changed merge patch the object
 	if !reflect.DeepEqual(existingFinalizers, resource.GetFinalizers()) {
-		if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
+		if err := c.Patch(ctx, resource, client.MergeFrom(persisted.(client.Object))); err != nil {
 			return *results.Failed, fmt.Errorf("patch object %s, %w", resource.GetName(), err)
 		}
 	}
