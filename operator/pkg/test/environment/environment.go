@@ -32,7 +32,7 @@ type Environment struct {
 func New() *Environment {
 	return &Environment{
 		Environment: envtest.Environment{
-			CRDDirectoryPaths:     []string{crdFilePath()},
+			CRDDirectoryPaths:     crdFilePaths(),
 			BinaryAssetsDirectory: "/usr/local/bin/kubebuilder-assets",
 		},
 	}
@@ -55,8 +55,9 @@ func (e *Environment) Stop() error {
 	return e.Environment.Stop()
 }
 
-func crdFilePath() string {
+func crdFilePaths() []string {
 	_, file, _, _ := runtime.Caller(0)
 	p := filepath.Join(filepath.Dir(file), "..", "..", "..")
-	return filepath.Join(p, "charts/kit-operator/crds/control-plane-crd.yaml")
+	// includes CRDs for podmonitors
+	return []string{filepath.Join(p, "charts/kit-operator/crds/control-plane-crd.yaml"), filepath.Dir(file)}
 }

@@ -102,7 +102,7 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				ReadOnly:  true,
 			}},
 			LivenessProbe: &v1.Probe{
-				Handler: v1.Handler{
+				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Host:   "127.0.0.1",
 						Scheme: v1.URISchemeHTTP,

@@ -75,7 +75,7 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 							},
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 							LivenessProbe: &v1.Probe{
-								Handler: v1.Handler{
+								ProbeHandler: v1.ProbeHandler{
 									HTTPGet: &v1.HTTPGetAction{
 										Scheme: v1.URISchemeHTTP,
 										Path:   "/healthz",

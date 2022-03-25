@@ -63,7 +63,7 @@ func (c *GenericController) Reconcile(ctx context.Context, req reconcile.Request
 	// 3. Reconcile else finalize if object is deleted
 	result, reconcileErr := c.reconcile(ctx, resource, persisted)
 	// 4. Update Status using a merge patch, we want to set status even when reconcile errored
-	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted)); err != nil && !errors.IsNotFound(err) {
+	if err := c.Status().Patch(ctx, resource, client.MergeFrom(persisted.(client.Object))); err != nil && !errors.IsNotFound(err) {
 		return *results.Failed, fmt.Errorf("status patch for %s, %w,", req.NamespacedName, err)
 	}
 	if reconcileErr != nil {
@@ -100,7 +100,7 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 	}
 	// If the finalizers have changed merge patch the object
 	if !reflect.DeepEqual(existingFinalizers, resource.GetFinalizers()) {
-		if err := c.Patch(ctx, resource, client.MergeFrom(persisted)); err != nil {
+		if err := c.Patch(ctx, resource, client.MergeFrom(persisted.(client.Object))); err != nil {
 			return *results.Failed, fmt.Errorf("patch object %s, %w", resource.GetName(), err)
 		}
 	}
