@@ -3,7 +3,7 @@
 ## Create hollow pods to pre-provision mixed instances for etcd pods
 ```bash
 ZONES=("a" "b" "c")
-SIZES=("m5.large" "t3.medium" "c5.2xlarge")
+SIZES=("m5.large" "t3.large" "c5.2xlarge")
 CONTROL_PLANE=foo 
 for i in {1..3}; do
 cat <<EOF | kubectl apply -f -
