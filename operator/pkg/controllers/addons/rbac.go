@@ -32,14 +32,12 @@ func RBACController(kubeClient *kubeprovider.Client) *RBAC {
 	return &RBAC{kubeClient: kubeClient}
 }
 
-type reconcileRBACResources func(context.Context) (err error)
-
 func (r *RBAC) Reconcile(ctx context.Context, _ *v1alpha1.ControlPlane) error {
-	for _, reconcile := range []reconcileRBACResources{
+	for _, fn := range []func(context.Context) error{
 		r.clusterRole,
 		r.clusterRoleBinding,
 	} {
-		if err := reconcile(ctx); err != nil {
+		if err := fn(ctx); err != nil {
 			return err
 		}
 	}

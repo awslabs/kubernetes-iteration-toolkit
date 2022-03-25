@@ -29,99 +29,33 @@ kind: ClusterRole
 metadata:
   name: kit-controller
 rules:
-- apiGroups:
-  - kit.k8s.sh
-  resources:
-  - controlplanes
-  - controlplanes/status
-  - dataplanes
-  - dataplanes/status
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - watch
-  - update
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - create
-  - get
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - nodes
-  - secrets
-  - services
-  - statefulsets
-  verbs:
-  - get
-  - create
-  - update
-  - patch
-  - list
-  - watch
-- apiGroups:
-  - "apps"
-  resources:
-  - statefulsets
-  - deployments
-  - daemonsets
-  verbs:
-  - get
-  - create
-  - update
-  - list
-  - watch
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-- apiGroups:
-  - "monitoring.coreos.com"
-  resources:
-  - podmonitors
-  verbs:
-  - get
-  - create
-  - update
-  - list
-  - patch
-  - watch
+- apiGroups: [kit.k8s.sh]
+  resources: [controlplanes, controlplanes/status, dataplanes, dataplanes/status]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [coordination.k8s.io]
+  resources: [leases]
+  verbs: [create, get, patch, update, watch]
+- apiGroups: [""]
+  resources: [configmaps, nodes, secrets, services, statefulsets]
+  verbs: [create, get, list, patch, update, watch]
+- apiGroups: [apps]
+  resources: [statefulsets, deployments, daemonsets]
+  verbs: [create, get, list, patch, update, watch]
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create]
+- apiGroups: ["monitoring.coreos.com"]
+  resources: [podmonitors]
+  verbs: [create, get, list, patch, update, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: kit-controller
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - configmaps/status
-  verbs:
-  - get
-  - update
-  - patch
+- apiGroups: [""]
+  resources: [configmaps]
+  verbs: [create, get, list, patch, update, watch, delete]
+- apiGroups: [""]
+  resources: [configmaps/status]
+  verbs: [get, patch, update]
