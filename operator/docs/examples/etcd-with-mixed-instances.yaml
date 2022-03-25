@@ -28,23 +28,12 @@ done
 
 ## Provision kubernetes cluster
 ```bash
-CONTROL_PLANE=foo
+CONTROL_PLANE=foo # Desired Cluster name
 cat <<EOF | kubectl apply -f -
 apiVersion: kit.k8s.sh/v1alpha1
 kind: ControlPlane
 metadata:
-  name: $CONTROL_PLANE # Desired Cluster Name
-spec:
-  etcd:
-    replicas: 3
-    spec:
-      nodeSelector: 
-        node.kubernetes.io/instance-type: ""
-      containers: 
-      - name: etcd
-        args:
-  master:
-    apiServer:
-      replicas: 1
+  name: ${CONTROL_PLANE} # Desired Cluster name
+  namespace: guest
 EOF
 ```
