@@ -5,8 +5,6 @@
 ```bash
 brew tap awslabs/kit https://github.com/awslabs/kubernetes-iteration-toolkit.git
 brew install kitctl
-or
-go install github.com/awslabs/kubernetes-iteration-toolkit/substrate/cmd/kitctl@latest
 ```
 
 ## Usage
