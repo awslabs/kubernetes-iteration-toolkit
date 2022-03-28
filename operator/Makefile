@@ -70,9 +70,17 @@ docs:
 		-template-dir $(shell go env GOMODCACHE)/github.com/ahmetb/gen-crd-api-reference-docs@v0.3.0/template
 
 publish: ## Generate release manifests and publish a versioned container image.
-	yq e -i ".controller.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-operator ko publish --platform=linux/arm64,linux/amd64 --bare -t $(RELEASE_VERSION) ./cmd/controller)\"" charts/kit-operator/values.yaml
-	yq e -i ".webhook.image = \"$$(KO_DOCKER_REPO=public.ecr.aws/kit/kit-webhook ko publish --platform=linux/arm64,linux/amd64 --bare -t $(RELEASE_VERSION) ./cmd/webhook)\"" charts/kit-operator/values.yaml
-	yq e -i '.version = "$(subst v,,${RELEASE_VERSION})"' charts/kit-operator/Chart.yaml
+	$(eval CONTROLLER_IMAGE := $(shell KO_DOCKER_REPO=public.ecr.aws/kit/kit-operator ko publish --platform=linux/arm64,linux/amd64 --bare -t $(RELEASE_VERSION) ./cmd/controller))
+	@echo 'Controller image = '$(CONTROLLER_IMAGE)
+	@test -n "$(CONTROLLER_IMAGE)" || (echo 'Controller Image version not defined' && exit 1)
+	yq e -i ".controller.image = \""$(CONTROLLER_IMAGE)"\"" charts/kit-operator/values.yaml || { echo "failed"; exit 1; }
+
+	$(eval WEBHOOK_IMAGE := $(shell KO_DOCKER_REPO=public.ecr.aws/kit/kit-webhook ko publish --platform=linux/arm64,linux/amd64 --bare -t $(RELEASE_VERSION) ./cmd/webhook))
+	@echo 'Webhook image = '$(WEBHOOK_IMAGE)
+	@test -n "$(WEBHOOK_IMAGE)" || (echo 'Webhook Image version not defined' && exit 1)
+	yq e -i ".webhook.image = \""$(WEBHOOK_IMAGE)"\"" charts/kit-operator/values.yaml || { echo "failed"; exit 1; }
+
+	yq e -i '.version = "$(subst v,,${RELEASE_VERSION})"' charts/kit-operator/Chart.yaml || { echo "failed"; exit 1; }
 
 toolchain: ## Install developer toolchain
 	./hack/toolchain.sh
