@@ -1,0 +1,124 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: control-plane-setup
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.17.0"
+    tekton.dev/categories: Kubernetes
+    tekton.dev/tags: CLI, kubectl
+    tekton.dev/displayName: "kubernetes actions"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: |
+    Setup a kubernetes control plane in the guess cluster.
+  params:
+  - name: name
+    default: "guest"
+    description: Name of the guess cluster
+  - name: scheduler-replicas
+    default: "1"
+    description: Number of scheduler replicas
+  - name: controller-manager-replicas
+    default: "1"
+    description: Number of controller manager replicas
+  - name: apiserver-replicas
+    default: "1"
+    description: Number of APIserver replicas
+  - name: apiserver-image
+    default: "public.ecr.aws/eks-distro/kubernetes/kube-apiserver:v1.21.9-eks-1-21-11"
+    description: Image of apiserver
+  - name: apiserver-parameters
+    default: "[]"
+    description: Parameters of the apiserver container
+  - name: apiserver-instance-type
+    default: "m5.16xlarge"
+    description: Instance type for the apiserver
+  - name: etcd-replicas
+    default: "3"
+    description: Number of ETCD replicas
+  - name: etcd-image
+    default: "public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.18-eks-1-21-11"
+    description: Image of ETCD
+  - name: etcd-parameters
+    default: "[]"
+    description: Parameters of the ETCD container
+  - name: etcd-instance-type
+    default: "m5.16xlarge"
+    description: Instance type for the ETCD
+  - name: kubernetes-version
+    default: "1.19"
+    description: Kubernetes version for the guest cluster 
+  steps:
+  - name: setup-control-plane
+    image: gcr.io/cloud-builders/kubectl@sha256:8ab94be8b2b4f3d117f02d868b39540fddd225447abf4014f7ba4765cb39f753
+    script: |
+      #!/bin/bash
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      namespace=$(kubectl get ns $(params.name) -o yaml 2>/dev/null | grep phase | awk '{print $2}')
+      if [[ $namespace != "Active" ]]
+      then
+        echo "Create namespace"
+        kubectl create namespace $(params.name)
+      fi
+      echo "Setting up control plane"
+      cat <<EOF | kubectl apply -f - 
+      apiVersion: kit.k8s.sh/v1alpha1
+      kind: ControlPlane
+      metadata:
+        name: $(params.name) # Desired Cluster name
+        namespace: $(params.name)
+      spec:
+        kubernetesVersion: "$(params.kubernetes-version)"
+        etcd:
+          replicas: $(params.etcd-replicas)
+          spec:
+            nodeSelector:
+              node.kubernetes.io/instance-type: $(params.etcd-instance-type)
+            containers:
+            - name: etcd
+              image: $(params.etcd-image)
+              args: $(params.etcd-parameters)
+        master:
+          controllerManager:
+            spec:
+              containers:
+              - name: controller-manager
+                args:
+                  - --controllers=*
+          apiServer:
+            replicas: $(params.apiserver-replicas)
+            spec:
+              nodeSelector:
+                node.kubernetes.io/instance-type: $(params.apiserver-instance-type)
+              containers:
+              - name: apiserver
+                image: $(params.apiserver-image)
+                args: $(params.apiserver-parameters)
+      EOF
+      echo "Getting kube admin config"
+      while true; do
+          data=$(kubectl get secret -n $(params.name) $(params.name)-kube-admin-config -ojsonpath='{.data.config}' 2>/dev/null) || true
+          if [[ ! -z "$data" ]]; then
+              echo $data | base64 -d > /tmp/kubeconfig
+              break
+          fi
+          sleep 1
+      done
+      echo "Waiting for the APIserver endpoint to be ready"
+      endpoint=$(cat /tmp/kubeconfig  | grep server | awk '{print $2}')
+      while true; do
+          state=$(curl -k --connect-timeou 5 -s $endpoint/healthz) 2>/dev/null || true
+          if [[ ! -z "$state" ]]; then
+              break
+          fi
+          sleep 5
+      done
+      echo "Installing CNI"
+      kubectl --kubeconfig=/tmp/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.10/config/master/aws-k8s-cni.yaml
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null  || true

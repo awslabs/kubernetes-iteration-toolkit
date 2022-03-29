@@ -31,98 +31,42 @@ metadata:
     app.kubernetes.io/component: dashboard
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-dashboard
-  name: tekton-dashboard-kit
+  name: tekton-pipelines-executor
 rules:
-- apiGroups:
-  - kit.k8s.sh
-  resources:
-  - controlplanes
-  - dataplanes
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - delete
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  - secrets
-  - namespaces
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - delete
-  - patch
-- apiGroups:
-  - "apiextensions.k8s.io"
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - delete
-  - patch
-- apiGroups:
-  - "rbac.authorization.k8s.io"
-  resources:
-  - clusterroles
-  - clusterrolebindings
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - delete
-  - patch
-- apiGroups:
-  - "apps"
-  resources:
-  - daemonsets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - delete
-  - patch
-- apiGroups:
-  - karpenter.sh
-  resources:
-  - provisioners
-  verbs:
-  - get
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests
-  - certificatesigningrequests/approval
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - delete
-  - patch
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - signers
-  verbs:
-  - approve
+- apiGroups: ["kit.k8s.sh"]
+  resources: ["controlplanes", "dataplanes"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+- apiGroups: [""]
+  resources: ["serviceaccounts", "secrets", "namespaces", "nodes"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+- apiGroups: ["karpenter.sh"]
+  resources: ["provisioners"]
+  verbs: ["get"]
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests", "certificatesigningrequests/approval"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["signers"]
+  verbs: ["approve"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/component: dashboard
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-dashboard
+  name: tekton-pipelines-executor
+  namespace: tekton-pipelines
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -131,14 +75,14 @@ metadata:
     app.kubernetes.io/component: dashboard
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-dashboard
-  name: tekton-dashboard-kit
+  name: tekton-pipelines-executor
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: tekton-dashboard-kit
+  name: tekton-pipelines-executor
 subjects:
 - kind: ServiceAccount
-  name: tekton-dashboard
+  name: tekton-pipelines-executor
   namespace: tekton-pipelines
 `
 

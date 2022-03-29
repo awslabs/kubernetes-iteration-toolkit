@@ -1,0 +1,54 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: data-plane-setup
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.2"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.17.0"
+    tekton.dev/categories: Kubernetes
+    tekton.dev/tags: CLI, kubectl
+    tekton.dev/displayName: "kubernetes actions"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: |
+    Setup a kubernetes data plane in the guess cluster.
+  params:
+  - name: name
+    default: "guest"
+    description: Name of the guess cluster
+  - name: substrate-name
+    description: Name of the substrate cluster
+  - name: node-count
+    default: "5"
+    description: Number of worker nodes
+  steps:
+  - name: setup-data-plane
+    image: gcr.io/cloud-builders/kubectl@sha256:8ab94be8b2b4f3d117f02d868b39540fddd225447abf4014f7ba4765cb39f753
+    script: |
+      #!/bin/bash
+      echo "Setting up data plane"
+      cat <<EOF | kubectl apply -f -
+      apiVersion: kit.k8s.sh/v1alpha1
+      kind: DataPlane
+      metadata:
+        name: $(params.name)
+        namespace: $(params.name)
+      spec:
+        clusterName: $(params.name) # Associated Cluster name
+        nodeCount: $(params.node-count)
+        subnetSelector:
+          karpenter.sh/discovery: $(params.substrate-name)
+      EOF
+      echo "Getting kube admin config"
+      kubectl get secret -n $(params.name) $(params.name)-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
+      echo "Waiting for the worker nodes to be ready"
+      while true; do
+          ready_node=$(kubectl --kubeconfig=/tmp/kubeconfig get nodes 2>/dev/null | grep -w Ready | wc -l)
+          if [[ "$ready_node" -eq $(params.node-count) ]]; then break; fi
+          sleep 5
+      done 
+      kubectl --kubeconfig=/tmp/kubeconfig get nodes
+

@@ -1,0 +1,138 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: etcd-list-job-pipeline
+  namespace: tekton-pipelines
+spec:
+  params:
+  - name: name
+    description: The name of the test cluster.
+    default: "guest"
+  - name: scheduler-replicas
+    default: "1"
+    description: Number of scheduler replicas
+  - name: controller-manager-replicas
+    default: "1"
+    description: Number of controller manager replicas
+  - name: apiserver-replicas
+    default: "1"
+    description: Number of APIserver replicas
+  - name: apiserver-image
+    default: "public.ecr.aws/eks-distro/kubernetes/kube-apiserver:v1.19.13-eks-1-19-9"
+    description: Image of apiserver
+  - name: apiserver-parameters
+    default: "[]"
+    description: Parameters of the apiserver container
+  - name: apiserver-instance-type
+    default: "m5.16xlarge"
+    description: Instance type for the apiserver
+  - name: etcd-replicas
+    default: "3"
+    description: Number of ETCD replicas
+  - name: etcd-image
+    default: "public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.16-eks-1-21-4"
+    description: Image of ETCD
+  - name: etcd-parameters
+    default: "[]"
+    description: Parameters of the ETCD container
+  - name: etcd-instance-type
+    default: "m5.16xlarge"
+    description: Instance type for the ETCD
+  - name: kubernetes-version
+    default: "1.19"
+    description: Kubernetes version for the guest cluster
+  - name: substrate-name
+    description: Name of the substrate cluster
+  - name: node-count
+    default: "5"
+    description: Number of worker nodes
+  - name: number-of-pods
+    default: "50"
+    description: Number of dummy pods
+  - name: pod-size
+    default: "5000"
+    description: Size of the pod object
+  - name: parallelism
+    default: "11"
+    description: K8S job parallelism
+  - name: etcd-list-job-image
+    default: "285627164574.dkr.ecr.us-west-2.amazonaws.com/etcd-load-tests:latest"
+    description: Image of the test pod
+  - name: duration
+    default: "10m"
+    description: Duration of the test
+  - name: enable-list-pods
+    default: "true"
+    description: Enable listing pods
+  - name: list-pods-tps 
+    default: "10"
+    description: list-pods-tps
+  tasks:
+  - name: setup-control-plane
+    taskRef:
+      name: control-plane-setup
+    params:
+      - name: name
+        value: '$(params.name)'
+      - name: scheduler-replicas
+        value: '$(params.scheduler-replicas)'
+      - name: controller-manager-replicas
+        value: '$(params.controller-manager-replicas)'
+      - name: apiserver-replicas
+        value: '$(params.apiserver-replicas)'
+      - name: apiserver-image
+        value: '$(params.apiserver-image)'
+      - name: apiserver-parameters
+        value: '$(params.apiserver-parameters)'
+      - name: apiserver-instance-type
+        value: '$(params.apiserver-instance-type)'
+      - name: etcd-replicas
+        value: '$(params.etcd-replicas)'
+      - name: etcd-image
+        value: '$(params.etcd-image)'
+      - name: etcd-parameters
+        value: '$(params.etcd-parameters)'
+      - name: etcd-instance-type
+        value: '$(params.etcd-instance-type)'
+      - name: kubernetes-version
+        value: '$(params.kubernetes-version)'
+  - name: setup-data-plane
+    runAfter: [setup-control-plane]
+    taskRef:
+      name: data-plane-setup
+    params:
+      - name: name
+        value: '$(params.name)'
+      - name: node-count
+        value: '$(params.node-count)'
+      - name: substrate-name
+        value: '$(params.substrate-name)'
+  - name: deploy-benchmark-payload
+    runAfter: [setup-data-plane]
+    taskRef:
+      name: deploy-benchmark-payload
+    params:
+      - name: name
+        value: '$(params.name)'
+      - name: number-of-pods
+        value: '$(params.number-of-pods)'
+      - name: pod-size
+        value: '$(params.pod-size)'
+  - name: deploy-etcd-list-job
+    runAfter: [deploy-benchmark-payload]
+    taskRef:
+      name: deploy-etcd-list-job
+    params:
+      - name: name
+        value: '$(params.name)'
+      - name: parallelism
+        value: '$(params.parallelism)'
+      - name: etcd-list-job-image
+        value: '$(params.etcd-list-job-image)'
+      - name: duration
+        value: '$(params.duration)'
+      - name: enable-list-pods
+        value: '$(params.enable-list-pods)'
+      - name: list-pods-tps
+        value: '$(params.list-pods-tps)'
