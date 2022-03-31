@@ -76,13 +76,17 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 			}, {
 				Name:      "etcd-server-certs",
 				MountPath: "/etc/kubernetes/pki/etcd/server",
+			}, {
+				Name:      "etcd-bootstrap",
+				MountPath: "/etc/kubernetes/",
 			}},
-			Command: []string{"etcd"},
+			Command: []string{
+				"./etc/kubernetes/bootstrap.sh",
+			},
 			Args: []string{
 				"--cert-file=/etc/kubernetes/pki/etcd/server/server.crt",
 				"--initial-cluster=" + initialClusterFlag(controlPlane),
 				"--data-dir=/var/lib/etcd",
-				"--initial-cluster-state=new",
 				"--initial-cluster-token=etcd-cluster-1",
 				"--key-file=/etc/kubernetes/pki/etcd/server/server.key",
 				"--advertise-client-urls=" + advertizeClusterURL(controlPlane),
@@ -176,6 +180,14 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 						Key:  secrets.SecretPrivateKey,
 						Path: "server.key",
 					}},
+				},
+			},
+		}, {
+			Name: "etcd-bootstrap",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					DefaultMode:          aws.Int32(0777),
+					LocalObjectReference: v1.LocalObjectReference{Name: bootstrapConfigMapName(controlPlane.ClusterName())},
 				},
 			},
 		}},

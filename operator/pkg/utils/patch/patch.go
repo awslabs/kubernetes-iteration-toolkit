@@ -23,6 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 )
 
+var blockListedFlags = map[string]map[string]bool{
+	"etcd": {
+		"--initial-cluster-state": true,
+	},
+}
+
 // VolumeClaimTemplateSpec returns the merged VolumeClaimTemplate spes
 func PersistentVolumeClaimSpec(defaultSpec, patch *v1.PersistentVolumeClaimSpec) (v1.PersistentVolumeClaimSpec, error) {
 	if patch == nil {
@@ -94,8 +100,10 @@ func mergeContainerArgs(defaultSpec, patch *v1.PodSpec) *v1.PodSpec {
 func parseArgsFor(podSpec *v1.PodSpec) map[string]string {
 	result := map[string]string{}
 	for _, arg := range podSpec.Containers[0].Args {
-		kv := strings.Split(arg, "=")
-		result[kv[0]] = kv[1]
+		if strings.Contains(arg, "=") {
+			kv := strings.Split(arg, "=")
+			result[kv[0]] = kv[1]
+		}
 	}
 	return result
 }
@@ -105,10 +113,10 @@ func additionalArgs(defaultSpec map[string]string, patch *v1.PodSpec) []string {
 	result := make([]string, 0)
 	for _, arg := range patch.Containers[0].Args {
 		kv := strings.Split(arg, "=")
-		if _, ok := defaultSpec[kv[0]]; ok {
-			continue
+		_, ok := defaultSpec[kv[0]]
+		if !ok && !blockListedFlags[patch.Containers[0].Name][kv[0]] {
+			result = append(result, arg)
 		}
-		result = append(result, arg)
 	}
 	return result
 }
