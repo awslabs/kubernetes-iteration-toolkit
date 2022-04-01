@@ -10,36 +10,37 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
 
 ### Overview
 
-- Create a Kubernetes (substrate) Cluster
+- Create a Kubernetes (management) Cluster
 - Install the AWS Load Balancer Controller
+- Inatall AWS EBS CSI Driver
 - Install Karpenter
 - Install the KIT operator
 
 
-### Create a substrate cluster with eksctl
+### Create a management cluster with eksctl
 ```bash
-SUBSTRATE_CLUSTER_NAME=kit-management-cluster
+MANAGEMENT_CLUSTER_NAME=kit-management-cluster
 GUEST_CLUSTER_NAME=example
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 AWS_REGION=us-west-2
 ```
 
-This will create a substrate cluster with the necessary tags for Karpenter:
+This will create a management cluster with the necessary tags for Karpenter:
 ```bash
 cat <<EOF > cluster.yaml
 ---
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 metadata:
-  name: ${SUBSTRATE_CLUSTER_NAME}
+  name: ${MANAGEMENT_CLUSTER_NAME}
   region: ${AWS_REGION}
   version: "1.21"
   tags:
-    karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
+    karpenter.sh/discovery: ${MANAGEMENT_CLUSTER_NAME}
 managedNodeGroups:
   - instanceType: m5.large
     amiFamily: AmazonLinux2
-    name: ${SUBSTRATE_CLUSTER_NAME}-ng
+    name: ${MANAGEMENT_CLUSTER_NAME}-ng
     desiredCapacity: 1
     minSize: 1
     maxSize: 10
@@ -61,7 +62,7 @@ aws iam create-policy \
 Create the IAM role and associate it to the load balancer controller service account.
 ```bash
 eksctl create iamserviceaccount \
-  --cluster=${SUBSTRATE_CLUSTER_NAME} \
+  --cluster=${MANAGEMENT_CLUSTER_NAME} \
   --namespace=kube-system \
   --name=aws-load-balancer-controller \
   --attach-policy-arn=arn:aws:iam::${AWS_ACCOUNT_ID}:policy/AWSLoadBalancerControllerIAMPolicy \
@@ -74,9 +75,48 @@ helm repo add eks https://aws.github.io/eks-charts
 helm repo update
 helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   -n kube-system \
-  --set clusterName=${SUBSTRATE_CLUSTER_NAME} \
+  --set clusterName=${MANAGEMENT_CLUSTER_NAME} \
   --set serviceAccount.create=false \
+  --set replicaCount=1 \
   --set serviceAccount.name=aws-load-balancer-controller 
+```
+
+### Install AWS EBS CSI Driver on your cluster
+
+- [AWS EBS CSI Driver](https://github.com/kubernetes-sigs/aws-ebs-csi-driver)
+
+Create an IAM policy that will be attached to the EBS role.
+
+```bash
+curl -o example-iam-policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-ebs-csi-driver/v1.5.1/docs/example-iam-policy.json
+aws iam create-policy \
+    --policy-name AmazonEBSCSIDriverServiceRolePolicy \
+    --policy-document file://example-iam-policy.json
+```
+
+Create an IAM role that will be assumed by the CSI driver to access AWS APIS.
+
+```bash
+eksctl create iamserviceaccount \
+    --name=ebs-csi-controller-sa \
+    --namespace=kube-system \
+    --cluster=${MANAGEMENT_CLUSTER_NAME} \
+    --attach-policy-arn=arn:aws:iam::${AWS_ACCOUNT_ID}:policy/AmazonEBSCSIDriverServiceRolePolicy \
+    --approve \
+    --override-existing-serviceaccounts \
+    --role-name AmazonEKS_EBS_CSI_DriverRole
+```
+
+Install the aws-ebs-csi-driver in the management cluster
+
+```bash
+helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
+helm repo update
+helm upgrade --install aws-ebs-csi-driver \
+    --namespace kube-system \
+    --set controller.replicaCount=1 \
+    --set serviceAccount.create=false \
+    aws-ebs-csi-driver/aws-ebs-csi-driver
 ```
 
 ### Install Karpenter on your cluster
@@ -87,87 +127,104 @@ the AmazonEKSClusterPolicy to the KarpenterNode IAM role so that KCM pods runnin
 to run the AWS Cloud Provider.
 ```bash
 aws cloudformation deploy  \
-  --stack-name Karpenter-${SUBSTRATE_CLUSTER_NAME} \
+  --stack-name Karpenter-${MANAGEMENT_CLUSTER_NAME} \
   --template-file docs/karpenter.cloudformation.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides ClusterName=${SUBSTRATE_CLUSTER_NAME}
+  --parameter-overrides ClusterName=${MANAGEMENT_CLUSTER_NAME}
 ```
+
 Allow instances using the KarpenterNode IAM role to authenticate to your cluster.
+
 ```bash
 eksctl create iamidentitymapping \
   --username system:node:{{EC2PrivateDNSName}} \
-  --cluster ${SUBSTRATE_CLUSTER_NAME} \
-  --arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/KarpenterNodeRole-${SUBSTRATE_CLUSTER_NAME} \
+  --cluster ${MANAGEMENT_CLUSTER_NAME} \
+  --arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/KarpenterNodeRole-${MANAGEMENT_CLUSTER_NAME} \
   --group system:bootstrappers \
   --group system:nodes
 ```
+
 Create the KarpenterController IAM Role and associate it to the karpenter service account with IRSA.
+
 ```bash
 eksctl create iamserviceaccount \
-  --cluster $SUBSTRATE_CLUSTER_NAME --name karpenter --namespace karpenter \
-  --attach-policy-arn arn:aws:iam::$AWS_ACCOUNT_ID:policy/KarpenterControllerPolicy-$SUBSTRATE_CLUSTER_NAME \
-  --approve
+  --cluster ${MANAGEMENT_CLUSTER_NAME} --name karpenter --namespace karpenter \
+  --role-name "${MANAGEMENT_CLUSTER_NAME}-karpenter" \
+  --attach-policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/KarpenterControllerPolicy-${MANAGEMENT_CLUSTER_NAME}" \
+  --role-only --approve
 ```
+
 Install the Karpenter Helm Chart.
+
 ```bash
 helm repo add karpenter https://charts.karpenter.sh
 helm repo update
-helm upgrade --install karpenter karpenter/karpenter --namespace karpenter \
-  --create-namespace --set serviceAccount.create=false --version v0.5.5 \
-  --set controller.clusterName=${SUBSTRATE_CLUSTER_NAME} \
-  --set controller.clusterEndpoint=$(aws eks describe-cluster --name ${SUBSTRATE_CLUSTER_NAME} --query "cluster.endpoint" --output json) \
+helm upgrade --install --namespace karpenter --create-namespace \
+  karpenter karpenter/karpenter \
+  --version v0.7.3 \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${MANAGEMENT_CLUSTER_NAME}-karpenter" \
+  --set clusterName=${MANAGEMENT_CLUSTER_NAME} \
+  --set clusterEndpoint=$(aws eks describe-cluster --name ${MANAGEMENT_CLUSTER_NAME} --query "cluster.endpoint" --output json)  \
   --wait # for the defaulting webhook to install before creating a Provisioner
 ```
-#### Configure Karpenter provisioners to be able to provision the right kind of nodes
-Create the two following provisioners for Karpenter to be able to provisioner nodes for master and etcd
-```bash
-cat <<EOF | kubectl apply -f -
-apiVersion: karpenter.sh/v1alpha5
-kind: Provisioner
-metadata:
-  name: master-nodes
-spec:
-  labels:
-    kit.k8s.sh/app: ${GUEST_CLUSTER_NAME}-apiserver
-    kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
-  provider:
-    instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
-    subnetSelector:
-      karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
-    securityGroupSelector:
-      kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: owned
-  ttlSecondsAfterEmpty: 30
-EOF
-```
+
+#### Configure Karpenter provisioner to be able to provision the right kind of nodes
+
+Create the following provisioners for Karpenter to be able to provisioner nodes for master and etcd
 
 ```bash
 cat <<EOF | kubectl apply -f -
 apiVersion: karpenter.sh/v1alpha5
 kind: Provisioner
 metadata:
-  name: etcd-nodes
+  name: default
 spec:
-  labels:
-    kit.k8s.sh/app: ${GUEST_CLUSTER_NAME}-etcd
-    kit.k8s.sh/control-plane-name: ${GUEST_CLUSTER_NAME}
-  provider:
-    instanceProfile: KarpenterNodeInstanceProfile-${SUBSTRATE_CLUSTER_NAME}
-    subnetSelector:
-      karpenter.sh/discovery: ${SUBSTRATE_CLUSTER_NAME}
-    securityGroupSelector:
-      kubernetes.io/cluster/${SUBSTRATE_CLUSTER_NAME}: owned
+  requirements:
+  - key: kit.k8s.sh/app
+    operator: Exists
+  - key: kit.k8s.sh/control-plane-name
+    operator: Exists
   ttlSecondsAfterEmpty: 30
+  provider:
+    instanceProfile: KarpenterNodeInstanceProfile-${MANAGEMENT_CLUSTER_NAME}
+    tags:
+      kit.aws/substrate: ${MANAGEMENT_CLUSTER_NAME}
+    subnetSelector:
+      karpenter.sh/discovery: ${MANAGEMENT_CLUSTER_NAME}
+    securityGroupSelector:
+      kubernetes.io/cluster/${MANAGEMENT_CLUSTER_NAME}: owned
 EOF
 ```
+
+#### Install Prometheus monitoring stack to scrape guest cluster control plane 
+
+Installs prometheus, grafana, prometheus-operator and node-exporter and we disable default monitoring configurations. Prometheus will be configured by the KIT operator to scrape the guest cluster components when a guest cluster control plane is provisioned.
+
+```bash
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring --create-namespace \
+  --set coreDns.enabled=false \
+  --set kubeProxy.enabled=false \
+  --set kubeEtcd.enabled=false \
+  --set alertmanager.enabled=false \
+  --set kubeScheduler.enabled=false \
+  --set kubeApiServer.enabled=false \
+  --set kubeStateMetrics.enabled=false \
+  --set kubeControllerManager.enabled=false \
+  --set prometheus.serviceMonitor.selfMonitor=false \
+  --set prometheusOperator.serviceMonitor.selfMonitor=false
+```
+
 ### Deploy KIT operator
 
 #### Create an IAM role and policy which will be assumed by KIT operator to be able to talk AWS APIs
+
 ```bash
 aws cloudformation deploy  \
   --template-file docs/kit.cloudformation.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --stack-name kitControllerPolicy \
-  --parameter-overrides ClusterName=${SUBSTRATE_CLUSTER_NAME}
+  --stack-name kitControllerPolicy-${MANAGEMENT_CLUSTER_NAME} \
+  --parameter-overrides ClusterName=${MANAGEMENT_CLUSTER_NAME}
 ```
 
 #### Associate the policy we just created to the kit-controller service account 
@@ -176,8 +233,8 @@ aws cloudformation deploy  \
 eksctl create iamserviceaccount \
   --name kit-controller \
   --namespace kit \
-  --cluster ${SUBSTRATE_CLUSTER_NAME} \
-  --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy-${SUBSTRATE_CLUSTER_NAME} \
+  --cluster ${MANAGEMENT_CLUSTER_NAME} \
+  --attach-policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/KitControllerPolicy-${MANAGEMENT_CLUSTER_NAME} \
   --approve \
   --override-existing-serviceaccounts \
   --region=${AWS_REGION}
@@ -189,6 +246,7 @@ eksctl create iamserviceaccount \
 helm repo add kit https://awslabs.github.io/kubernetes-iteration-toolkit/
 helm upgrade --install kit-operator kit/kit-operator --namespace kit --create-namespace --set serviceAccount.create=false
 ```
+
 Once KIT operator is deployed in a Kubernetes cluster. You can create a new Kubernetes control plane and worker nodes by following these steps in any namespace in the substrate cluster
 
 1. Provision a control plane for the guest cluster
@@ -257,7 +315,7 @@ EOF
 ```bash
 eksctl delete iamserviceaccount --name kit-controller \
   --namespace kit \
-  --cluster ${SUBSTRATE_CLUSTER_NAME} \
+  --cluster ${MANAGEMENT_CLUSTER_NAME} \
   --region=$AWS_REGION
 ```
 
