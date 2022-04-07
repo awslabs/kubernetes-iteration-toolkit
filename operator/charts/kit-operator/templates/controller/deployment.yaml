@@ -26,3 +26,15 @@ spec:
       # https://github.com/aws/amazon-eks-pod-identity-webhook/issues/8#issuecomment-636888074
       securityContext:
         fsGroup: 1000
+      {{- with .Values.controller.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controller.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controller.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

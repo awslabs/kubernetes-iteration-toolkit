@@ -89,3 +89,11 @@ func (c *Client) Apply(ctx context.Context, chart *Chart) error {
 	logging.FromContext(ctx).Infof("Upgraded chart %s/%s", chart.Repository, chart.Name)
 	return nil
 }
+
+func Affinity() map[string]interface{} {
+	matchExpressions := []map[string]interface{}{map[string]interface{}{"key": "karpenter.sh/provisioner-name", "operator": "DoesNotExist"}}
+	nodeSelectorTerms := []map[string]interface{}{map[string]interface{}{"matchExpressions": matchExpressions}}
+	requiredDuringSchedulingIgnoredDuringExecution := map[string]interface{}{"nodeSelectorTerms": nodeSelectorTerms}
+	nodeAffinity := map[string]interface{}{"requiredDuringSchedulingIgnoredDuringExecution": requiredDuringSchedulingIgnoredDuringExecution}
+	return map[string]interface{}{"nodeAffinity": nodeAffinity}
+}

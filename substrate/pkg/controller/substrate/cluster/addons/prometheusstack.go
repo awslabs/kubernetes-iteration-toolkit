@@ -29,6 +29,7 @@ func (p *PrometheusStack) Create(ctx context.Context, substrate *v1alpha1.Substr
 	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
+	affinity := helm.Affinity()
 	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:       "monitoring",
 		Name:            "kube-prometheus-stack",
@@ -44,8 +45,9 @@ func (p *PrometheusStack) Create(ctx context.Context, substrate *v1alpha1.Substr
 			"kubeApiServer":         map[string]interface{}{"enabled": false},
 			"kubeStateMetrics":      map[string]interface{}{"enabled": false},
 			"kubeControllerManager": map[string]interface{}{"enabled": false},
-			"prometheus":            map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}},
-			"prometheusOperator":    map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}},
+			"prometheus":            map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}, "prometheusSpec": map[string]interface{}{"affinity": affinity}},
+			"prometheusOperator":    map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}, "affinity": affinity},
+			"grafana":               map[string]interface{}{"affinity": affinity},
 		},
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
