@@ -45,6 +45,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileSecrets,
 		c.reconcileBootstrapConfig,
 		c.reconcileStatefulSet,
+		c.reconcilePersistentVolumeClaims,
 	} {
 		if err := reconcile(ctx, controlPlane); err != nil {
 			return err
