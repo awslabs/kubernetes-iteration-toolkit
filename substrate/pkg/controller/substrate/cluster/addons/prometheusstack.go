@@ -29,7 +29,6 @@ func (p *PrometheusStack) Create(ctx context.Context, substrate *v1alpha1.Substr
 	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	affinity := helm.Affinity()
 	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:       "monitoring",
 		Name:            "kube-prometheus-stack",
@@ -45,9 +44,9 @@ func (p *PrometheusStack) Create(ctx context.Context, substrate *v1alpha1.Substr
 			"kubeApiServer":         map[string]interface{}{"enabled": false},
 			"kubeStateMetrics":      map[string]interface{}{"enabled": false},
 			"kubeControllerManager": map[string]interface{}{"enabled": false},
-			"prometheus":            map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}, "prometheusSpec": map[string]interface{}{"affinity": affinity}},
-			"prometheusOperator":    map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}, "affinity": affinity},
-			"grafana":               map[string]interface{}{"affinity": affinity},
+			"prometheus":            map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}, "prometheusSpec": map[string]interface{}{"nodeSelector": map[string]interface{}{"kit.aws/substrate": "control-plane"}}},
+			"prometheusOperator":    map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}, "nodeSelector": map[string]interface{}{"kit.aws/substrate": "control-plane"}},
+			"grafana":               map[string]interface{}{"nodeSelector": map[string]interface{}{"kit.aws/substrate": "control-plane"}},
 		},
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
