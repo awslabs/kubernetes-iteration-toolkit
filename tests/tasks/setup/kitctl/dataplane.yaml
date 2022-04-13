@@ -4,8 +4,6 @@ kind: Task
 metadata:
   name: data-plane-setup
   namespace: tekton-pipelines
-  labels:
-    app.kubernetes.io/version: "0.2"
   annotations:
     tekton.dev/pipelines.minVersion: "0.17.0"
     tekton.dev/categories: Kubernetes
@@ -14,19 +12,19 @@ metadata:
     tekton.dev/platforms: "linux/amd64"
 spec:
   description: |
-    Setup a kubernetes data plane in the guess cluster.
+    Setup a kubernetes data plane in the guest cluster.
   params:
   - name: name
     default: "guest"
-    description: Name of the guess cluster
-  - name: substrate-name
-    description: Name of the substrate cluster
+    description: Name of the guest cluster
+  - name: management-cluster-name
+    description: Name of the management cluster
   - name: node-count
     default: "5"
     description: Number of worker nodes
   steps:
   - name: setup-data-plane
-    image: gcr.io/cloud-builders/kubectl@sha256:8ab94be8b2b4f3d117f02d868b39540fddd225447abf4014f7ba4765cb39f753
+    image: bitnami/kubectl
     script: |
       #!/bin/bash
       echo "Setting up data plane"
@@ -40,7 +38,7 @@ spec:
         clusterName: $(params.name) # Associated Cluster name
         nodeCount: $(params.node-count)
         subnetSelector:
-          karpenter.sh/discovery: $(params.substrate-name)
+          karpenter.sh/discovery: $(params.management-cluster-name)
       EOF
       echo "Getting kube admin config"
       kubectl get secret -n $(params.name) $(params.name)-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig

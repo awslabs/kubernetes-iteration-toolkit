@@ -128,7 +128,7 @@ spec:
       create_dp 0 $remaining_nodes
       # sleep for kude-admin config secret for kit guest cluster to appear
       sleep 30
-      #Get the admin KUBECONFIG for the guest cluster from the substrate cluster
+      #Get the admin KUBECONFIG for the guest cluster from the management cluster
       kubectl get secret $(params.cluster-name)-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > $(workspaces.config.path)/kubeconfig
       # wait for NLB APIServer endpoint to be available
       sleep 300

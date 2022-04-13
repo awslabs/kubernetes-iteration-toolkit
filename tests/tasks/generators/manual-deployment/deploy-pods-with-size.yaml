@@ -2,10 +2,8 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: deploy-benchmark-payload
+  name: deploy-pods-with-size
   namespace: tekton-pipelines
-  labels:
-    app.kubernetes.io/version: "0.2"
   annotations:
     tekton.dev/pipelines.minVersion: "0.17.0"
     tekton.dev/categories: Kubernetes
@@ -14,20 +12,20 @@ metadata:
     tekton.dev/platforms: "linux/amd64"
 spec:
   description: |
-    Deploy dummy workload in the test cluster.
+    Deploy multiple pods with given pod object size in the test cluster.
   params:
   - name: name
     default: "guest"
-    description: Name of the guess cluster
+    description: Name of the guest cluster
   - name: number-of-pods
     default: "50"
     description: Number of dummy pods
   - name: pod-size
     default: "5000"
-    description: Size of the pod object
+    description: Size of the pod object in bytes
   steps:
   - name: deploy-benchmark-payload
-    image: gcr.io/cloud-builders/kubectl@sha256:8ab94be8b2b4f3d117f02d868b39540fddd225447abf4014f7ba4765cb39f753
+    image: bitnami/kubectl
     script: |
       #!/bin/bash
       kubectl get secret $(params.name)-kube-admin-config -n $(params.name) -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
@@ -64,6 +62,7 @@ spec:
             - name: config
               emptyDir: {}
       EOF
+      # Replace __LOADSTRING__ with a random string. This will create a pod object with the given size.
       sed -i "s/__LOADSTRING__/$(tr -dc A-Za-z0-9 < /dev/urandom | dd bs=$(params.pod-size) count=1 2>/dev/null)/g" /tmp/deploy.yaml
       kubectl --kubeconfig=/tmp/kubeconfig apply -f /tmp/deploy.yaml
       echo "Get pods"

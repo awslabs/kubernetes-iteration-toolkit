@@ -1,0 +1,28 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: teardown
+  namespace: tekton-pipelines
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.17.0"
+    tekton.dev/categories: Kubernetes
+    tekton.dev/tags: CLI, kubectl
+    tekton.dev/displayName: "kubernetes actions"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: |
+    Tear down the guest cluster.
+  params:
+  - name: name
+    default: "guest"
+    description: Name of the guess cluster
+  steps:
+  - name: teardown
+    image: bitnami/kubectl
+    script: |
+      #!/bin/bash
+      echo "Tear down guest cluster"
+      kubectl delete controlplane -n $(params.name) $(params.name)
+      echo "Delete namespace"
+      kubectl delete namespace $(params.name)

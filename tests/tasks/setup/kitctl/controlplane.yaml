@@ -4,8 +4,6 @@ kind: Task
 metadata:
   name: control-plane-setup
   namespace: tekton-pipelines
-  labels:
-    app.kubernetes.io/version: "0.2"
   annotations:
     tekton.dev/pipelines.minVersion: "0.17.0"
     tekton.dev/categories: Kubernetes
@@ -14,25 +12,19 @@ metadata:
     tekton.dev/platforms: "linux/amd64"
 spec:
   description: |
-    Setup a kubernetes control plane in the guess cluster.
+    Setup a kubernetes control plane in the guest cluster.
   params:
   - name: name
     default: "guest"
-    description: Name of the guess cluster
-  - name: scheduler-replicas
-    default: "1"
-    description: Number of scheduler replicas
-  - name: controller-manager-replicas
-    default: "1"
-    description: Number of controller manager replicas
+    description: Name of the guest cluster
   - name: apiserver-replicas
     default: "1"
     description: Number of APIserver replicas
   - name: apiserver-image
-    default: "public.ecr.aws/eks-distro/kubernetes/kube-apiserver:v1.21.9-eks-1-21-11"
+    default: ""
     description: Image of apiserver
   - name: apiserver-parameters
-    default: "[]"
+    default: ""
     description: Parameters of the apiserver container
   - name: apiserver-instance-type
     default: "m5.16xlarge"
@@ -41,10 +33,10 @@ spec:
     default: "3"
     description: Number of ETCD replicas
   - name: etcd-image
-    default: "public.ecr.aws/eks-distro/etcd-io/etcd:v3.4.18-eks-1-21-11"
+    default: ""
     description: Image of ETCD
   - name: etcd-parameters
-    default: "[]"
+    default: ""
     description: Parameters of the ETCD container
   - name: etcd-instance-type
     default: "m5.16xlarge"
@@ -54,7 +46,7 @@ spec:
     description: Kubernetes version for the guest cluster 
   steps:
   - name: setup-control-plane
-    image: gcr.io/cloud-builders/kubectl@sha256:8ab94be8b2b4f3d117f02d868b39540fddd225447abf4014f7ba4765cb39f753
+    image: bitnami/kubectl
     script: |
       #!/bin/bash
       echo "Approving KCM requests"
@@ -66,14 +58,13 @@ spec:
         kubectl create namespace $(params.name)
       fi
       echo "Setting up control plane"
-      cat <<EOF | kubectl apply -f - 
+      cat <<EOF > /tmp/controlplane.yaml 
       apiVersion: kit.k8s.sh/v1alpha1
       kind: ControlPlane
       metadata:
         name: $(params.name) # Desired Cluster name
         namespace: $(params.name)
       spec:
-        kubernetesVersion: "$(params.kubernetes-version)"
         etcd:
           replicas: $(params.etcd-replicas)
           spec:
@@ -81,25 +72,43 @@ spec:
               node.kubernetes.io/instance-type: $(params.etcd-instance-type)
             containers:
             - name: etcd
+      EOF
+      if [ -n "$(params.etcd-image)" ]; then
+        cat <<EOF >> /tmp/controlplane.yaml 
               image: $(params.etcd-image)
+      EOF
+      fi
+      if [ -n "$(params.etcd-parameters)" ]; then
+        cat <<EOF >> /tmp/controlplane.yaml 
               args: $(params.etcd-parameters)
+      EOF
+      fi
+      cat <<EOF >> /tmp/controlplane.yaml 
         master:
-          controllerManager:
-            spec:
-              containers:
-              - name: controller-manager
-                args:
-                  - --controllers=*
           apiServer:
             replicas: $(params.apiserver-replicas)
             spec:
               nodeSelector:
                 node.kubernetes.io/instance-type: $(params.apiserver-instance-type)
               containers:
-              - name: apiserver
+              - name: apiserver 
+      EOF
+      if [ -n "$(params.apiserver-image)" ]; then
+        cat <<EOF >> /tmp/controlplane.yaml 
                 image: $(params.apiserver-image)
+      EOF
+      fi
+      if [ -n "$(params.apiserver-parameters)" ]; then
+        cat <<EOF >> /tmp/controlplane.yaml 
                 args: $(params.apiserver-parameters)
       EOF
+      fi
+      if [ -n "$(params.kubernetes-version)" ]; then
+        cat <<EOF >> /tmp/controlplane.yaml 
+        kubernetesVersion: "$(params.kubernetes-version)"
+      EOF
+      fi
+      kubectl apply -f /tmp/controlplane.yaml
       echo "Getting kube admin config"
       while true; do
           data=$(kubectl get secret -n $(params.name) $(params.name)-kube-admin-config -ojsonpath='{.data.config}' 2>/dev/null) || true
@@ -112,7 +121,7 @@ spec:
       echo "Waiting for the APIserver endpoint to be ready"
       endpoint=$(cat /tmp/kubeconfig  | grep server | awk '{print $2}')
       while true; do
-          state=$(curl -k --connect-timeou 5 -s $endpoint/healthz) 2>/dev/null || true
+          state=$(curl -k --connect-timeout 5 -s $endpoint/healthz) 2>/dev/null || true
           if [[ ! -z "$state" ]]; then
               break
           fi
