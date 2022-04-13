@@ -103,7 +103,7 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				"--client-ca-file=/etc/kubernetes/pki/ca/ca.crt",
 				"--cluster-signing-cert-file=/etc/kubernetes/pki/ca/ca.crt",
 				"--cluster-signing-key-file=/etc/kubernetes/pki/ca/ca.key",
-				"--controllers=*,-csrsigning",
+				"--controllers=*", // TODO add -csrsigning once this is closed - https://github.com/awslabs/kubernetes-iteration-toolkit/issues/105
 				"--kubeconfig=/etc/kubernetes/config/kcm/controller-manager.conf",
 				"--leader-elect=true",
 				"--requestheader-client-ca-file=/etc/kubernetes/pki/proxy-ca/front-proxy-ca.crt",
