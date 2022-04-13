@@ -21,7 +21,9 @@ import (
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"knative.dev/pkg/logging"
@@ -47,9 +49,16 @@ type Chart struct {
 	Values          map[string]interface{}
 }
 
-func (c *Client) Apply(ctx context.Context, chart *Chart) error {
+func (c *Client) Apply(ctx context.Context, chart *Chart) (err error) {
 	// Get the chart from the repository
-	charts, err := c.httpGetter.Get(fmt.Sprintf("%s/%s-%s.tgz", chart.Repository, chart.Name, chart.Version))
+	chartPath := fmt.Sprintf("%s/%s-%s.tgz", chart.Repository, chart.Name, chart.Version)
+	if chart.Version == "" {
+		chartPath, err = repo.FindChartInRepoURL(chart.Repository, chart.Name, "", "", "", "", getter.All(&cli.EnvSettings{}))
+		if err != nil {
+			return fmt.Errorf("failed to find chart, %w", err)
+		}
+	}
+	charts, err := c.httpGetter.Get(chartPath)
 	if err != nil {
 		return fmt.Errorf("getting chart, %w", err)
 	}
