@@ -12,10 +12,11 @@ KIT uses the [operator pattern](https://kubernetes.io/docs/concepts/extend-kuber
 
 - Create a Kubernetes (management) Cluster
 - Install the AWS Load Balancer Controller
-- Inatall AWS EBS CSI Driver
+- Install AWS EBS CSI Driver
 - Install Karpenter
 - Install the KIT operator
 
+> Note: All these install steps can be skipped when using [kitctl](https://github.com/awslabs/kubernetes-iteration-toolkit/tree/main/substrate) to provision an environment.
 
 ### Create a management cluster with eksctl
 ```bash

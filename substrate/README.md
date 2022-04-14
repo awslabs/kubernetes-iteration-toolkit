@@ -19,12 +19,6 @@ kitctl bootstrap kitctl-$(whoami) # Optional environment name
 ```
 > Set KUBECONFIG to access the environment with the kubeconfig location provided from this command
 
-### Allowing API server to trust kubelet endpoints
-
-```bash
-kubectl certificate approve $(k get csr | grep "Pending" | awk '{print $1}')
-```
-
 ### Provision a Kubernetes cluster control plane
 
 ```bash
@@ -81,7 +75,7 @@ kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 8080:80&
 ### Allowing API server to trust kubelet endpoints for the guest cluster
 
 ```bash
-kubectl certificate approve $(k get csr | grep "Pending" | awk '{print $1}')
+kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')
 ```
 
 ### cleanup
