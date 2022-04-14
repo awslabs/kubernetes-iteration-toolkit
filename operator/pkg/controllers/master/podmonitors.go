@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +32,9 @@ func (c *Controller) reconcilePodmonitors(ctx context.Context, controlPlane *v1a
 	for _, spec := range []monitoringv1.PodMonitorSpec{
 		apiServerPodMonitorFor(controlPlane),
 		etcdPodMonitorFor(controlPlane),
+		kcmPodMonitorFor(controlPlane),
+		schedulerPodMonitorFor(controlPlane),
+		authenticatorPodMonitorFor(controlPlane),
 	} {
 		if err := c.kubeClient.EnsureCreate(ctx, object.WithOwner(controlPlane, &monitoringv1.PodMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -80,5 +84,37 @@ func etcdPodMonitorFor(controlPlane *v1alpha1.ControlPlane) monitoringv1.PodMoni
 		NamespaceSelector:   monitoringv1.NamespaceSelector{MatchNames: []string{controlPlane.Namespace}},
 		Selector:            metav1.LabelSelector{MatchLabels: map[string]string{object.AppNameLabelKey: "etcd"}},
 		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{{Port: "metrics"}},
+	}
+}
+
+func kcmPodMonitorFor(controlPlane *v1alpha1.ControlPlane) monitoringv1.PodMonitorSpec {
+	return monitoringv1.PodMonitorSpec{
+		JobLabel:            fmt.Sprintf("%s-controller-manager", controlPlane.ClusterName()),
+		NamespaceSelector:   monitoringv1.NamespaceSelector{MatchNames: []string{controlPlane.Namespace}},
+		Selector:            metav1.LabelSelector{MatchLabels: map[string]string{object.AppNameLabelKey: "kube-controller-manager"}},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{{Port: "metrics"}},
+	}
+}
+
+func schedulerPodMonitorFor(controlPlane *v1alpha1.ControlPlane) monitoringv1.PodMonitorSpec {
+	return monitoringv1.PodMonitorSpec{
+		JobLabel:            fmt.Sprintf("%s-scheduler", controlPlane.ClusterName()),
+		NamespaceSelector:   monitoringv1.NamespaceSelector{MatchNames: []string{controlPlane.Namespace}},
+		Selector:            metav1.LabelSelector{MatchLabels: map[string]string{object.AppNameLabelKey: "kube-scheduler"}},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{{Port: "metrics"}},
+	}
+}
+
+func authenticatorPodMonitorFor(controlPlane *v1alpha1.ControlPlane) monitoringv1.PodMonitorSpec {
+	return monitoringv1.PodMonitorSpec{
+		JobLabel:          fmt.Sprintf("%s-authenticator", controlPlane.ClusterName()),
+		NamespaceSelector: monitoringv1.NamespaceSelector{MatchNames: []string{controlPlane.Namespace}},
+		Selector:          metav1.LabelSelector{MatchLabels: iamauthenticator.Labels},
+		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{{
+			Port: "metrics", Scheme: "https",
+			TLSConfig: &monitoringv1.PodMetricsEndpointTLSConfig{
+				SafeTLSConfig: monitoringv1.SafeTLSConfig{InsecureSkipVerify: true},
+			},
+		}},
 	}
 }

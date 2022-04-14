@@ -43,13 +43,13 @@ func (c *Controller) reconcileScheduler(ctx context.Context, controlPlane *v1alp
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      SchedulerName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
-				Labels:    schedulerLabels(controlPlane.ClusterName()),
+				Labels:    schedulerLabel,
 			},
 			Spec: appsv1.DaemonSetSpec{
 				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
-				Selector:       &metav1.LabelSelector{MatchLabels: schedulerLabels(controlPlane.ClusterName())},
+				Selector:       &metav1.LabelSelector{MatchLabels: schedulerLabel},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{Labels: schedulerLabels(controlPlane.ClusterName())},
+					ObjectMeta: metav1.ObjectMeta{Labels: schedulerLabel},
 					Spec:       schedulerPodSpec,
 				},
 			},
@@ -61,11 +61,7 @@ func SchedulerName(clusterName string) string {
 	return fmt.Sprintf("%s-scheduler", clusterName)
 }
 
-func schedulerLabels(clustername string) map[string]string {
-	return map[string]string{
-		object.AppNameLabelKey: SchedulerName(clustername),
-	}
-}
+var schedulerLabel = map[string]string{object.AppNameLabelKey: "kube-scheduler"}
 
 func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
@@ -85,6 +81,10 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					v1.ResourceCPU: resource.MustParse("1"),
 				},
 			},
+			Ports: []v1.ContainerPort{{
+				ContainerPort: 10251,
+				Name:          "metrics",
+			}},
 			Args: []string{
 				"--authentication-kubeconfig=/etc/kubernetes/config/scheduler/scheduler.conf",
 				"--authorization-kubeconfig=/etc/kubernetes/config/scheduler/scheduler.conf",

@@ -20,7 +20,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/functional"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/patch"
@@ -56,13 +55,13 @@ func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.Co
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      controllerManagerName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
-				Labels:    kcmLabels(controlPlane.ClusterName()),
+				Labels:    kcmLabel,
 			},
 			Spec: appsv1.DaemonSetSpec{
 				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
-				Selector:       &metav1.LabelSelector{MatchLabels: kcmLabels(controlPlane.ClusterName())},
+				Selector:       &metav1.LabelSelector{MatchLabels: kcmLabel},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{Labels: kcmLabels(controlPlane.ClusterName())},
+					ObjectMeta: metav1.ObjectMeta{Labels: kcmLabel},
 					Spec:       kcmPodSpec,
 				},
 			},
@@ -74,9 +73,7 @@ func controllerManagerName(clusterName string) string {
 	return fmt.Sprintf("%s-controller-manager", clusterName)
 }
 
-func kcmLabels(clustername string) map[string]string {
-	return functional.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "kube-controller-manager"})
-}
+var kcmLabel = map[string]string{object.AppNameLabelKey: "kube-controller-manager"}
 
 func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
@@ -96,6 +93,10 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					v1.ResourceCPU: resource.MustParse("1"),
 				},
 			},
+			Ports: []v1.ContainerPort{{
+				ContainerPort: 10252,
+				Name:          "metrics",
+			}},
 			Args: []string{
 				"--authentication-kubeconfig=/etc/kubernetes/config/kcm/controller-manager.conf",
 				"--authorization-kubeconfig=/etc/kubernetes/config/kcm/controller-manager.conf",
