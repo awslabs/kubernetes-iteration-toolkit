@@ -17,8 +17,6 @@ spec:
   - name: name
     default: "guest"
     description: Name of the guest cluster
-  - name: management-cluster-name
-    description: Name of the management cluster
   - name: node-count
     default: "5"
     description: Number of worker nodes
@@ -27,6 +25,8 @@ spec:
     image: bitnami/kubectl
     script: |
       #!/bin/bash
+      echo "Getting subnet and security group tags"
+      TAG=$(kubectl get provisioner -oyaml | grep karpenter.sh/discovery | awk 'NR==1{ print $2}')
       echo "Setting up data plane"
       cat <<EOF | kubectl apply -f -
       apiVersion: kit.k8s.sh/v1alpha1
@@ -38,7 +38,7 @@ spec:
         clusterName: $(params.name) # Associated Cluster name
         nodeCount: $(params.node-count)
         subnetSelector:
-          karpenter.sh/discovery: $(params.management-cluster-name)
+          karpenter.sh/discovery: ${TAG}
       EOF
       echo "Getting kube admin config"
       kubectl get secret -n $(params.name) $(params.name)-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig

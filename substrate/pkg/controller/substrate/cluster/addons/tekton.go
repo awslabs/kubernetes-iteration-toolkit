@@ -50,7 +50,7 @@ rules:
   verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 - apiGroups: ["karpenter.sh"]
   resources: ["provisioners"]
-  verbs: ["get"]
+  verbs: ["get", "list"]
 - apiGroups: ["certificates.k8s.io"]
   resources: ["certificatesigningrequests", "certificatesigningrequests/approval"]
   verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]

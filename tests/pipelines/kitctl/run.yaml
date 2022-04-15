@@ -7,8 +7,6 @@ spec:
   params:
   - name: name
     value: "example"
-  - name: management-cluster-name
-    value: "YOUR_MANAGEMENT_CLUSTER_NAME"
   podTemplate:
     nodeSelector:
       kubernetes.io/arch: amd64

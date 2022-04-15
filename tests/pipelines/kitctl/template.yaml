@@ -9,8 +9,6 @@ spec:
   - name: name
     description: The name of the test cluster.
     default: "guest"
-  - name: management-cluster-name
-    description: Name of the management cluster
   tasks:
   - name: setup-control-plane
     taskRef:
@@ -25,8 +23,6 @@ spec:
     params:
       - name: name
         value: '$(params.name)'
-      - name: management-cluster-name
-        value: '$(params.management-cluster-name)'
   finally:      
   - name: teardown
     taskRef:
