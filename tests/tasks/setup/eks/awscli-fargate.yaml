@@ -1,0 +1,79 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-fargate-create
+  namespace: tekton-pipelines
+spec:
+  description: |
+    Create an EKS  fargate pods for a given cluster and label selectors.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: namespace
+    default: "kube-system"
+  - name: desired-nodes
+    default: "500"
+    description: The desired number of nodes in the cluster.
+  - name: labels
+    default: "{k8s-app=kube-dns}"
+    description: The label selector used for fargate profile.
+  - name: profile-name
+    description: Fargate profile name that you want to use
+    default: nodescale
+  - name: endpoint
+    default: ""
+  - name: host-cluster-node-role-arn
+    description: arn of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups/fargate.
+    default: arn:aws:iam::197575167141:role/kitctl-fargate-tenant-controlplane-node-role
+  - name: fargate-subnets
+    description: only provide private subnets of your cluster VPC 
+    default: subnet-08da94336d0d7cdb9 subnet-035640b1ba6ae378a subnet-0569dc2a1ec3cc16f 
+  steps:
+  - name: create-fargate
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      CREATED_PROFILE=$(aws eks $ENDPOINT_FLAG list-fargate-profiles --region $(params.region) --cluster-name $(params.cluster-name) --query 'fargateProfileNames[?@==`'$(params.profile-name)'`]' --output text)
+      echo "CREATED_PROFILE=$CREATED_PROFILE"
+      if [ "$CREATED_PROFILE" == "" ]; then
+        aws eks create-fargate-profile  --region $(params.region) --fargate-profile-name $(params.profile-name) --cluster-name $(params.cluster-name) --pod-execution-role-arn $(params.host-cluster-node-role-arn) --selectors namespace=$(params.namespace),labels=$(params.labels) --subnets $(params.fargate-subnets)
+      fi
+
+      while [[ "$(aws eks $ENDPOINT_FLAG  describe-fargate-profile --region $(params.region) --cluster-name $(params.cluster-name) --fargate-profile-name $(params.profile-name) --query fargateProfile.status --output text)" == "CREATING" ]]; do
+          echo "$(params.profile-name) is "CREATING" at $(date)"
+          sleep 2
+      done
+  - name: validate-nodes
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "validate fargate nodes"
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      kubectl patch deployment coredns -n kube-system --type json -p='[{"op": "remove", "path": "/spec/template/metadata/annotations/eks.amazonaws.com~1compute-type"}]' || true
+      kubectl version
+      kubectl config current-context
+      kubectl get pods -n kube-system -o wide
+      kubectl get ns
+      kubectl get nodes
+      kubectl scale deployment/coredns --replicas=$(params.desired-nodes) -n kube-system
+      echo "Waiting for the fargate nodes to be ready"
+      while true; do
+          ready_node=$(kubectl get nodes 2>/dev/null | grep -w Ready | wc -l)
+          echo "ready-nodes=$ready_node"
+          if [[ "$ready_node" -eq $(params.desired-nodes) ]]; then break; fi
+          sleep 5
+      done
+      echo "test is passed"
+      kubectl scale deployment/coredns --replicas=5 -n kube-system

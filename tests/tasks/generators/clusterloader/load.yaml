@@ -3,6 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: load
+  namespace: tekton-pipelines
 spec:
   description: "clusterloader2 task to run various types of cl2 tests on a given cluster."
   params:
@@ -11,12 +12,16 @@ spec:
     default: https://github.com/kubernetes/perf-tests.git
   - name: nodes-per-namespace
     description: "nodes per namespace to get created for load test "
+    default: "100"
   - name: cl2-load-test-throughput
     description: " throughput used for mutate operations"
+    default: "15"
   - name: pods-per-node
     description: "pod density"
+    default: "10"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
+    default: "1000"
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
   workspaces:
@@ -29,7 +34,7 @@ spec:
     workingDir: $(workspaces.source.path)
     args: ["clone", "$(params.giturl)"]
   - name: prepare-loadtest
-    image: amazon/aws-cli
+    image: alpine/k8s:1.22.6
     workingDir: $(workspaces.source.path)
     script: |
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
@@ -50,7 +55,7 @@ spec:
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
   - name: validate-cluster
-    image: amazon/aws-cli
+    image: alpine/k8s:1.22.6
     workingDir: $(workspaces.config.path)
     script: |
       mkdir -p /root/.kube/
@@ -75,7 +80,7 @@ spec:
       fi
     timeout: 30000s
   - name: upload-results
-    image: amazon/aws-cli
+    image: alpine/k8s:1.22.6
     workingDir: $(workspaces.results.path)
     script: |
       aws sts get-caller-identity

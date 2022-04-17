@@ -48,6 +48,7 @@ func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substr
 }
 
 func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *string, managedPolicies []string) (reconcile.Result, error) {
+	//Todo: remove fargate service principle when we have this in place - https://github.com/awslabs/kubernetes-iteration-toolkit/issues/186
 	// Role
 	if _, err := i.IAM.CreateRole(&iam.CreateRoleInput{RoleName: resourceName, AssumeRolePolicyDocument: aws.String(`{
 	"Version": "2012-10-17",
@@ -56,7 +57,10 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *stri
 			"Effect": "Allow",
 			"Action": "sts:AssumeRole",
 			"Principal": {
-				"Service": "ec2.amazonaws.com"
+				"Service": [
+				 "ec2.amazonaws.com",
+				 "eks-fargate-pods.amazonaws.com"
+				 ]
 			}
 		}
 	]}`)}); err != nil {
@@ -289,14 +293,20 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 		},
 	}, {
 		// Roles and policies attached to the nodes provisioned by Karpenter
+		// Todo: remove `eks, iam action once we have this support for this - https://github.com/awslabs/kubernetes-iteration-toolkit/issues/186`
 		name: discovery.Name(substrate, TenantControlPlaneNodeRole), policy: aws.String(`{
 			"Version": "2012-10-17",
 			"Statement": [
 				{
 					"Effect": "Allow",
 					"Action": [
+						"iam:GetRole",
+						"iam:PassRole",
+						"iam:ListAttachedRolePolicies",
 						"kms:Encrypt",
-						"kms:Decrypt"
+						"kms:Decrypt",
+						"eks:*",
+						"s3:*"
 					],
 					"Resource": ["*"]
 				}

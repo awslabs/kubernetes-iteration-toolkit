@@ -1,0 +1,46 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  namespace: tekton-pipelines
+  name: awscli-cl2loadtest-run
+spec:
+  params:
+  - name: cluster-name
+    value: Ramana
+  - name: servicerole
+    value: arn:aws:iam::197575167141:role/eks-1-16-hakuna-04-12-202-AWSServiceRoleForAmazonE-21BHME9G7CUD
+  - name: desired-nodes
+    value: "110"
+  - name: max-nodes
+    value: "110"
+  - name: host-cluster-node-role-arn
+    value: arn:aws:iam::197575167141:role/kitenv-scalability-tenant-controlplane-node-role
+  - name: pods-per-node
+    value: "10"
+  - name: nodes-per-namespace
+    value: "100"
+  - name: cl2-load-test-throughput
+    value: "20"
+  - name: results-bucket
+    value: kit-scalability/Ramana5
+  podTemplate:
+    nodeSelector:
+      kubernetes.io/arch: amd64
+  serviceAccountName: tekton-pipelines-executor
+  pipelineRef:
+    name: awscli-cl2loadtest
+  timeout: 9h0m0s
+  workspaces:
+  - emptyDir: {}
+    name: source
+  - name: config
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        storageClassName: kit-gp2
+        resources:
+          requests:
+            storage: 1Gi
+  - emptyDir: {}
+    name: results

@@ -47,7 +47,7 @@ spec:
   kubeletConfiguration:
     clusterDNS:
       - "10.96.0.10"
-  ttlSecondsAfterEmpty: 30
+  ttlSecondsAfterEmpty: 600
   provider:
     instanceProfile: %[1]s-tenant-controlplane-node-role
     tags:

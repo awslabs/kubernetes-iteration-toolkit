@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: awscli-eks-fargate-run
+  namespace: tekton-pipelines
+spec:
+  params:
+  - name: cluster-name
+    value: fargate-scalability
+  - name: desired-nodes
+    value: "500"
+  podTemplate:
+    nodeSelector:
+      kubernetes.io/arch: amd64
+  serviceAccountName: tekton-pipelines-executor
+  pipelineRef:
+    name: awscli-eks-fargate
+  workspaces:
+  - emptyDir: {}
+    name: config

@@ -1,0 +1,85 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-nodegroup-create
+  namespace: tekton-pipelines
+spec:
+  description: |
+    Create an EKS managed nodegroup for a given cluster.
+    This Task can be used to create an EKS managed nodegroup for a given VPC Subnets, security groups and service role in an AWS account and write a kubeconfig to a desired location that
+    can be used by other tasks (in a context with kubectl) to make requests to the cluster.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: desired-nodes
+    default: "10"
+    description: The desired number of nodes in the cluster.
+  - name: min-nodes
+    default: "1"
+    description: The minimum number of nodes in the cluster.
+  - name: max-nodes
+    default: "10"
+    description: The maximum number of nodes in the cluster.
+  - name: endpoint
+    default: ""
+  - name: host-cluster-node-role-arn
+    description: arn of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups.
+  steps:
+  - name: create-nodegroup
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+
+      NG_SUBNETS=$(aws eks $ENDPOINT_FLAG --region $(params.region)  describe-cluster --name $(params.cluster-name) \
+      --query cluster.resourcesVpcConfig.subnetIds --output text \
+      )
+
+      NG_NAME=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$NG_NAME'`]' --output text)
+      if [ "$NG_NAME" == "" ]; then
+        #create node group
+        export NG_NAME=NG-$(params.cluster-name)-$(params.region)
+        aws eks $ENDPOINT_FLAG create-nodegroup \
+        --cluster-name $(params.cluster-name) \
+        --nodegroup-name $NG_NAME \
+        --node-role $(params.host-cluster-node-role-arn) \
+        --region $(params.region) \
+        --scaling-config minSize=$(params.min-nodes),maxSize=$(params.max-nodes),desiredSize=$(params.desired-nodes) \
+        --subnets $NG_SUBNETS
+      fi
+      echo "CREATED_NODEGROUP=$NG_NAME"
+
+      while [[ "$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $NG_NAME --query nodegroup.status --output text)" == "CREATING" ]]
+      do
+      echo "$NG_NAME is "CREATING" at $(date)"
+      sleep 2
+      done
+  - name: validate-nodes
+    image: alpine/k8s:1.22.6
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      #kubectl commands are purely for knowing state of cluster before kicking off the test.
+      kubectl version
+      kubectl config current-context
+      kubectl describe clusterrole eks:node-manager
+      kubectl get nodes -o wide
+      kubectl get ns
+      # while true; do
+      #     ready_node=$(kubectl get nodes 2>/dev/null | grep -w Ready | wc -l)
+      #     echo "ready-nodes=$ready_node"
+      #     if [[ "$ready_node" -eq $(params.desired-nodes) ]]; then break; fi
+      #     sleep 5
+      # done

@@ -1,0 +1,82 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: awscli-cl2loadtest
+  namespace: tekton-pipelines
+spec:
+  params:
+  - name: cluster-name
+  - name: servicerole
+  - name: desired-nodes
+  - name: max-nodes
+  - name: host-cluster-node-role-arn
+  - name: pods-per-node
+  - name: nodes-per-namespace
+  - name: cl2-load-test-throughput
+  - name: results-bucket
+    description: Results bucket with path of s3 to upload results
+  tasks:
+  - name: create-eks-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: servicerole
+      value: $(params.servicerole)
+    taskRef:
+      kind: Task
+      name:  awscli-eks-cluster-create
+    workspaces:
+    - name: config
+      workspace: config
+  - name: create-mng-nodes
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: desired-nodes
+      value: $(params.desired-nodes)
+    - name: max-nodes
+      value: $(params.max-nodes)
+    - name: host-cluster-node-role-arn
+      value: $(params.host-cluster-node-role-arn)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name:  awscli-eks-nodegroup-create
+  - name: generate
+    params:
+    - name: pods-per-node
+      value: $(params.pods-per-node)
+    - name: nodes-per-namespace
+      value: $(params.nodes-per-namespace)
+    - name: cl2-load-test-throughput
+      value: $(params.cl2-load-test-throughput)
+    - name: results-bucket
+      value: $(params.results-bucket)
+    - name: nodes
+      value: $(params.desired-nodes)
+    runAfter:
+    - create-mng-nodes
+    taskRef:
+      kind: Task
+      name: load
+    workspaces:
+    - name: source
+      workspace: source
+    - name: config
+      workspace: config
+    - name: results
+      workspace: results
+  - name: teardown
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    runAfter:
+    - generate
+    taskRef:
+      kind: Task
+      name: awscli-eks-cluster-teardown
+  workspaces:
+  - name: config
+  - name: source
+  - name: results

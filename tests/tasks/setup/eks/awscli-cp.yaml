@@ -1,0 +1,55 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-cluster-create
+  namespace: tekton-pipelines  
+spec:
+  description: |
+    Create an EKS cluster.
+    This Task can be used to create an EKS cluster for a given VPC Subnets, security groups and service role in an AWS account and write a kubeconfig to a desired location that
+    can be used by other tasks (in a context with kubectl) to make requests to the cluster.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin.
+  - name: kubernetes-version
+    default: "1.21"
+    description: The EKS version to install.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+    description: "aws eks enpoint to create clusters against"
+  - name: subnets
+    description: list of subnet ids of the VPC for eks cluster.
+    default: subnet-08e09533840c2e713,subnet-0387141ab3c555cf7,subnet-049c59ad6d2a3c8f3,subnet-0b407d4568173c8d9,subnet-0cc45316116d910e4,subnet-0344ce6cdfef574c1
+  - name: securitygroups
+    description: list of securitygroup ids as a string of the associated VPC
+    default: sg-03e8016a74d88416c
+  - name: servicerole
+    description: servicerole arn to be used for eks cluster
+    default: arn:aws:iam::197575167141:role/eks-1-16-hakuna-04-12-202-AWSServiceRoleForAmazonE-21BHME9G7CUD
+  workspaces:
+  - name: config
+    description: |
+      A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
+  steps:
+  - name: write-kubeconfig
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      CREATED_CLUSTER=$(aws eks $ENDPOINT_FLAG list-clusters --region $(params.region) --query 'clusters[?@==`'$(params.cluster-name)'`]' --output text )
+      echo "CREATED_CLUSTER=$CREATED_CLUSTER"
+
+      if [ "$CREATED_CLUSTER" == "" ]; then
+        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $(params.servicerole) --resources-vpc-config subnetIds=$(params.subnets),securityGroupIds=$(params.securitygroups) $ENDPOINT_FLAG
+      fi
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      cp  /root/.kube/config $(workspaces.config.path)/kubeconfig
