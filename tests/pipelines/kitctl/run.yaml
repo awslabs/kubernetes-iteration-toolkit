@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: pipeline-template
+  namespace: tekton-pipelines
+spec:
+  params:
+  - name: name
+    value: "example"
+  podTemplate:
+    nodeSelector:
+      kubernetes.io/arch: amd64
+  serviceAccountName: tekton-pipelines-executor
+  pipelineRef:
+    name: pipeline-template

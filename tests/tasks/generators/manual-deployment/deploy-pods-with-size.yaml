@@ -1,0 +1,70 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-pods-with-size
+  namespace: tekton-pipelines
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.17.0"
+    tekton.dev/categories: Kubernetes
+    tekton.dev/tags: CLI, kubectl
+    tekton.dev/displayName: "kubernetes actions"
+    tekton.dev/platforms: "linux/amd64"
+spec:
+  description: |
+    Deploy multiple pods with given pod object size in the test cluster.
+  params:
+  - name: name
+    default: "guest"
+    description: Name of the guest cluster
+  - name: number-of-pods
+    default: "50"
+    description: Number of dummy pods
+  - name: pod-size
+    default: "5000"
+    description: Size of the pod object in bytes
+  steps:
+  - name: deploy-benchmark-payload
+    image: bitnami/kubectl
+    script: |
+      #!/bin/bash
+      kubectl get secret $(params.name)-kube-admin-config -n $(params.name) -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
+      echo "Deploy dummy pods"
+      cat <<EOF >/tmp/deploy.yaml
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: workload
+        namespace: default
+      spec:
+        replicas: $(params.number-of-pods)
+        selector:
+          matchLabels:
+            app: pod_size_workload
+        template:
+          metadata:
+            labels:
+              app: pod_size_workload
+          spec:
+            nodeSelector:
+              kubernetes.io/arch: amd64
+            containers:
+              - name: dummy
+                image: busybox:latest
+                command:
+                  - "/bin/sh"
+                  - "-ec"
+                  - "echo -n __LOADSTRING__ >> /config/output.txt && while true; do sleep 100; done"
+                volumeMounts:
+                - mountPath: /config
+                  name: config
+            volumes:
+            - name: config
+              emptyDir: {}
+      EOF
+      # Replace __LOADSTRING__ with a random string. This will create a pod object with the given size.
+      sed -i "s/__LOADSTRING__/$(tr -dc A-Za-z0-9 < /dev/urandom | dd bs=$(params.pod-size) count=1 2>/dev/null)/g" /tmp/deploy.yaml
+      kubectl --kubeconfig=/tmp/kubeconfig apply -f /tmp/deploy.yaml
+      echo "Get pods"
+      kubectl --kubeconfig=/tmp/kubeconfig get pod -A
+

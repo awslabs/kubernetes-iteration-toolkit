@@ -1,0 +1,32 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: pipeline-template
+  namespace: tekton-pipelines
+spec:
+  params:
+  - name: name
+    description: The name of the test cluster.
+    default: "guest"
+  tasks:
+  - name: setup-control-plane
+    taskRef:
+      name: control-plane-setup
+    params:
+      - name: name
+        value: '$(params.name)'
+  - name: setup-data-plane
+    runAfter: [setup-control-plane]
+    taskRef:
+      name: data-plane-setup
+    params:
+      - name: name
+        value: '$(params.name)'
+  finally:      
+  - name: teardown
+    taskRef:
+      name: teardown
+    params:
+      - name: name
+        value: '$(params.name)'
