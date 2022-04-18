@@ -112,6 +112,10 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				"--use-service-account-credentials=true",
 				"--cloud-provider=aws",
 				"--cloud-config=/etc/kubernetes/cloud-config/aws.config",
+				"--horizontal-pod-autoscaler-use-rest-clients=true",
+				"--feature-gates=RotateKubeletServerCertificate=true",
+				"--logtostderr=true",
+				"--v=2",
 			},
 			VolumeMounts: []v1.VolumeMount{{
 				Name:      "ca-certs",

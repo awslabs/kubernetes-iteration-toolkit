@@ -103,6 +103,9 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 				"--trusted-ca-file=/etc/kubernetes/pki/ca.crt",
 				"--logger=zap",
 				"--quota-backend-bytes=8589934592",
+				"--max-request-bytes=1572864",
+				"--grpc-keepalive-interval=2h0m0s",
+				"--pre-vote=true",
 			},
 			Env: []v1.EnvVar{{
 				Name: "NODE_IP",
