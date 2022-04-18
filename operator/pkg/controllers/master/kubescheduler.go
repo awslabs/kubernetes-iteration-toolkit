@@ -43,13 +43,13 @@ func (c *Controller) reconcileScheduler(ctx context.Context, controlPlane *v1alp
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      SchedulerName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
-				Labels:    schedulerLabel,
+				Labels:    schedulerLabels(controlPlane.ClusterName()),
 			},
 			Spec: appsv1.DaemonSetSpec{
 				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
-				Selector:       &metav1.LabelSelector{MatchLabels: schedulerLabel},
+				Selector:       &metav1.LabelSelector{MatchLabels: schedulerLabels(controlPlane.ClusterName())},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{Labels: schedulerLabel},
+					ObjectMeta: metav1.ObjectMeta{Labels: schedulerLabels(controlPlane.ClusterName())},
 					Spec:       schedulerPodSpec,
 				},
 			},
@@ -61,7 +61,12 @@ func SchedulerName(clusterName string) string {
 	return fmt.Sprintf("%s-scheduler", clusterName)
 }
 
-var schedulerLabel = map[string]string{object.AppNameLabelKey: "kube-scheduler"}
+func schedulerLabels(clusterName string) map[string]string {
+	return map[string]string{
+		object.AppNameLabelKey:      "kube-scheduler",
+		object.ControlPlaneLabelKey: clusterName,
+	}
+}
 
 func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

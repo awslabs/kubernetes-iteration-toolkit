@@ -71,7 +71,8 @@ func APIServerDeploymentName(clusterName string) string {
 
 func APIServerLabels(clustername string) map[string]string {
 	return map[string]string{
-		object.AppNameLabelKey: "apiserver",
+		object.AppNameLabelKey:      "apiserver",
+		object.ControlPlaneLabelKey: clustername,
 	}
 }
 

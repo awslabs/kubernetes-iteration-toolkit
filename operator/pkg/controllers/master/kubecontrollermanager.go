@@ -55,13 +55,13 @@ func (c *Controller) reconcileKCM(ctx context.Context, controlPlane *v1alpha1.Co
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      controllerManagerName(controlPlane.ClusterName()),
 				Namespace: controlPlane.Namespace,
-				Labels:    kcmLabel,
+				Labels:    kcmLabels(controlPlane.ClusterName()),
 			},
 			Spec: appsv1.DaemonSetSpec{
 				UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
-				Selector:       &metav1.LabelSelector{MatchLabels: kcmLabel},
+				Selector:       &metav1.LabelSelector{MatchLabels: kcmLabels(controlPlane.ClusterName())},
 				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{Labels: kcmLabel},
+					ObjectMeta: metav1.ObjectMeta{Labels: kcmLabels(controlPlane.ClusterName())},
 					Spec:       kcmPodSpec,
 				},
 			},
@@ -73,7 +73,12 @@ func controllerManagerName(clusterName string) string {
 	return fmt.Sprintf("%s-controller-manager", clusterName)
 }
 
-var kcmLabel = map[string]string{object.AppNameLabelKey: "kube-controller-manager"}
+func kcmLabels(clustername string) map[string]string {
+	return map[string]string{
+		object.AppNameLabelKey:      "kube-controller-manager",
+		object.ControlPlaneLabelKey: clustername,
+	}
+}
 
 func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

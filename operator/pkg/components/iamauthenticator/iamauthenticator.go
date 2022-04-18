@@ -51,9 +51,9 @@ func Config(ctx context.Context, name, ns, instanceRole, accountID string) (*v1.
 
 type Options func(v1.PodTemplateSpec) v1.PodTemplateSpec
 
-func PodSpec(opts ...Options) v1.PodTemplateSpec {
+func PodSpec(clusterName string, opts ...Options) v1.PodTemplateSpec {
 	podTemplateSpec := v1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{Name: "aws-iam-authenticator", Labels: Labels},
+		ObjectMeta: metav1.ObjectMeta{Name: "aws-iam-authenticator", Labels: Labels(clusterName)},
 		Spec: v1.PodSpec{
 			HostNetwork: true,
 			Tolerations: []v1.Toleration{{Operator: v1.TolerationOpExists}},
@@ -158,4 +158,9 @@ func AuthenticatorConfigMapName(clusterName string) string {
 	return fmt.Sprintf("%s-auth-config", clusterName)
 }
 
-var Labels = map[string]string{object.AppNameLabelKey: "aws-iam-authenticator"}
+func Labels(clustername string) map[string]string {
+	return map[string]string{
+		object.AppNameLabelKey:      "aws-iam-authenticator",
+		object.ControlPlaneLabelKey: clustername,
+	}
+}

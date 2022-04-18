@@ -49,12 +49,12 @@ func (c *Controller) ensureDaemonSet(ctx context.Context, controlPlane *v1alpha1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-authenticator", controlPlane.ClusterName()),
 			Namespace: controlPlane.Namespace,
-			Labels:    iamauthenticator.Labels,
+			Labels:    iamauthenticator.Labels(controlPlane.ClusterName()),
 		},
 		Spec: appsv1.DaemonSetSpec{
 			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
-			Selector:       &metav1.LabelSelector{MatchLabels: iamauthenticator.Labels},
-			Template: iamauthenticator.PodSpec(func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
+			Selector:       &metav1.LabelSelector{MatchLabels: iamauthenticator.Labels(controlPlane.ClusterName())},
+			Template: iamauthenticator.PodSpec(controlPlane.ClusterName(), func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
 				template.Spec.NodeSelector = APIServerLabels(controlPlane.ClusterName())
 				template.Spec.Volumes = append(template.Spec.Volumes, v1.Volume{Name: "config",
 					VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{

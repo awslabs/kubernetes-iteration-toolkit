@@ -17,7 +17,7 @@ require (
 	k8s.io/cli-runtime v0.23.4
 	k8s.io/client-go v0.23.4
 	k8s.io/kubernetes v1.23.1
-	knative.dev/pkg v0.0.0-20211215065729-552319d4f55b
+	knative.dev/pkg v0.0.0-20220318185521-e6e3cf03d765
 	sigs.k8s.io/controller-runtime v0.11.1
 )
 
@@ -55,7 +55,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
-	github.com/go-logr/logr v1.2.0 // indirect
+	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.15 // indirect
@@ -122,11 +122,11 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871 // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
@@ -138,16 +138,16 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	k8s.io/apiextensions-apiserver v0.23.1 // indirect
+	k8s.io/apiextensions-apiserver v0.23.4 // indirect
 	k8s.io/apiserver v0.23.4 // indirect
 	k8s.io/cluster-bootstrap v0.0.0 // indirect
 	k8s.io/component-base v0.23.4 // indirect
-	k8s.io/klog/v2 v2.30.0 // indirect
+	k8s.io/klog/v2 v2.40.2-0.20220227211518-7ea6d6adb645 // indirect
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65 // indirect
 	k8s.io/kube-proxy v0.0.0 // indirect
 	k8s.io/kubectl v0.23.1 // indirect
 	k8s.io/kubelet v0.0.0 // indirect
-	k8s.io/utils v0.0.0-20211116205334-6203023598ed // indirect
+	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 	oras.land/oras-go v1.1.0 // indirect
 	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect
 	sigs.k8s.io/kustomize/api v0.10.1 // indirect
@@ -157,6 +157,7 @@ require (
 )
 
 replace (
+	github.com/awslabs/kubernetes-iteration-toolkit/operator => ../operator
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => k8s.io/api v0.23.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.23.4

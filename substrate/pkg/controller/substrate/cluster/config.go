@@ -304,7 +304,7 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 }
 
 func (c *Config) staticPodSpecForAuthenticator(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	podTemplateSpec := iamauthenticator.PodSpec(func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
+	podTemplateSpec := iamauthenticator.PodSpec(substrate.Name, func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
 		template.ObjectMeta.Namespace = "kube-system"
 		template.Spec.Volumes = append(template.Spec.Volumes, v1.Volume{Name: "config",
 			VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: authenticatorConfigDir}},

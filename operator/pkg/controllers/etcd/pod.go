@@ -20,9 +20,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
-	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/functional"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
-	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,20 +33,20 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
-		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
+		NodeSelector:                  labels(controlPlane.ClusterName()),
 		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
 			MaxSkew:           int32(1),
 			TopologyKey:       "topology.kubernetes.io/zone",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: labels(controlPlane.ClusterName()),
 			},
 		}, {
 			MaxSkew:           int32(1),
 			TopologyKey:       "kubernetes.io/hostname",
 			WhenUnsatisfiable: v1.DoNotSchedule,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: labels(controlPlane.ClusterName()),
 			},
 		}},
 		Containers: []v1.Container{{
@@ -223,9 +221,4 @@ func caServerName(controlPlane *v1alpha1.ControlPlane) string {
 }
 func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 	return fmt.Sprintf("%s-etcd-peer", controlPlane.ClusterName())
-}
-
-func nodeSelector(clusterName string) map[string]string {
-	return functional.UnionStringMaps(labels,
-		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }
