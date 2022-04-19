@@ -37,6 +37,34 @@ spec:
 EOF
 ```
 
+### Get the KUBECONFIG for the guest cluster from the management cluster
+
+```bash
+kubectl get secret ${GUEST_CLUSTER_NAME}-kube-admin-config -ojsonpath='{.data.config}' | base64 -d > /tmp/kubeconfig
+```
+
+### Deploy CNI plugin to the guest cluster for the nodes to be ready
+
+If you are deploying in us-west-2 region run the following command to install AWS CNI plugin, for other regions follow the setup [steps](https://github.com/aws/amazon-vpc-cni-k8s#setup)
+
+```bash
+kubectl --kubeconfig=/tmp/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.10/config/master/aws-k8s-cni.yaml
+```
+
+### Provision worker nodes for the guest cluster
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: kit.k8s.sh/v1alpha1
+kind: DataPlane
+metadata:
+  name: ${GUEST_CLUSTER_NAME}-nodes
+spec:
+  clusterName: ${GUEST_CLUSTER_NAME} # Associated Cluster name
+  nodeCount: 1
+EOF
+```
+
 ### Accessing metrics from prometheus and grafana
 
 ```bash
@@ -44,10 +72,10 @@ kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090&
 kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 8080:80&
 ```
 
-### Allowing API server to trust kubelet endpoints
+### Allowing API server to trust kubelet endpoints for the guest cluster
 
 ```bash
-kubectl certificate approve $(k get csr | grep "Pending" | awk '{print $1}')
+kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')
 ```
 
 ### cleanup
