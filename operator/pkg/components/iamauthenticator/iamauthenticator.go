@@ -21,6 +21,7 @@ import (
 	"html/template"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,9 +52,9 @@ func Config(ctx context.Context, name, ns, instanceRole, accountID string) (*v1.
 
 type Options func(v1.PodTemplateSpec) v1.PodTemplateSpec
 
-func PodSpec(opts ...Options) v1.PodTemplateSpec {
+func PodSpec(clusterName string, opts ...Options) v1.PodTemplateSpec {
 	podTemplateSpec := v1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{Name: "aws-iam-authenticator", Labels: Labels()},
+		ObjectMeta: metav1.ObjectMeta{Name: "aws-iam-authenticator", Labels: Labels(clusterName)},
 		Spec: v1.PodSpec{
 			HostNetwork: true,
 			Tolerations: []v1.Toleration{{Operator: v1.TolerationOpExists}},
@@ -77,11 +78,16 @@ func PodSpec(opts ...Options) v1.PodTemplateSpec {
 				Image: imageprovider.AWSIamAuthenticator(),
 				Args: []string{
 					"server",
+					"--address=0.0.0.0",
 					"--master=https://localhost/",
 					"--config=/etc/aws-iam-authenticator/config.yaml",
 					"--state-dir=/var/aws-iam-authenticator/state/",
 					"--generate-kubeconfig=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 				},
+				Ports: []v1.ContainerPort{{
+					ContainerPort: 21362,
+					Name:          "metrics",
+				}},
 				SecurityContext: &v1.SecurityContext{AllowPrivilegeEscalation: ptr.Bool(true)},
 				VolumeMounts: []v1.VolumeMount{{
 					Name:      "config",
@@ -167,6 +173,9 @@ func AuthenticatorConfigMapName(clusterName string) string {
 	return fmt.Sprintf("%s-auth-config", clusterName)
 }
 
-func Labels() map[string]string {
-	return map[string]string{"component": "aws-iam-authenticator"}
+func Labels(clustername string) map[string]string {
+	return map[string]string{
+		object.AppNameLabelKey:      "aws-iam-authenticator",
+		object.ControlPlaneLabelKey: clustername,
+	}
 }
