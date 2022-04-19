@@ -91,6 +91,8 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				"--bind-address=127.0.0.1",
 				"--kubeconfig=/etc/kubernetes/config/scheduler/scheduler.conf",
 				"--leader-elect=true",
+				"--logtostderr=true",
+				"--v=2",
 			},
 			VolumeMounts: []v1.VolumeMount{{
 				Name:      "ca-certs",

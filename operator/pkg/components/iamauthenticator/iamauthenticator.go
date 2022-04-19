@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
 	"knative.dev/pkg/ptr"
 )
@@ -92,6 +93,20 @@ func PodSpec(opts ...Options) v1.PodTemplateSpec {
 					Name:      "kubeconfig",
 					MountPath: "/var/aws-iam-authenticator/kubeconfig/",
 				}},
+				LivenessProbe: &v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						HTTPGet: &v1.HTTPGetAction{
+							Host:   "127.0.0.1",
+							Scheme: v1.URISchemeHTTP,
+							Path:   "/healthz",
+							Port:   intstr.FromInt(21363),
+						},
+					},
+					InitialDelaySeconds: 10,
+					PeriodSeconds:       5,
+					TimeoutSeconds:      5,
+					FailureThreshold:    5,
+				},
 			}},
 			Volumes: []v1.Volume{{
 				Name: "kubeconfig",
