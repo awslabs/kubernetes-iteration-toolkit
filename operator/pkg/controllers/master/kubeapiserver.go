@@ -116,7 +116,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--allow-privileged=true",
 					"--authorization-mode=Node,RBAC",
 					"--client-ca-file=/etc/kubernetes/pki/ca/ca.crt",
-					"--enable-admission-plugins=NodeRestriction,PodSecurityPolicy,ExtendedResourceToleration",
+					"--enable-admission-plugins=NodeRestriction",
 					"--enable-bootstrap-token-auth=true",
 					"--etcd-cafile=/etc/kubernetes/pki/etcd-ca/ca.crt",
 					"--etcd-certfile=/etc/kubernetes/pki/etcd/apiserver-etcd-client.crt",
