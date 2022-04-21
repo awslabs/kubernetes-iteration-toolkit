@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/discovery"
@@ -46,7 +47,9 @@ func (n *NatGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 		DestinationCidrBlock: aws.String("0.0.0.0/0"),
 		NatGatewayId:         natGW.NatGatewayId,
 	}); err != nil {
-		return reconcile.Result{}, fmt.Errorf("creating route for NAT gateway, %w", err)
+		if err.(awserr.Error).Code() != "RouteAlreadyExists" {
+			return reconcile.Result{}, fmt.Errorf("creating route for NAT gateway, %w", err)
+		}
 	} else {
 		logging.FromContext(ctx).Debugf("Ensured route for NAT gateway %s", aws.StringValue(natGW.NatGatewayId))
 	}

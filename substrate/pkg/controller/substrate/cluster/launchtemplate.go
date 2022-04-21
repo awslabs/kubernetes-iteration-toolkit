@@ -98,7 +98,7 @@ while [ true ]; do
     echo "\$(date) Syncing S3 files for \$dir"
     mkdir -p \$dir
     existing_checksum=\$(ls -alR \$dir | md5sum)
-    aws s3 sync s3://%[1]s/tmp/%[1]s\$dir "\$dir"
+    aws s3 sync s3://%[2]s/tmp/%[2]s\$dir "\$dir"
     new_checksum=\$(ls -alR \$dir | md5sum)
     if [ "\$new_checksum" != "\$existing_checksum" ]; then
 		echo "Successfully synced from S3 \$dir"
@@ -111,7 +111,7 @@ done
 EOF
 
 chmod a+x /etc/kit/sync.sh
-/etc/kit/sync.sh > /var/log/sync-kit-files.log&`, aws.StringValue(discovery.Name(substrate)))))),
+/etc/kit/sync.sh > /var/log/sync-kit-files.log&`, aws.StringValue(discovery.Name(substrate, "apiserver")), aws.StringValue(discovery.Name(substrate)))))),
 	}
 	if _, err := l.EC2.CreateLaunchTemplateWithContext(ctx, &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateName: discovery.Name(substrate),
