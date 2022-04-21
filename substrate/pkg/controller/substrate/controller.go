@@ -54,6 +54,7 @@ func NewController(ctx context.Context) *Controller {
 			&infrastructure.Subnets{EC2: EC2},
 			&infrastructure.RouteTable{EC2: EC2},
 			&infrastructure.InternetGateway{EC2: EC2},
+			&infrastructure.NatGateway{EC2: EC2},
 			&infrastructure.SecurityGroup{EC2: EC2},
 			&cluster.Address{EC2: EC2},
 			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session), Region: session.Config.Region},
