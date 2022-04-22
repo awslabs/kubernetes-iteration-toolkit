@@ -70,7 +70,7 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		CreateNamespace: true,
 		Values: map[string]interface{}{
 			"clusterName":     substrate.Name,
-			"clusterEndpoint": fmt.Sprintf("https://%s:8443", *substrate.Status.Cluster.Address),
+			"clusterEndpoint": fmt.Sprintf("https://%s:8443", *substrate.Status.Cluster.APIServerAddress),
 			"controller": map[string]interface{}{
 				"resources": map[string]interface{}{
 					"requests": map[string]interface{}{

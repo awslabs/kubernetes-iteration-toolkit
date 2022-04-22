@@ -16,9 +16,12 @@ package cluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/discovery"
@@ -30,28 +33,52 @@ type Address struct {
 	EC2 *ec2.EC2
 }
 
+type addressOutput struct {
+	ipAddress    *string
+	allocationID *string
+}
+
 func (a *Address) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
+	for _, req := range []struct {
+		name *string
+	}{
+		{name: discovery.Name(substrate, "apiserver")},
+		{name: discovery.Name(substrate, "natgw")},
+	} {
+		result, err := a.ensure(ctx, req.name, substrate)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("ensuring IP address, %w", err)
+		}
+		switch aws.StringValue(req.name) {
+		case aws.StringValue(discovery.Name(substrate, "apiserver")):
+			substrate.Status.Cluster.APIServerAddress = result.ipAddress
+		case aws.StringValue(discovery.Name(substrate, "natgw")):
+			substrate.Status.Infrastructure.ElasticIpIDForNatGW = result.allocationID
+		}
+	}
+	return reconcile.Result{}, nil
+}
+
+func (a *Address) ensure(ctx context.Context, tagValue *string, substrate *v1alpha1.Substrate) (*addressOutput, error) {
+	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate, tagValue)})
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("describing addresses, %w", err)
+		return nil, fmt.Errorf("describing addresses, %w", err)
 	}
 	if len(addressesOutput.Addresses) > 0 {
-		logging.FromContext(ctx).Debugf("Found address %s", aws.StringValue(addressesOutput.Addresses[0].PublicIp))
-		substrate.Status.Cluster.Address = addressesOutput.Addresses[0].PublicIp
-		return reconcile.Result{}, nil
+		logging.FromContext(ctx).Debugf("Found address, name %s, IP %s", aws.StringValue(tagValue), aws.StringValue(addressesOutput.Addresses[0].PublicIp))
+		return &addressOutput{addressesOutput.Addresses[0].PublicIp, addressesOutput.Addresses[0].AllocationId}, nil
 	}
-	addressOutput, err := a.EC2.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
+	output, err := a.EC2.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeElasticIp),
-			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+			Tags:         discovery.Tags(substrate, tagValue),
 		}},
 	})
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("allocating address, %w", err)
+		return nil, fmt.Errorf("allocating address, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Created address %s", aws.StringValue(addressOutput.PublicIp))
-	substrate.Status.Cluster.Address = addressOutput.PublicIp
-	return reconcile.Result{}, nil
+	logging.FromContext(ctx).Infof("Created address name %s, IP %s", aws.StringValue(tagValue), aws.StringValue(output.PublicIp))
+	return &addressOutput{output.PublicIp, output.AllocationId}, nil
 }
 
 func (a *Address) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
@@ -62,6 +89,12 @@ func (a *Address) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (re
 	for _, address := range addressesOutput.Addresses {
 		if address.AssociationId != nil {
 			if _, err := a.EC2.DisassociateAddressWithContext(ctx, &ec2.DisassociateAddressInput{AssociationId: address.AssociationId}); err != nil {
+				// Until NAT GW is not yet deleted we can't disassociate, check for error and retry
+				if err != nil && strings.Contains(err.Error(), "AuthFailure: You do not have permission to access the specified resource") {
+					if aerr := awserr.Error(nil); errors.As(err, &aerr) {
+						return reconcile.Result{Requeue: true}, nil
+					}
+				}
 				return reconcile.Result{}, fmt.Errorf("disassociating elastic IP, %w", err)
 			}
 		}

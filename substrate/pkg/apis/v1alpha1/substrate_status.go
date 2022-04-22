@@ -23,13 +23,14 @@ var (
 )
 
 type ClusterStatus struct {
-	Address               *string `json:"address,omitempty"`
+	APIServerAddress      *string `json:"apiServerAddress,omitempty"`
 	KubeConfig            *string `json:"kubeConfig,omitempty"`
 	LaunchTemplateVersion *string `json:"launchTemplateVersion,omitempty"`
 }
 
 type InfrastructureStatus struct {
 	VPCID               *string  `json:"vpcID,omitempty"`
+	ElasticIpIDForNatGW *string  `json:"elasticIpIdForNat,omitempty"`
 	PrivateRouteTableID *string  `json:"privateRouteTableID,omitempty"`
 	PublicRouteTableID  *string  `json:"publicRouteTableID,omitempty"`
 	SecurityGroupID     *string  `json:"securityGroupID,omitempty"`

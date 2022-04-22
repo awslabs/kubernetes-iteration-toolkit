@@ -70,7 +70,7 @@ type Config struct {
 }
 
 func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.Cluster.Address == nil {
+	if substrate.Status.Cluster.APIServerAddress == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	// ensure S3 bucket
@@ -249,7 +249,7 @@ func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 		},
 	}
 	// master specific config
-	masterElasticIP := aws.StringValue(substrate.Status.Cluster.Address)
+	masterElasticIP := aws.StringValue(substrate.Status.Cluster.APIServerAddress)
 	defaultStaticConfig.LocalAPIEndpoint.AdvertiseAddress = masterElasticIP
 	defaultStaticConfig.LocalAPIEndpoint.BindPort = 8443
 	defaultStaticConfig.ControlPlaneEndpoint = masterElasticIP + ":8443"

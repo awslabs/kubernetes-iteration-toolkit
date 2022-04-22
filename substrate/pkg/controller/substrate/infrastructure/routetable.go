@@ -49,19 +49,19 @@ func (r *RouteTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 }
 
 func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name *string) (*ec2.RouteTable, error) {
-	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
+	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate, name)})
 	if err != nil {
 		return nil, fmt.Errorf("describing route tables, %w", err)
 	}
 	if len(describeRouteTablesOutput.RouteTables) > 0 {
-		logging.FromContext(ctx).Debugf("Found route table %s", aws.StringValue(name))
+		logging.FromContext(ctx).Debugf("Found route table %s, %v", aws.StringValue(name), *describeRouteTablesOutput.RouteTables[0].RouteTableId)
 		return describeRouteTablesOutput.RouteTables[0], nil
 	}
 	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
 		VpcId: substrate.Status.Infrastructure.VPCID,
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeRouteTable),
-			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+			Tags:         discovery.Tags(substrate, name),
 		}},
 	})
 	if err != nil {
