@@ -41,8 +41,7 @@ type Substrate struct {
 }
 
 type VPCSpec struct {
-	// TODO accept a slice of CIDR for megaXL we need to create multiple CIDRs
-	CIDR string `json:"cidr,omitempty"`
+	CIDR []string `json:"cidr,omitempty"`
 }
 
 type SubnetSpec struct {
