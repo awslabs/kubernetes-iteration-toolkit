@@ -42,7 +42,8 @@ func (v *VPC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 		return reconcile.Result{}, nil
 	}
 	createVpcOutput, err := v.EC2.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock: aws.String(substrate.Spec.VPC.CIDR),
+		// create VPC with a CIDR here and add additional CIDR blocks below
+		CidrBlock: aws.String(substrate.Spec.VPC.CIDR[0]),
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeVpc),
 			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
@@ -50,6 +51,16 @@ func (v *VPC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconc
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)
+	}
+	// add additional CIDRs to VPC here.
+	for _, cidr := range substrate.Spec.VPC.CIDR[1:] {
+		_, err = v.EC2.AssociateVpcCidrBlock(&ec2.AssociateVpcCidrBlockInput{
+			CidrBlock: aws.String(cidr),
+			VpcId:     createVpcOutput.Vpc.VpcId,
+		})
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("associating CIDR to VPC, %w", err)
+		}
 	}
 	substrate.Status.Infrastructure.VPCID = createVpcOutput.Vpc.VpcId
 	logging.FromContext(ctx).Infof("Created vpc %s", aws.StringValue(substrate.Status.Infrastructure.VPCID))
