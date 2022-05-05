@@ -48,18 +48,20 @@ import (
 )
 
 const (
-	ClusterCertsBasePath       = "/tmp/"
-	kubeconfigPath             = "/etc/kubernetes"
-	kubeconfigFile             = "etc/kubernetes/admin.conf"
-	certPKIPath                = "/etc/kubernetes/pki"
-	clusterManifestPath        = "/etc/kubernetes/manifests"
-	kubeletSystemdPath         = "/etc/systemd/system"
-	kubeletConfigPath          = "/var/lib/kubelet/"
-	authenticatorConfigDir     = "/etc/aws-iam-authenticator"
-	kubernetesVersionTag       = "v1.21.2-eks-1-21-4"
-	imageRepository            = "public.ecr.aws/eks-distro/kubernetes"
-	etcdVersionTag             = "v3.4.16-eks-1-21-7"
-	etcdImageRepository        = "public.ecr.aws/eks-distro/etcd-io"
+	ClusterCertsBasePath   = "/tmp/"
+	kubeconfigPath         = "/etc/kubernetes"
+	kubeconfigFile         = "etc/kubernetes/admin.conf"
+	certPKIPath            = "/etc/kubernetes/pki"
+	clusterManifestPath    = "/etc/kubernetes/manifests"
+	kubeletSystemdPath     = "/etc/systemd/system"
+	kubeletConfigPath      = "/var/lib/kubelet/"
+	authenticatorConfigDir = "/etc/aws-iam-authenticator"
+	kubernetesVersionTag   = "v1.21.2-eks-1-21-4"
+	imageRepository        = "public.ecr.aws/eks-distro/kubernetes"
+	etcdVersionTag         = "v3.4.16-eks-1-21-7"
+	etcdImageRepository    = "public.ecr.aws/eks-distro/etcd-io"
+	//Todo: until we have irsa support - https://github.com/awslabs/kubernetes-iteration-toolkit/issues/186,
+	//this role name is tightly coupled with tekton pipelines and tasks; Please ensure you change tasks/ accordingly if you change this rolename
 	TenantControlPlaneNodeRole = "tenant-controlplane-node-role"
 )
 

@@ -1,0 +1,34 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: awscli-eks-fargate
+  namespace: tekton-pipelines
+spec:
+  workspaces:
+    - name: config
+  params:
+  - name: cluster-name
+  - name: desired-nodes
+  - name: host-cluster-node-role-arn
+  tasks:
+  - name: setup-control-plane
+    taskRef:
+      name: awscli-eks-cluster-create
+    params:
+      - name: cluster-name
+        value: '$(params.cluster-name)'
+    workspaces:
+      - name: config    
+        workspace: config
+  - name: setup-data-plane
+    runAfter: [setup-control-plane]
+    taskRef:
+      name: awscli-eks-fargate-create
+    params:
+      - name: cluster-name
+        value: '$(params.cluster-name)'
+      - name: desired-nodes
+        value: '$(params.desired-nodes)'
+      - name: host-cluster-node-role-arn
+        value: '$(params.host-cluster-node-role-arn)'

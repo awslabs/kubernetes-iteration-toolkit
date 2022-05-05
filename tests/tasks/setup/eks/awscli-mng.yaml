@@ -1,0 +1,107 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-nodegroup-create
+  namespace: tekton-pipelines
+spec:
+  description: |
+    Create an EKS managed nodegroup for a given cluster.
+    This Task can be used to create an EKS managed nodegroup for a given VPC Subnets, security groups and service role in an AWS account.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin managed nodegroups for.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: desired-nodes
+    default: "10"
+    description: The desired number of nodes in the cluster.
+  - name: min-nodes
+    default: "1"
+    description: The minimum number of nodes in the cluster.
+  - name: max-nodes
+    default: "1000"
+    description: The maximum number of nodes in the cluster.
+  - name: endpoint
+    default: ""
+  - name: host-cluster-node-role-arn
+    description: arn of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups.
+  steps:
+  - name: create-nodegroup
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      # Todo: remove this workaround for nodes less than 5k when our scaling system can scale up instantly
+      if [ $(params.desired-nodes) -lt 5001  ] && [ $(params.desired-nodes) -gt 500 ]
+      then
+        echo "sleeping for 3hrs to workaround VAS cool off time"
+        sleep 10800
+      fi
+
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+
+      NG_SUBNETS=$(aws eks $ENDPOINT_FLAG --region $(params.region)  describe-cluster --name $(params.cluster-name) \
+      --query cluster.resourcesVpcConfig.subnetIds --output text \
+      )
+
+      nodes=$(params.desired-nodes)
+      asgs=$((nodes/1000))
+      asg_name=$(params.cluster-name)-nodes
+      create_dp()
+      {
+        CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$asg_name-$1'`]' --output text)
+        if [ "$CREATED_NODEGROUP" == "" ]; then
+          #create node group
+          aws eks $ENDPOINT_FLAG create-nodegroup \
+          --cluster-name $(params.cluster-name) \
+          --nodegroup-name $asg_name-$1 \
+          --node-role $(params.host-cluster-node-role-arn) \
+          --region $(params.region) \
+          --instance-types m5.4xlarge m4.4xlarge m5d.4xlarge m5a.4xlarge m5ad.4xlarge \
+          --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
+          --subnets $NG_SUBNETS
+        fi
+        echo "CREATED_NODEGROUP=$asg_name-$1"
+        while [[ "$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $asg_name-$1 --query nodegroup.status --output text)" == "CREATING" ]]
+        do
+          echo "$asg_name-$1 is "CREATING" at $(date)"
+          sleep 2
+        done
+      }
+      for i in $(seq 1 $asgs)
+      do
+        #max number of nodes MNG allows per ASG
+        create_dp $i 1000
+      done
+      remaining_nodes=$((nodes%1000))
+      if [[ $remaining_nodes -gt 0 ]]
+      then
+        echo "The remaining_nodes var is greater than 0."
+        create_dp 0 $remaining_nodes
+      fi
+      
+  - name: validate-nodes
+    image: alpine/k8s:1.22.6
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      #kubectl commands are purely for knowing state of cluster before kicking off the test.
+      kubectl version
+      kubectl config current-context
+      kubectl describe clusterrole eks:node-manager
+      kubectl get nodes -o wide
+      kubectl get ns
+      while true; do
+          ready_node=$(kubectl get nodes 2>/dev/null | grep -w Ready | wc -l)
+          echo "ready-nodes=$ready_node"
+          if [[ "$ready_node" -eq $(params.desired-nodes) ]]; then break; fi
+          sleep 5
+      done
