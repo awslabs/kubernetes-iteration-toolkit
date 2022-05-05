@@ -6,5 +6,5 @@ Kubernetes Iteration Toolkit (or KIT) is a set of decoupled tools to accelerate 
 It consists of the following components at the moment.
 
 * [Operator](operator/README.md)
-* [Substrate](substrate/README.md)
+* [KIT-environment](substrate/README.md)
 * [TestBed](testbed/README.md)
