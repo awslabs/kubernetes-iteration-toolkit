@@ -72,6 +72,15 @@ kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090&
 kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 8080:80&
 ```
 
+Adding additional Grafana dashboards from [monitoring](monitoring/)
+
+```bash
+kubectl create configmap master-compare -n monitoring --from-file=master-comparison.json
+kubectl label configmap master-compare -n monitoring  grafana_dashboard=1
+```
+
+> Note: Coming soon, auto-load these dashboards when a KIT environment is created
+
 ### Allowing API server to trust kubelet endpoints for the guest cluster
 
 ```bash
