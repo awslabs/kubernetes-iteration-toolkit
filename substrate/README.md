@@ -75,8 +75,8 @@ kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 8080:80&
 Adding additional Grafana dashboards from [monitoring](monitoring/)
 
 ```bash
-kubectl create configmap master-compare -n monitoring --from-file=master-comparison.json
-kubectl label configmap master-compare -n monitoring  grafana_dashboard=1
+kubectl create configmap master-dashboard -n monitoring --from-file=master-dashboard.json
+kubectl label configmap master-dashboard -n monitoring  grafana_dashboard=1
 ```
 
 > Note: Coming soon, auto-load these dashboards when a KIT environment is created
