@@ -3,6 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: load
+  namespace: tekton-pipelines
 spec:
   description: "clusterloader2 task to run various types of cl2 tests on a given cluster."
   params:
@@ -11,12 +12,16 @@ spec:
     default: https://github.com/kubernetes/perf-tests.git
   - name: nodes-per-namespace
     description: "nodes per namespace to get created for load test "
+    default: "100"
   - name: cl2-load-test-throughput
     description: " throughput used for mutate operations"
+    default: "15"
   - name: pods-per-node
     description: "pod density"
+    default: "10"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
+    default: "1000"
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
   workspaces:
@@ -29,12 +34,13 @@ spec:
     workingDir: $(workspaces.source.path)
     args: ["clone", "$(params.giturl)"]
   - name: prepare-loadtest
-    image: amazon/aws-cli
+    image: alpine/k8s:1.22.6
     workingDir: $(workspaces.source.path)
     script: |
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
       CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
+      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 20
       PODS_PER_NODE: $(params.pods-per-node)
       CL2_USE_HOST_NETWORK_PODS: false
       # we are not testing statefulsets at this point
@@ -42,40 +48,20 @@ spec:
       MEDIUM_STATEFUL_SETS_PER_NAMESPACE: 0
       # we are not testing PVS at this point
       CL2_ENABLE_PVS: false
-      PROMETHEUS_SCRAPE_APISERVER_ONLY: true
-      PROMETHEUS_SCRAPE_KUBE_PROXY: false
+      PROMETHEUS_SCRAPE_KUBE_PROXY: true
       ENABLE_SYSTEM_POD_METRICS: false
       NODE_MODE: master 
       EOL
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
-  - name: validate-cluster
-    image: amazon/aws-cli
-    workingDir: $(workspaces.config.path)
-    script: |
-      mkdir -p /root/.kube/
-      cp $(workspaces.config.path)/kubeconfig /root/.kube/config
-      # TODO: Move to a separate task and chain it to this task through pipeline if we need more checks than just these before kicking off test.
-      #kubectl commands are purely for knowing state of cluster before kicking off the test.
-      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-      install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-      kubectl version
-      kubectl config current-context
-      kubectl get nodes 
-      kubectl get ns
-      # end
   - name: run-loadtest
-    image: 197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:76e3fd7
+    image: public.ecr.aws/kit/clusterloader2:v0.0.1
+    onError: continue
     script: |
-      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$(workspaces.config.path)/kubeconfig --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr
-      #To run the next step regardless of success/failure of the test
-      TEST_EXIT_CODE=$?
-      if [ $TEST_EXIT_CODE != 0 ]; then
-        exit 0
-      fi
+      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=$(workspaces.config.path)/kubeconfig --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=6
     timeout: 30000s
   - name: upload-results
-    image: amazon/aws-cli
+    image: alpine/k8s:1.22.6
     workingDir: $(workspaces.results.path)
     script: |
       aws sts get-caller-identity

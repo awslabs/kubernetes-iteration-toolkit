@@ -1,0 +1,55 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-cluster-create
+  namespace: tekton-pipelines  
+spec:
+  description: |
+    Create an EKS cluster.
+    This Task can be used to create an EKS cluster for a given service role in an AWS account and write a kubeconfig to a desired location that
+    can be used by other tasks (in a context with kubectl) to make requests to the cluster.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin.
+  - name: kubernetes-version
+    default: "1.21"
+    description: The EKS version to install.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+    description: "aws eks enpoint to create clusters against"
+  - name: servicerole
+    description: servicerole arn to be used for eks cluster to perform operations in customer account to setup cluster
+  workspaces:
+  - name: config
+    description: |
+      A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
+  steps:
+  - name: write-kubeconfig
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      CREATED_CLUSTER=$(aws eks $ENDPOINT_FLAG list-clusters --region $(params.region) --query 'clusters[?@==`'$(params.cluster-name)'`]' --output text )
+      echo "CREATED_CLUSTER=$CREATED_CLUSTER"
+      TAG=$(kubectl get provisioner -oyaml | grep karpenter.sh/discovery | awk 'NR==1{ print $2}')
+      subnets=$(aws ec2 describe-subnets --region $(params.region) --filters Name=tag:kit.aws/substrate,Values=$TAG  --query 'Subnets[].SubnetId' | jq -r ' [.[]] | join(",")')
+      echo "subnets=$subnets"
+      sg=$(aws ec2 describe-security-groups --region $(params.region) --filters Name=tag:kit.aws/substrate,Values=$TAG --query 'SecurityGroups[].GroupId' | jq -r ' .[0] ')
+      echo "securitygroup=$sg"
+      
+      if [ "$CREATED_CLUSTER" == "" ]; then
+        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $(params.servicerole) --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
+      fi
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      cp  /root/.kube/config $(workspaces.config.path)/kubeconfig
+      # enable PD on the cluster 
+      kubectl set env ds aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true

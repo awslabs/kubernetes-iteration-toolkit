@@ -1,0 +1,31 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-fargate-profile-teardown
+  namespace: tekton-pipelines
+spec:
+  description: |
+    Teardown an EKS fargate profile for a cluster.
+    This Task can be used to teardown an EKS fargate profile in an AWS account.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster which will be teared down.
+  - name: region
+    default: us-west-2
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+  - name: profile-name
+    description: name of the fargate profile that needs to be deleted
+  steps:
+  - name: delete-profile
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks delete-fargate-profile --cluster-name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG --fargate-profile-name $(params.profile-name)
