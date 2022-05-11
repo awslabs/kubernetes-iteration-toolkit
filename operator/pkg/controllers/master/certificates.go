@@ -79,7 +79,9 @@ func kubeAPIServerCertConfig(hostname string, nn types.NamespacedName) *secrets.
 			CommonName: "kube-apiserver",
 			AltNames: certutil.AltNames{
 				DNSNames: []string{hostname, "localhost", "kubernetes", "kubernetes.default",
-					"kubernetes.default.svc", "kubernetes.default.svc.cluster.local"},
+					"kubernetes.default.svc", "kubernetes.default.svc.cluster.local",
+					fmt.Sprintf("%s-cp.%s.svc.cluster.local", nn.Name, nn.Namespace),
+				},
 				IPs: []net.IP{net.IPv4(127, 0, 0, 1), apiServerVirtualIP()},
 			},
 		},
