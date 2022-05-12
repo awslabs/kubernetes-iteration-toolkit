@@ -107,7 +107,7 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 				if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "RequestLimitExceeded" {
 					logging.FromContext(ctx).Debugf("RequestLimitExceeded while reconciling %s, err %w", reflect.ValueOf(resource).Elem().Type(), err)
 				} else {
-					logging.FromContext(ctx).Errorf("reconciling %s, err %w", reflect.ValueOf(resource).Elem().Type(), err)
+					logging.FromContext(ctx).Errorf("reconciling %s, err %v", reflect.ValueOf(resource).Elem().Type(), err)
 					errs[i] = fmt.Errorf("reconciling %s, %w", reflect.ValueOf(resource).Elem().Type(), err)
 					cancel()
 					return
