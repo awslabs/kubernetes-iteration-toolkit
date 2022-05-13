@@ -3,8 +3,8 @@
 ## Create hollow pods to pre-provision mixed instances for etcd pods
 ```bash
 ZONES=("a" "b" "c")
-SIZES=("m5.large" "t3.large" "c5.2xlarge")
-CONTROL_PLANE=foo 
+SIZES=("t3.medium" "t3.medium" "t2.medium")
+CONTROL_PLANE=foo
 for i in {1..3}; do
 cat <<EOF | kubectl apply -f -
   apiVersion: v1
@@ -34,6 +34,59 @@ apiVersion: kit.k8s.sh/v1alpha1
 kind: ControlPlane
 metadata:
   name: ${CONTROL_PLANE} # Desired Cluster name
-  namespace: guest
+spec:
+  kubernetesVersion: "1.21"
+  master:
+    apiServer:
+      replicas: 2
+      spec:
+        containers:
+        - name: apiserver
+          args:
+            - --max-requests-inflight=400
+            - --max-mutating-requests-inflight=200
+    controllerManager:
+      spec:
+        containers:
+        - name: controller-manager
+          args:
+            - --controllers=*
+            - --kube-api-qps=300
+            - --kube-api-burst=400
+    scheduler:
+      spec:
+        containers:
+        - name: scheduler
+          args:
+            - --kube-api-qps=300
+            - --kube-api-burst=400
+  etcd:
+    spec:
+      containers:
+      - name: etcd
+        resources:
+          requests:
+            memory: 2Gi
+EOF
+```
+
+# Create Dataplane nodes for the guest cluster provisioned
+```bash
+CONTROL_PLANE=foo
+cat <<EOF | kubectl apply -f -
+apiVersion: kit.k8s.sh/v1alpha1
+kind: DataPlane
+metadata:
+  name: ${CONTROL_PLANE}-nodes
+spec:
+  clusterName: ${CONTROL_PLANE} # Desired Cluster Name
+  nodeCount: 10
+  subnetSelector:
+    kit.aws/substrate: ${MANAGEMENT_CLUSTER_NAME}
+  instanceTypes:
+    - c4.xlarge
+    - c5.xlarge
+    - c4.4xlarge
+    - c5.4xlarge
 EOF
 ```

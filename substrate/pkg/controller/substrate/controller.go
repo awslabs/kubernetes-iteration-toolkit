@@ -17,11 +17,13 @@ package substrate
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -39,6 +41,7 @@ import (
 	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
+	"knative.dev/pkg/logging"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -101,9 +104,14 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 			}
 			result, err := f(ctx, mutable)
 			if err != nil {
-				errs[i] = fmt.Errorf("reconciling %s, %w", reflect.ValueOf(resource).Elem().Type(), err)
-				cancel()
-				return
+				if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "RequestLimitExceeded" {
+					logging.FromContext(ctx).Debugf("RequestLimitExceeded while reconciling %s, err %w", reflect.ValueOf(resource).Elem().Type(), err)
+				} else {
+					logging.FromContext(ctx).Errorf("reconciling %s, err %v", reflect.ValueOf(resource).Elem().Type(), err)
+					errs[i] = fmt.Errorf("reconciling %s, %w", reflect.ValueOf(resource).Elem().Type(), err)
+					cancel()
+					return
+				}
 			}
 			c.Lock()
 			runtime.Must(mergo.Merge(substrate, mutable))
@@ -111,7 +119,7 @@ func (c *Controller) Reconcile(ctx context.Context, substrate *v1alpha1.Substrat
 			if !result.Requeue && result.RequeueAfter == 0 {
 				return
 			}
-			time.Sleep(result.RequeueAfter + time.Second*1)
+			time.Sleep(result.RequeueAfter + time.Duration(rand.Intn(3000))*time.Millisecond)
 		}
 	})
 	return multierr.Combine(errs...)

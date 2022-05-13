@@ -37,7 +37,7 @@ rules:
   resources: ["controlplanes", "dataplanes"]
   verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 - apiGroups: [""]
-  resources: ["serviceaccounts", "secrets", "namespaces", "nodes"]
+  resources: ["serviceaccounts", "secrets", "namespaces", "nodes", "persistentvolumeclaims"]
   verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
