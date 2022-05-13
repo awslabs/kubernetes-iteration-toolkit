@@ -1,0 +1,29 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-cluster-teardown
+  namespace: tekton-pipelines
+spec:
+  description: |
+    Teardown an EKS cluster.
+    This Task can be used to teardown an EKS cluster in an AWS account.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster which will be teared down.
+  - name: region
+    default: us-west-2
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+  steps:
+  - name: delete-cluster
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
