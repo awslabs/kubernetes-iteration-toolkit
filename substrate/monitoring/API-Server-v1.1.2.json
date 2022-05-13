@@ -15,7 +15,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "8.4.6"
+      "version": "8.4.2"
     },
     {
       "type": "panel",
@@ -78,7 +78,7 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1651843577041,
+  "iteration": 1652392901479,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -127,12 +127,12 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.6",
+      "pluginVersion": "8.4.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "sum(rate(apiserver_request_terminations_total{job=\"$job\"}[$__rate_interval]))",
@@ -193,12 +193,12 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.6",
+      "pluginVersion": "8.4.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "process_resident_memory_bytes{job=\"apiserver\"}",
@@ -215,7 +215,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "$datasource"
       },
       "description": "",
       "fieldConfig": {
@@ -266,12 +266,12 @@
         "text": {},
         "textMode": "value_and_name"
       },
-      "pluginVersion": "8.4.6",
+      "pluginVersion": "8.4.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "apiserver_envelope_encryption_dek_cache_fill_percent{job=\"$job\"}",
@@ -332,12 +332,12 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.6",
+      "pluginVersion": "8.4.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "topk(5, max by (kind)(apiserver_registered_watchers{job=\"$job\"}))",
@@ -354,7 +354,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "$datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -401,12 +401,12 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.6",
+      "pluginVersion": "8.4.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "sum without(instance)(aggregator_unavailable_apiservice{job=\"$job\"}) > 0.9",
@@ -433,7 +433,7 @@
       "dataFormat": "tsbuckets",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "$datasource"
       },
       "gridPos": {
         "h": 18,
@@ -454,7 +454,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "max(increase(apiserver_request_duration_seconds_bucket{job=\"$job\",subresource!=\"status\",subresource!=\"token\",subresource!=\"scale\",subresource!=\"/healthz\",subresource!=\"binding\",subresource!=\"proxy\",verb!=\"WATCH\"}[$__rate_interval])) by (le)",
@@ -497,7 +497,7 @@
       "dataFormat": "tsbuckets",
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "$datasource"
       },
       "description": "All Calls Heatmap to etcd server. Show etcd high level  if etcd is source of slowness",
       "gridPos": {
@@ -519,7 +519,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "max by (le)(increase(etcd_request_duration_seconds_bucket{job=\"$job\"}[$__rate_interval]))",
@@ -602,7 +602,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "topk(1, histogram_quantile(0.90, max without(instance,scope,version, group,dry_run) (rate(apiserver_request_duration_seconds_bucket{job=\"$job\",subresource!=\"status\",subresource!=\"token\",subresource!=\"scale\",subresource!=\"/healthz\",subresource!=\"binding\",subresource!=\"proxy\",verb!=\"WATCH\"}[$__rate_interval]))))",
@@ -805,7 +805,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "sum by (instance)(rate(apiserver_current_inflight_requests{job=\"$job\"}[$__rate_interval]))",
@@ -979,7 +979,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": true,
           "expr": "sum by (instance)(rate(rest_client_requests_total{job=\"$job\",code=~\"2..\"}[$__rate_interval]))",
@@ -993,7 +993,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": true,
           "expr": "sum by (instance)(rate(rest_client_requests_total{job=\"$job\",code=~\"4..\"}[$__rate_interval]))",
@@ -1007,7 +1007,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": true,
           "expr": "sum by (instance)(rate(rest_client_requests_total{job=\"$job\",code=~\"5..\"}[$__rate_interval]))",
@@ -1027,7 +1027,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "$datasource"
       },
       "description": "1.22 or greater",
       "fieldConfig": {
@@ -1108,7 +1108,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "100 * (max by (priority_level) (apiserver_flowcontrol_request_concurrency_in_use{}) / max by (priority_level) (apiserver_flowcontrol_request_concurrency_limit{}))",
@@ -1126,7 +1126,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "$datasource"
       },
       "description": "",
       "fieldConfig": {
@@ -1184,7 +1184,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "topk(3, histogram_quantile(0.90, sum without(instance,type,operation) (increase(apiserver_admission_webhook_admission_duration_seconds_bucket{job=\"$job\"}[$__rate_interval]))))",
@@ -1305,7 +1305,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": true,
           "expr": "rate(process_cpu_seconds_total{job=\"$job\"}[$__rate_interval])",
@@ -1365,12 +1365,12 @@
         "text": {},
         "textMode": "value_and_name"
       },
-      "pluginVersion": "8.4.6",
+      "pluginVersion": "8.4.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "topk(5, apiserver_requested_deprecated_apis{job=\"$job\"})",
@@ -1476,7 +1476,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "histogram_quantile(0.90, max without (instance) (increase(apiserver_flowcontrol_request_wait_duration_seconds_bucket{}[$__rate_interval])))",
@@ -1492,7 +1492,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "$datasource"
       },
       "description": "long requests spent queued",
       "fieldConfig": {
@@ -1572,7 +1572,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "histogram_quantile(0.90, max without (instance) (increase(apiserver_flowcontrol_request_execution_seconds_bucket{job=\"$job\"}[$__rate_interval])))",
@@ -1664,7 +1664,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": true,
           "expr": "apiserver_flowcontrol_current_inqueue_requests{job=\"$job\"}",
@@ -1756,7 +1756,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "max without (endpoint,namespace,service) (apiserver_flowcontrol_current_executing_requests{job=\"$job\"})",
@@ -1817,12 +1817,12 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "8.4.6",
+      "pluginVersion": "8.4.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": false,
           "expr": "go_threads{job=\"$job\"}",
@@ -1865,7 +1865,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "$datasource"
           },
           "exemplar": true,
           "expr": "max without(instance,name)(increase(workqueue_queue_duration_seconds_bucket{job=\"$job\"}[$__rate_interval]))",
@@ -1907,7 +1907,7 @@
         "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "$datasource"
         },
         "definition": "label_values(apiserver_current_inflight_requests, job)",
         "hide": 0,
@@ -1958,8 +1958,8 @@
     ]
   },
   "timezone": "browser",
-  "title": "API Server flow control v2.01",
+  "title": "API Server flow control v1.1.2",
   "uid": "U3y_Zcb7k",
-  "version": 12,
+  "version": 1,
   "weekStart": ""
 }
