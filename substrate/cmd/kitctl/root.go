@@ -18,7 +18,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -36,6 +38,7 @@ func main() {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	rand.Seed(time.Now().UnixNano())
 	logger := zap.New(zapcore.NewCore(zapcore.NewConsoleEncoder(zapcore.EncoderConfig{MessageKey: "message"}),
 		customLogWriteTo(ctx, os.Stdout), zap.LevelEnablerFunc(func(level zapcore.Level) bool {
 			return level >= logLevel

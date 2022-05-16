@@ -48,7 +48,6 @@ import (
 )
 
 const (
-	ClusterCertsBasePath   = "/tmp/"
 	kubeconfigPath         = "/etc/kubernetes"
 	kubeconfigFile         = "etc/kubernetes/admin.conf"
 	certPKIPath            = "/etc/kubernetes/pki"
@@ -66,14 +65,20 @@ const (
 )
 
 type Config struct {
-	S3         *s3.S3
-	STS        *sts.STS
-	S3Uploader *s3manager.Uploader
+	S3                *s3.S3
+	STS               *sts.STS
+	S3Uploader        *s3manager.Uploader
+	clusterConfigPath string
 }
 
 func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	if substrate.Status.Cluster.APIServerAddress == nil {
 		return reconcile.Result{Requeue: true}, nil
+	}
+	if c.clusterConfigPath == "" {
+		if err := c.ensureKitEnvDir(); err != nil {
+			return reconcile.Result{}, fmt.Errorf("ensuring kit env dir, %w", err)
+		}
 	}
 	// ensure S3 bucket
 	if err := c.ensureBucket(ctx, substrate); err != nil {
@@ -102,11 +107,11 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 	}
 	// upload to s3 bucket
 	if err := c.S3Uploader.UploadWithIterator(ctx, NewDirectoryIterator(
-		aws.StringValue(discovery.Name(substrate)), path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))); err != nil {
+		aws.StringValue(discovery.Name(substrate)), path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate))))); err != nil {
 		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
 	logging.FromContext(ctx).Debugf("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
-	substrate.Status.Cluster.KubeConfig = ptr.String(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigFile))
+	substrate.Status.Cluster.KubeConfig = ptr.String(path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), kubeconfigFile))
 	return reconcile.Result{}, nil
 }
 
@@ -124,7 +129,7 @@ func (c *Config) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 	} else {
 		logging.FromContext(ctx).Infof("Deleted S3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
-	return reconcile.Result{}, os.RemoveAll(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate))))
+	return reconcile.Result{}, os.RemoveAll(path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate))))
 }
 
 func ErrNoSuchBucket(err error) bool {
@@ -137,7 +142,7 @@ func ErrNoSuchBucket(err error) bool {
 }
 
 func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	cfg.CertificatesDir = path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), certPKIPath)
+	cfg.CertificatesDir = path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), certPKIPath)
 	certTree, err := certs.GetDefaultCertList().AsMap().CertTree()
 	if err != nil {
 		return err
@@ -151,7 +156,7 @@ func (c *Config) generateCerts(cfg *kubeadm.InitConfiguration, substrate *v1alph
 
 func (c *Config) kubeConfigs(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
 	// Generate Kube config files for master components
-	kubeConfigDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeconfigPath)
+	kubeConfigDir := path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), kubeconfigPath)
 	for _, kubeConfigFileName := range []string{
 		kubeadmconstants.AdminKubeConfigFileName,
 		kubeadmconstants.KubeletKubeConfigFileName,
@@ -165,7 +170,7 @@ func (c *Config) kubeConfigs(cfg *kubeadm.InitConfiguration, substrate *v1alpha1
 }
 
 func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	manifestDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath)
+	manifestDir := path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath)
 	// etcd phase adds cfg.CertificatesDir to static pod yaml for pods to read the certs from
 	cfg.CertificatesDir = certPKIPath
 	if err := etcd.CreateLocalEtcdStaticPodManifestFile(
@@ -176,7 +181,7 @@ func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, subs
 		kubeadmconstants.KubeAPIServer,
 		kubeadmconstants.KubeControllerManager,
 		kubeadmconstants.KubeScheduler} {
-		err := controlplane.CreateStaticPodFiles(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath), "",
+		err := controlplane.CreateStaticPodFiles(path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), clusterManifestPath), "",
 			&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false, componentName)
 		if err != nil {
 			return fmt.Errorf("creating static pod file for %v, %w", componentName, err)
@@ -200,7 +205,7 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 }
 
 func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
-	localDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
+	localDir := path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
 	if _, err := os.Stat(localDir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
@@ -295,7 +300,7 @@ func (c *Config) ensureAuthenticatorConfig(ctx context.Context, substrate *v1alp
 		return fmt.Errorf("creating authenticator config, %w", err)
 	}
 	logging.FromContext(ctx).Debugf("Created config map for authenticator")
-	configDir := path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)), authenticatorConfigDir)
+	configDir := path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), authenticatorConfigDir)
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("failed to create directory, %w", err)
 	}
@@ -318,9 +323,21 @@ func (c *Config) staticPodSpecForAuthenticator(ctx context.Context, substrate *v
 	if err != nil {
 		return fmt.Errorf("failed to marshal config map manifest, %w", err)
 	}
-	if err := ioutil.WriteFile(path.Join(ClusterCertsBasePath, aws.StringValue(discovery.Name(substrate)),
+	if err := ioutil.WriteFile(path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)),
 		clusterManifestPath, "aws-iam-authenticator.yaml"), serialized, 0644); err != nil {
 		return fmt.Errorf("writing authenticator pod yaml, %w", err)
+	}
+	return nil
+}
+
+func (c *Config) ensureKitEnvDir() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("finding HOME dir %v", err)
+	}
+	c.clusterConfigPath = filepath.Join(home, ".kit/env")
+	if err := os.MkdirAll(c.clusterConfigPath, 0755); err != nil {
+		return fmt.Errorf("creating .kit/env dir %v", err)
 	}
 	return nil
 }
@@ -329,6 +346,7 @@ func (c *Config) staticPodSpecForAuthenticator(ctx context.Context, substrate *v
 type DirectoryIterator struct {
 	filePaths []string
 	bucket    string
+	localDir  string
 	next      struct {
 		path string
 		f    *os.File
@@ -351,6 +369,7 @@ func NewDirectoryIterator(bucket, dir string) s3manager.BatchUploadIterator {
 	return &DirectoryIterator{
 		filePaths: paths,
 		bucket:    bucket,
+		localDir:  dir,
 	}
 }
 
@@ -373,6 +392,8 @@ func (d *DirectoryIterator) Err() error {
 
 // UploadObject uploads a file
 func (d *DirectoryIterator) UploadObject() s3manager.BatchUploadObject {
+	// trim the local path before uploading to S3
+	d.next.path = strings.TrimPrefix(d.next.path, d.localDir)
 	return s3manager.BatchUploadObject{
 		Object: &s3manager.UploadInput{Bucket: &d.bucket, Key: &d.next.path, Body: d.next.f},
 		After:  d.next.f.Close,
