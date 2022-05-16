@@ -47,7 +47,7 @@ spec:
   kubeletConfiguration:
     clusterDNS:
       - "10.96.0.10"
-  ttlSecondsAfterEmpty: 30
+  ttlSecondsAfterEmpty: 7200
   provider:
     instanceProfile: %[1]s-tenant-controlplane-node-role
     tags:
@@ -66,7 +66,7 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		Namespace:       "karpenter",
 		Name:            "karpenter",
 		Repository:      "https://charts.karpenter.sh",
-		Version:         "0.7.3",
+		Version:         "0.9.0",
 		CreateNamespace: true,
 		Values: map[string]interface{}{
 			"clusterName":     substrate.Name,
@@ -90,13 +90,11 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("initializing client, %w", err)
 	}
+	subnets := append(substrate.Status.Infrastructure.PublicSubnetIDs, substrate.Status.Infrastructure.PrivateSubnetIDs...)
 	// Tag EC2 Resources
 	if _, err := k.EC2.CreateTagsWithContext(ctx, &ec2.CreateTagsInput{
-		Resources: aws.StringSlice(append(
-			substrate.Status.Infrastructure.PublicSubnetIDs,
-			aws.StringValue(substrate.Status.Infrastructure.SecurityGroupID),
-		)),
-		Tags: []*ec2.Tag{{Key: aws.String("karpenter.sh/discovery"), Value: aws.String(substrate.Name)}},
+		Resources: aws.StringSlice(append(subnets, aws.StringValue(substrate.Status.Infrastructure.SecurityGroupID))),
+		Tags:      []*ec2.Tag{{Key: aws.String("karpenter.sh/discovery"), Value: aws.String(substrate.Name)}},
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("tagging resources, %w", err)
 	}

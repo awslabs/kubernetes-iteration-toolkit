@@ -33,7 +33,7 @@ func (a *AWSVPCCNI) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		Namespace:  "kube-system",
 		Name:       "aws-vpc-cni",
 		Repository: "https://aws.github.io/eks-charts",
-		Version:    "1.1.13",
+		Version:    "1.1.16",
 	}); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
 	}
