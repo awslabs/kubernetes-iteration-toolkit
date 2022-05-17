@@ -48,6 +48,7 @@ import (
 )
 
 const (
+	clusterConfigDir       = ".kit/env"
 	kubeconfigPath         = "/etc/kubernetes"
 	kubeconfigFile         = "etc/kubernetes/admin.conf"
 	certPKIPath            = "/etc/kubernetes/pki"
@@ -128,6 +129,13 @@ func (c *Config) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		}
 	} else {
 		logging.FromContext(ctx).Infof("Deleted S3 bucket %s", aws.StringValue(discovery.Name(substrate)))
+	}
+	if c.clusterConfigPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("finding HOME dir %v", err)
+		}
+		c.clusterConfigPath = filepath.Join(home, clusterConfigDir)
 	}
 	return reconcile.Result{}, os.RemoveAll(path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate))))
 }
@@ -335,9 +343,9 @@ func (c *Config) ensureKitEnvDir() error {
 	if err != nil {
 		return fmt.Errorf("finding HOME dir %v", err)
 	}
-	c.clusterConfigPath = filepath.Join(home, ".kit/env")
+	c.clusterConfigPath = filepath.Join(home, clusterConfigDir)
 	if err := os.MkdirAll(c.clusterConfigPath, 0755); err != nil {
-		return fmt.Errorf("creating .kit/env dir %v", err)
+		return fmt.Errorf("creating cluster config dir %v", err)
 	}
 	return nil
 }
