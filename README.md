@@ -26,6 +26,6 @@ KIT Clusters are implemented using Kubernetes primitives like deployments, state
 
 ## How do I get started with KIT?
 
-KIT-v0.1 (alpha) is available now. You can get started with kitctl by installing `kitctl` [here](https://github.com/awslabs/kubernetes-iteration-toolkit/tree/main/substrate#installing-kitctl) or by reaching out in our [Slack channel](https://amzn-aws.slack.com/archives/C02HZDEQ678). We’re focused on delivering features that unblock scalability testing, contributions are welcome.
+KIT-v0.1 (alpha) is available now. You can get started with kitctl by following these instructions [How To get started with KIT](/docs/how-to-use-kit.md)
 
 > Note: KIT is an alpha project things are changing and evolving rapidly. If you run into any issues, feel free to open an issue.
