@@ -2,10 +2,10 @@
 require 'formula'
 class Kitctl < Formula
   homepage 'https://github.com/awslabs/kubernetes-iteration-toolkit/substrate'
-  version '0.0.14'
+  version '0.0.16'
   if OS.mac? && Hardware::CPU.is_64_bit?
-    url 'https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/v0.0.14/kitctl_v0.0.14_darwin_amd64.zip'
-    sha256 '44a22c992cce1f449555e759d097caaa6878e8f0b662ada681874c22cb082944'
+    url 'https://github.com/awslabs/kubernetes-iteration-toolkit/releases/download/v0.0.16/kitctl_v0.0.16_darwin_amd64.zip'
+    sha256 '490cfae9cd79933b637532e105c46db9f39b53c7a3542b1e4e58872743fec5b3'
   else
     echo "Hardware not supported"
     exit 1
