@@ -280,7 +280,9 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 						"autoscaling:DeleteAutoScalingGroup",
 						"autoscaling:UpdateAutoScalingGroup",
 						"autoscaling:SetDesiredCapacity",
-						"autoscaling:DescribeAutoScalingGroups"
+						"autoscaling:DescribeAutoScalingGroups",
+						"logs:*",
+						"cloudwatch:*"
 					],
 					"Resource": ["*"]
 				}
@@ -306,8 +308,10 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 						"iam:ListAttachedRolePolicies",
 						"kms:Encrypt",
 						"kms:Decrypt",
+						"logs:*",
 						"eks:*",
-						"s3:*"
+						"s3:*",
+						"cloudwatch:*"
 					],
 					"Resource": ["*"]
 				}
