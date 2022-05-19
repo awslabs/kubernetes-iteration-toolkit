@@ -94,4 +94,4 @@ jobs:
           Update kitctl to ${{ env.RELEASE_VERSION }}
           Created by Github actions during Release CLI action
       env:
-        COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
