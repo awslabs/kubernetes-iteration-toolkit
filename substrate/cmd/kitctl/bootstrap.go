@@ -51,7 +51,7 @@ func bootstrap(cmd *cobra.Command, args []string) {
 	start := time.Now()
 	name := parseName(ctx, args)
 	logging.FromContext(ctx).Infof("Bootstrapping %q", name)
-	vpcCidrs := []string{"10.0.0.0/16", "10.1.0.0/16", "10.2.0.0/16", "10.3.0.0/16", "10.4.0.0/16", "10.5.0.0/16"}
+	vpcCidrs := []string{"10.0.0.0/16", "10.1.0.0/16", "10.2.0.0/16", "10.3.0.0/16", "10.4.0.0/16"}
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 
@@ -64,7 +64,6 @@ func bootstrap(cmd *cobra.Command, args []string) {
 				{Zone: "us-west-2c", CIDR: vpcCidrs[2]},
 				{Zone: "us-west-2a", CIDR: vpcCidrs[3], Public: true},
 				{Zone: "us-west-2b", CIDR: vpcCidrs[4], Public: true},
-				{Zone: "us-west-2c", CIDR: vpcCidrs[5], Public: true},
 			},
 		},
 	}); err != nil {
