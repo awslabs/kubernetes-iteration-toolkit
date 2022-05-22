@@ -38,7 +38,7 @@ Note: This environment we just created comes pre-installed with Tekton for runni
 * To access the Grafana dashboard `kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 8080:80`
 ## Running tests
 
-At this point a user can run tests against either an EKS cluster or vanilla Kubernetes cluster provisioned by KIT operator called [guest clusters](https://quip-amazon.com/xCtbA6C6X7dy/How-to-use-KIT-for-Kubernetes-testing#temp:C:VfOa1f3b6a5d7de51afb05d574ef) running in the environment. 
+At this point a user can run tests against either an EKS cluster or vanilla Kubernetes cluster provisioned by KIT operator called [guest clusters](#key-terms) running in the environment. 
 Difference between testing against the two cluster types-
 
 * EKS cluster doesn’t allow changing any flags or control plane images, however, if you want to make any flags changes or want to run custom docker images for API server or any other Kubernetes control plane component use guest cluster for testing
