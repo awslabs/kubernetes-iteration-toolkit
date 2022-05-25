@@ -60,7 +60,7 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1653064238596,
+  "iteration": 1653494369334,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -530,7 +530,7 @@
           "refId": "A"
         }
       ],
-      "title": "Etcd Request Leg",
+      "title": "Etcd Request Latency",
       "tooltip": {
         "show": true,
         "showHistogram": true
@@ -715,8 +715,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-blue",
-                "value": null
+                "color": "light-blue"
               },
               {
                 "color": "light-yellow",
@@ -819,8 +818,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-blue",
-                "value": null
+                "color": "light-blue"
               },
               {
                 "color": "light-yellow",
@@ -1060,8 +1058,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1185,8 +1182,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1286,8 +1282,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1358,8 +1353,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "semi-dark-blue",
-                "value": null
+                "color": "semi-dark-blue"
               },
               {
                 "color": "red",
@@ -1426,8 +1420,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1512,8 +1505,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1612,8 +1604,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1714,8 +1705,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1814,8 +1804,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1912,8 +1901,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2014,8 +2002,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2113,8 +2100,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -2229,7 +2215,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "API Server Troubleshooter v1.5.5",
+  "title": "API Server Troubleshooter v1.5.6",
   "uid": "U3y_Zcb7k",
   "version": 2,
   "weekStart": ""
