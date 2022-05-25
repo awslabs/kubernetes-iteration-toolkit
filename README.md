@@ -14,7 +14,7 @@ KIT can help you run scale tests against a KIT cluster or an EKS cluster, collec
 
 ## What are KIT Environments?
 
-KIT Environments provide an opinionated testing environment with support for test workflow execution, analysis, and observability. Developers can use `kitctl` cli to create a personal or shared testing environment for oneshot or periodic tests. KIT Environments consists of a management Kubrenetes cluster that come preinstalled with a suite of Kubernetes operators that enable the execution, analysis, and persistence.
+KIT Environments provide an opinionated testing environment with support for test workflow execution, analysis, and observability. Developers can use `kitctl` cli to create a personal or shared testing environment for oneshot or periodic tests. KIT Environments consists of a management Kubernetes cluster that come preinstalled with a suite of Kubernetes operators that enable the execution of the tests, help analyse the test results easily, and persists logs and control plane metrics for the test runs.
 
 Additionally, KIT Environments provide a library of predefined [Tasks](https://github.com/awslabs/kubernetes-iteration-toolkit/tree/c6925e3db92ae909cafb2751b153dd8221d6fd55/tests/tasks) to configure clusters, generate load, and analyze results. For example, you can combine the “MegaXL KIT cluster” task and “upstream pod density load generator” task to reproduce the scalability team’s MegaXL test results. You can then swap in the “EKS Cluster” task and verify the results as improvements are merged into EKS. You can also parameterize existing tasks or define your own to meet your use cases.
 

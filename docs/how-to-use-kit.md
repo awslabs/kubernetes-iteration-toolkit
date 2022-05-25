@@ -58,7 +58,7 @@ Add tasks and pipelines from the KIT repo, (we have a [task](https://github.com/
 
 * Access the Tekton dashboard on [http://localhost:9097](http://localhost:9097/), make sure you have run port-forward command mentioned above.
 * Under the tasks tab look for the pre-loaded tasks that can be run.
-* Under pipelines tab are some sample pipelines flow which help create logic regarding run for running multiple tasks for an end-to-end test flow. Example pipeline combines the following tasks-
+* Under pipelines tab are some sample pipelines spec that help getting started for running multiple tasks for an end-to-end test flow. Example pipeline combines the following tasks-
     * Create an EKS cluster + create a managed node group with `n` nodes + deploy `n` pods in the cluster + measure  pod startup latency as part of the test
 * These pipelines can be triggered from dashboard using pipeline runs or by creating a CRD for pipeline run.
 * Based on these samples, a users can create their own pipelines for specific tasks based on their test use case and run these pipelines using pipeline runs.
