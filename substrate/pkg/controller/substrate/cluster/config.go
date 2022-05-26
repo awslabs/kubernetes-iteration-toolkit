@@ -199,7 +199,9 @@ func (c *Config) generateStaticPodManifests(cfg *kubeadm.InitConfiguration, subs
 }
 
 func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate) error {
-	if _, err := c.S3.CreateBucket(&s3.CreateBucketInput{Bucket: discovery.Name(substrate)}); err != nil {
+	if _, err := c.S3.CreateBucket(&s3.CreateBucketInput{Bucket: discovery.Name(substrate),
+		CreateBucketConfiguration: &s3.CreateBucketConfiguration{LocationConstraint: c.S3.Config.Region},
+	}); err != nil {
 		if err.(awserr.Error).Code() != s3.ErrCodeBucketAlreadyOwnedByYou {
 			return fmt.Errorf("creating S3 bucket, %w", err)
 		}
