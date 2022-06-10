@@ -75,6 +75,7 @@ func NewController(ctx context.Context) *Controller {
 			&addons.RBAC{},
 			&addons.Tekton{},
 			&addons.PrometheusStack{},
+			&addons.FluentBit{Region: session.Config.Region},
 		},
 	}
 }
