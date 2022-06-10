@@ -67,6 +67,7 @@ Add tasks and pipelines from the KIT repo, (we have a [task](https://github.com/
 How to collect metrics
 
 * Access the Grafana dashboard on [http://localhost:8080](http://localhost:8080/), make sure you have run port-forward command mentioned above.
+* After reaching the login screen at `http://localhost:8080/login`, log in with username: `admin`, password: `prom-operator`.
 * All the core Kubernetes components like API Server, KCM, scheduler, etcd, authenticator are being scraped and their metrics are being plotted in their own Grafana dashboards
 * For node level metrics in Grafana refer to NodeExporter/Nodes dashboard
 
