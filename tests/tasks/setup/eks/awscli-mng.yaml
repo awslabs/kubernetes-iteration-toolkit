@@ -38,7 +38,7 @@ spec:
       if [ $(params.desired-nodes) -lt 5001  ] && [ $(params.desired-nodes) -gt 500 ]
       then
         echo "sleeping for 3hrs to workaround VAS cool off time"
-        sleep 10800
+        sleep 12000
       fi
 
       if [ -n "$(params.endpoint)" ]; then
