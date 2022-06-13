@@ -27,9 +27,9 @@ spec:
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
 
-      for i in `aws eks list-nodegroups --cluster-name $(params.cluster-name) $ENDPOINT_FLAG | jq -r '.nodegroups[]'`;
+      for i in `aws eks list-nodegroups --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region)  | jq -r '.nodegroups[]'`;
       do
-          aws eks delete-nodegroup --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG;
-          aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG;
+          aws eks delete-nodegroup --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
+          aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
       done;
       aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
