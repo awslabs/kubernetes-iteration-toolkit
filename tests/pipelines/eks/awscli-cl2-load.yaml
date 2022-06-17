@@ -68,6 +68,16 @@ spec:
       workspace: config
     - name: results
       workspace: results
+  finally:    
+  - name: teardown
+    params:   
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    taskRef:
+      kind: Task
+      name:  awscli-eks-cluster-teardown
   workspaces:
   - name: config
   - name: source
