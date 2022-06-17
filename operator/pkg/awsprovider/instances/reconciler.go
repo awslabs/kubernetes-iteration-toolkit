@@ -123,10 +123,10 @@ func (c *Controller) updateAutoScalingGroup(ctx context.Context, dataplane *v1al
 func (c *Controller) createAutoScalingGroup(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	subnets, err := c.subnetsFor(ctx, dataplane)
 	if err != nil {
-		return fmt.Errorf("getting private subnet for %s, %w", dataplane.Spec.ClusterName, err)
+		return fmt.Errorf("getting subnet for %s, %w", dataplane.Spec.ClusterName, err)
 	}
 	if len(subnets) == 0 {
-		return fmt.Errorf("failed to find private subnets for dataplane")
+		return fmt.Errorf("failed to find subnets for dataplane %s", dataplane.Name)
 	}
 	_, err = c.autoscaling.CreateAutoScalingGroupWithContext(ctx, &autoscaling.CreateAutoScalingGroupInput{
 		AutoScalingGroupName: ptr.String(AutoScalingGroupNameFor(dataplane)),
@@ -180,24 +180,36 @@ func (c *Controller) subnetsFor(ctx context.Context, dataplane *v1alpha1.DataPla
 	if err != nil {
 		return nil, fmt.Errorf("getting subnet for %s, %w", dataplane.Spec.ClusterName, err)
 	}
-	return c.filterPrivateSubnets(ctx, subnetIDs)
+	// Returns public subnets if no private subnets are found
+	return c.filterSubnets(ctx, subnetIDs)
 }
 
-func (c *Controller) filterPrivateSubnets(ctx context.Context, ids []*string) ([]string, error) {
+func (c *Controller) filterSubnets(ctx context.Context, ids []*string) ([]string, error) {
+	if len(ids) == 0 {
+		return []string{}, fmt.Errorf("found zero subnets while filtering")
+	}
 	output, err := c.ec2api.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 		SubnetIds: ids,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing subnet, %w", err)
 	}
-	result := []string{}
+	public := []string{}
+	private := []string{}
 	for _, subnet := range output.Subnets {
-		if ptr.BoolValue(subnet.MapPublicIpOnLaunch) {
+		if aws.Int64Value(subnet.AvailableIpAddressCount) == 0 {
 			continue
 		}
-		result = append(result, *subnet.SubnetId)
+		if ptr.BoolValue(subnet.MapPublicIpOnLaunch) {
+			public = append(public, *subnet.SubnetId)
+		} else {
+			private = append(private, *subnet.SubnetId)
+		}
 	}
-	return result, nil
+	if len(private) == 0 {
+		return public, nil
+	}
+	return private, nil
 }
 
 func (c *Controller) subnetsForSelector(ctx context.Context, selector map[string]string) ([]string, error) {
