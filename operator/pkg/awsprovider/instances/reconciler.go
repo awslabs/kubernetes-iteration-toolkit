@@ -186,7 +186,7 @@ func (c *Controller) subnetsFor(ctx context.Context, dataplane *v1alpha1.DataPla
 
 func (c *Controller) filterSubnets(ctx context.Context, ids []*string) ([]string, error) {
 	if len(ids) == 0 {
-		return []string{}, fmt.Errorf("found zero subnets while filtering")
+		return nil, fmt.Errorf("found zero subnets while filtering")
 	}
 	output, err := c.ec2api.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 		SubnetIds: ids,
