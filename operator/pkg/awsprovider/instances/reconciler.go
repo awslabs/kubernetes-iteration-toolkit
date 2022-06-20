@@ -87,10 +87,10 @@ func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane
 func (c *Controller) updateAutoScalingGroup(ctx context.Context, dataplane *v1alpha1.DataPlane, asg *autoscaling.Group) error {
 	subnets, err := c.subnetsFor(ctx, dataplane)
 	if err != nil {
-		return fmt.Errorf("getting private subnet for %s, %w", dataplane.Spec.ClusterName, err)
+		return fmt.Errorf("getting subnet for %s, %w", dataplane.Spec.ClusterName, err)
 	}
 	if len(subnets) == 0 {
-		return fmt.Errorf("failed to find private subnets for dataplane")
+		return fmt.Errorf("failed to find subnets for dataplane")
 	}
 	if functional.ValidateAll(
 		func() bool { return asg != nil },
@@ -180,14 +180,14 @@ func (c *Controller) subnetsFor(ctx context.Context, dataplane *v1alpha1.DataPla
 	if err != nil {
 		return nil, fmt.Errorf("getting subnet for %s, %w", dataplane.Spec.ClusterName, err)
 	}
+	if len(subnetIDs) == 0 {
+		return []string{}, nil
+	}
 	// Returns public subnets if no private subnets are found
 	return c.filterSubnets(ctx, subnetIDs)
 }
 
 func (c *Controller) filterSubnets(ctx context.Context, ids []*string) ([]string, error) {
-	if len(ids) == 0 {
-		return nil, fmt.Errorf("found zero subnets while filtering")
-	}
 	output, err := c.ec2api.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 		SubnetIds: ids,
 	})
@@ -197,7 +197,7 @@ func (c *Controller) filterSubnets(ctx context.Context, ids []*string) ([]string
 	public := []string{}
 	private := []string{}
 	for _, subnet := range output.Subnets {
-		if aws.Int64Value(subnet.AvailableIpAddressCount) == 0 {
+		if ptr.Int64Value(subnet.AvailableIpAddressCount) == 0 {
 			continue
 		}
 		if ptr.BoolValue(subnet.MapPublicIpOnLaunch) {
@@ -206,10 +206,10 @@ func (c *Controller) filterSubnets(ctx context.Context, ids []*string) ([]string
 			private = append(private, *subnet.SubnetId)
 		}
 	}
-	if len(private) == 0 {
-		return public, nil
+	if len(private) > 0 {
+		return private, nil
 	}
-	return private, nil
+	return public, nil
 }
 
 func (c *Controller) subnetsForSelector(ctx context.Context, selector map[string]string) ([]string, error) {
