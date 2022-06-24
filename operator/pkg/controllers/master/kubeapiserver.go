@@ -141,6 +141,8 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--tls-private-key-file=/etc/kubernetes/pki/apiserver/apiserver.key",
 					"--authentication-token-webhook-config-file=/var/aws-iam-authenticator/kubeconfig/kubeconfig.yaml",
 					"--encryption-provider-config=/etc/kubernetes/aws-encryption-provider/encryption-configuration.yaml",
+					"--audit-policy-file=/etc/kubernetes/audit-policy/audit-policy.yaml",
+					"--audit-log-path=/var/log/kubernetes/audit/audit.log",
 					"--profiling=false",
 					"--shutdown-delay-duration=5s",
 					"--authentication-token-webhook-cache-ttl=7m",
@@ -213,6 +215,14 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				}, {
 					Name:      "aws-provider-encryption-config",
 					MountPath: "/etc/kubernetes/aws-encryption-provider",
+					ReadOnly:  true,
+				}, {
+					Name:      "audit-log",
+					MountPath: "/var/log/kubernetes/audit/",
+					ReadOnly:  false,
+				}, {
+					Name:      "audit",
+					MountPath: "/etc/kubernetes/audit-policy",
 					ReadOnly:  true,
 				}},
 				LivenessProbe: &v1.Probe{
@@ -387,6 +397,21 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			VolumeSource: v1.VolumeSource{
 				ConfigMap: &v1.ConfigMapVolumeSource{
 					LocalObjectReference: v1.LocalObjectReference{Name: EncryptionProviderConfigName(controlPlane.ClusterName())},
+				},
+			},
+		}, {
+			Name: "audit-log",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/var/log/kubernetes/audit/",
+					Type: &hostPathDirectoryOrCreate,
+				},
+			},
+		}, {
+			Name: "audit",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{Name: AuditLogProviderConfigName(controlPlane.ClusterName())},
 				},
 			},
 		}},

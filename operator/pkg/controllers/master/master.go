@@ -54,6 +54,7 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 		c.reconcileCertificates,
 		c.reconcileKubeConfigs,
 		c.reconcileSAKeyPair,
+		c.reconcileAuditLogProviderConfig,
 		c.reconcileApiServer,
 		c.reconcileKCMCloudConfig,
 		c.reconcileKCM,
