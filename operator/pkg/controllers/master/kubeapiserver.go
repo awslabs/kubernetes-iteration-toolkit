@@ -411,7 +411,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			Name: "audit",
 			VolumeSource: v1.VolumeSource{
 				ConfigMap: &v1.ConfigMapVolumeSource{
-					LocalObjectReference: v1.LocalObjectReference{Name: AuditLogProviderConfigName(controlPlane.ClusterName())},
+					LocalObjectReference: v1.LocalObjectReference{Name: AuditLogConfigName(controlPlane.ClusterName())},
 				},
 			},
 		}},

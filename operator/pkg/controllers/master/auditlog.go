@@ -23,25 +23,21 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-func (c *Controller) reconcileAuditLogProviderConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+func (c *Controller) reconcileAuditLogConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	providerConfig := auditLogConfig
 	configMap, err := object.GenerateConfigMap(providerConfig, struct{ ConfigMapName, Namespace string }{
-		ConfigMapName: AuditLogProviderConfigName(controlPlane.ClusterName()),
+		ConfigMapName: AuditLogConfigName(controlPlane.ClusterName()),
 		Namespace:     controlPlane.Namespace,
 	})
 	if err != nil {
-		return fmt.Errorf("generating provider config, %w", err)
+		return fmt.Errorf("creating audit log config, %w", err)
 	}
 	return c.kubeClient.EnsurePatch(ctx, &v1.ConfigMap{}, object.WithOwner(controlPlane, configMap))
 }
 
-func AuditLogProviderConfigName(clusterName string) string {
+func AuditLogConfigName(clusterName string) string {
 	return fmt.Sprintf("%s-audit-log-config", clusterName)
 }
-
-// func auditLogProviderLabels(clustername string) map[string]string {
-// 	return functional.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "aws-encryption-provider"})
-// }
 
 var (
 	auditLogConfig = `
