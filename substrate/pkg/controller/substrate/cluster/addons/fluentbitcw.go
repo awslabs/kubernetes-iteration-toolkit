@@ -153,6 +153,21 @@ data:
         Read_from_Head      ${READ_FROM_HEAD}
         Path_Key            path
  
+    [INPUT]
+        Name                tail
+        Tag                 application.*
+        Path                /var/log/kubernetes/audit/*.log
+        Parser              Docker
+        Docker_Mode         On
+        Docker_Mode_Flush   5
+        Docker_Mode_Parser  docker
+        DB                  /var/fluent-bit/state/flb_auditlog.db
+        Mem_Buf_Limit       5MB
+        Skip_Long_Lines     On
+        Refresh_Interval    10
+        Read_from_Head      ${READ_FROM_HEAD}
+        Path_key            path
+
     [FILTER]
         Name                kubernetes
         Match               application.*
@@ -333,12 +348,12 @@ func (t *FluentBit) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		return reconcile.Result{}, fmt.Errorf("initializing client, %w", err)
 	}
 
-  	// Apply fluentbit ns
-	  if err := client.ApplyYAML(ctx, []byte(fluentbitNS)); err != nil {
+	// Apply fluentbit ns
+	if err := client.ApplyYAML(ctx, []byte(fluentbitNS)); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying fluentbit ns, %w", err)
 	}
 
-  	// Apply fluentbit configmp
+	// Apply fluentbit configmp
 	if err := client.ApplyYAML(ctx, []byte(fmt.Sprintf(fluentbitCM, substrate.Name, *t.Region))); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying fluentbit cm, %w", err)
 	}
