@@ -111,7 +111,7 @@ data:
     [INPUT]
         Name                tail
         Tag                 application.*
-        Exclude_Path        /var/log/containers/cloudwatch-agent*, /var/log/containers/fluent-bit*
+        Exclude_Path        /var/log/containers/cloudwatch-agent*, /var/log/containers/fluent-bit*, /var/log/kubernetes/audit/audit.log
         Path                /var/log/containers/*.log
         Docker_Mode         On
         Docker_Mode_Flush   5
@@ -152,21 +152,21 @@ data:
         Refresh_Interval    10
         Read_from_Head      ${READ_FROM_HEAD}
         Path_Key            path
- 
+
     [INPUT]
         Name                tail
-        Tag                 application.*
-        Path                /var/log/kubernetes/audit/*.log
-        Parser              Docker
+        Tag                 kube_audit.*
+        Path                /var/log/kubernetes/audit/audit.log
         Docker_Mode         On
         Docker_Mode_Flush   5
-        Docker_Mode_Parser  docker
+        Docker_Mode_Parser  cwagent_firstline
+        Parser              docker
         DB                  /var/fluent-bit/state/flb_auditlog.db
         Mem_Buf_Limit       5MB
         Skip_Long_Lines     On
         Refresh_Interval    10
         Read_from_Head      ${READ_FROM_HEAD}
-        Path_key            path
+        Path_Key            path
 
     [FILTER]
         Name                kubernetes
@@ -189,7 +189,17 @@ data:
         auto_create_group   true
         extra_user_agent    container-insights
         log_retention_days  30
- 
+
+    [OUTPUT]
+        Name                cloudwatch
+        Match               kube_audit.*
+        region              ${AWS_REGION}
+        log_group_name      /${CLUSTER_NAME}
+        log_stream_name     audit-log
+        auto_create_group   true
+        extra_user_agent    container-insights
+        log_retention_days  30
+
   parsers.conf: |
     [PARSER]
         Name                docker
@@ -303,6 +313,9 @@ spec:
         - name: dmesg
           mountPath: /var/log/dmesg
           readOnly: true
+        - name: audit-log
+          mountPath: /var/log/kubernetes/audit/
+          readOnly: false
       terminationGracePeriodSeconds: 10
       volumes:
       - name: fluentbitstate
@@ -323,6 +336,9 @@ spec:
       - name: dmesg
         hostPath:
           path: /var/log/dmesg
+      - name: audit-log
+        hostPath:
+          path: /var/log/kubernetes/audit/
       serviceAccountName: fluent-bit
       tolerations:
       - key: node-role.kubernetes.io/master

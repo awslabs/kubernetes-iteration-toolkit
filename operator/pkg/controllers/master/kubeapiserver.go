@@ -143,6 +143,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					"--encryption-provider-config=/etc/kubernetes/aws-encryption-provider/encryption-configuration.yaml",
 					"--audit-policy-file=/etc/kubernetes/audit-policy/audit-policy.yaml",
 					"--audit-log-path=/var/log/kubernetes/audit/audit.log",
+					"--audit-log-maxbackup=1",
 					"--profiling=false",
 					"--shutdown-delay-duration=5s",
 					"--authentication-token-webhook-cache-ttl=7m",
