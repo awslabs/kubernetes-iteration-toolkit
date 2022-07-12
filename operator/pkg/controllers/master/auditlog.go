@@ -24,8 +24,7 @@ import (
 )
 
 func (c *Controller) reconcileAuditLogConfig(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
-	providerConfig := auditLogConfig
-	configMap, err := object.GenerateConfigMap(providerConfig, struct{ ConfigMapName, Namespace string }{
+	configMap, err := object.GenerateConfigMap(auditLogConfig, struct{ ConfigMapName, Namespace string }{
 		ConfigMapName: AuditLogConfigName(controlPlane.ClusterName()),
 		Namespace:     controlPlane.Namespace,
 	})
