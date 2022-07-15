@@ -313,9 +313,6 @@ spec:
         - name: dmesg
           mountPath: /var/log/dmesg
           readOnly: true
-        - name: audit-log
-          mountPath: /var/log/kubernetes/audit/
-          readOnly: false
       terminationGracePeriodSeconds: 10
       volumes:
       - name: fluentbitstate
@@ -336,9 +333,6 @@ spec:
       - name: dmesg
         hostPath:
           path: /var/log/dmesg
-      - name: audit-log
-        hostPath:
-          path: /var/log/kubernetes/audit/
       serviceAccountName: fluent-bit
       tolerations:
       - key: node-role.kubernetes.io/master
