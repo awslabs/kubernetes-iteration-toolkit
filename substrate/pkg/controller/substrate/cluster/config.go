@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"io/ioutil"
 	"os"
 	"path"
@@ -207,9 +208,61 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 	} else {
 		logging.FromContext(ctx).Infof("Created s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
+
+	bucket := discovery.Name(substrate)
+	tagName1 := "kit.aws/substrate"
+	tagValue1 := "kitctl-ganiredi"
+	// Initialize a session in us-west-2 that the SDK will use to load credentials
+	// from the shared credentials file. (~/.aws/credentials).
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String("us-west-2")},
+	)
+	svc := s3.New(sess)
+	// Create input for PutBucket method
+	putInput := &s3.PutBucketTaggingInput{
+		Bucket: bucket,
+		Tagging: &s3.Tagging{
+			TagSet: []*s3.Tag{
+				{
+					Key:   aws.String(tagName1),
+					Value: aws.String(tagValue1),
+				},
+			},
+		},
+	}
+	_, err = svc.PutBucketTagging(putInput)
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil
+	}
+	// Now show the tags and Create input for GetBucket method
+	getInput := &s3.GetBucketTaggingInput{
+		Bucket: bucket,
+	}
+
+	result, err := c.S3.GetBucketTagging(getInput)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	numTags := len(result.TagSet)
+
+	if numTags > 0 {
+		fmt.Println("Found", numTags, "Tag(s):")
+		fmt.Println("")
+
+		for _, t := range result.TagSet {
+			fmt.Println("  Key:  ", *t.Key)
+			fmt.Println("  Value:", *t.Value)
+			fmt.Println("")
+		}
+	} else {
+
+		fmt.Println("Did not find any tags")
+	}
+
 	return nil
 }
-
 func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
 	localDir := path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
 	if _, err := os.Stat(localDir); err != nil {
