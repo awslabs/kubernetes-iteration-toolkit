@@ -56,7 +56,7 @@ func bootstrap(cmd *cobra.Command, args []string) {
 
 		Spec: v1alpha1.SubstrateSpec{
 			VPC:          &v1alpha1.VPCSpec{CIDR: vpcCidrs},
-			InstanceType: aws.String("r6g.4xlarge"),
+			InstanceType: aws.String("r6g.8xlarge"),
 			Subnets: []*v1alpha1.SubnetSpec{
 				{Zone: "us-west-2a", CIDR: vpcCidrs[0]},
 				{Zone: "us-west-2b", CIDR: vpcCidrs[1]},

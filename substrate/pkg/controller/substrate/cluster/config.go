@@ -18,21 +18,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/discovery"
+	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -45,7 +40,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
+	"os"
+	"path"
+	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"strings"
 )
 
 const (
@@ -208,59 +207,12 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 	} else {
 		logging.FromContext(ctx).Infof("Created s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
-
+	//sets tags on a bucket. Any existing tags are replaced.
 	bucket := discovery.Name(substrate)
-	tagName1 := "kit.aws/substrate"
-	tagValue1 := "kitctl-ganiredi"
-	// Initialize a session in us-west-2 that the SDK will use to load credentials
-	// from the shared credentials file. (~/.aws/credentials).
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("us-west-2")},
-	)
-	svc := s3.New(sess)
-	// Create input for PutBucket method
-	putInput := &s3.PutBucketTaggingInput{
-		Bucket: bucket,
-		Tagging: &s3.Tagging{
-			TagSet: []*s3.Tag{
-				{
-					Key:   aws.String(tagName1),
-					Value: aws.String(tagValue1),
-				},
-			},
-		},
-	}
-	_, err = svc.PutBucketTagging(putInput)
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil
-	}
-	// Now show the tags and Create input for GetBucket method
-	getInput := &s3.GetBucketTaggingInput{
-		Bucket: bucket,
-	}
-
-	result, err := c.S3.GetBucketTagging(getInput)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	numTags := len(result.TagSet)
-
-	if numTags > 0 {
-		fmt.Println("Found", numTags, "Tag(s):")
-		fmt.Println("")
-
-		for _, t := range result.TagSet {
-			fmt.Println("  Key:  ", *t.Key)
-			fmt.Println("  Value:", *t.Value)
-			fmt.Println("")
-		}
-	} else {
-
-		fmt.Println("Did not find any tags")
-	}
-
+	svc := s3.New(session.New())
+	putInput := &s3.PutBucketTaggingInput{Bucket: bucket, Tagging: &s3.Tagging{TagSet: []*s3.Tag{{
+		Key: aws.String("kit.aws/substrate"), Value: aws.String("Kitctl")}}}}
+	svc.PutBucketTagging(putInput)
 	return nil
 }
 func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
