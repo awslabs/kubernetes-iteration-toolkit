@@ -207,10 +207,15 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 		logging.FromContext(ctx).Infof("Created s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
 	//sets tags on a bucket. Any existing tags are replaced.
-	putInput := &s3.PutBucketTaggingInput{Bucket: discovery.Name(substrate), Tagging: &s3.Tagging{TagSet: []*s3.Tag{{
-		Key: aws.String("kit.aws/substrate"), Value: aws.String(substrate.Name)}}}}
-	_, err := c.S3.PutBucketTagging(putInput)
-	if err != nil {return fmt.Errorf("adding tag %w", err)}
+	if _, err := c.S3.PutBucketTagging(&s3.PutBucketTaggingInput{
+		Bucket: discovery.Name(substrate),
+		Tagging: &s3.Tagging{TagSet: []*s3.Tag{{
+			Key:   aws.String("kit.aws/substrate"),
+			Value: aws.String(substrate.Name)},
+		}},
+	}); err != nil {
+		return fmt.Errorf("adding tag %w", err)
+	}
 	return nil
 }
 func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
