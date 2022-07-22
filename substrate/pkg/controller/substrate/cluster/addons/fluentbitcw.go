@@ -155,8 +155,8 @@ data:
 
     [INPUT]
         Name                tail
-        Tag                 kube_audit.*
-        Path                /var/log/kubernetes/audit/audit.log
+        Tag                 audit.*
+        Path                /var/log/kubernetes/audit/*.log
         Docker_Mode         On
         Docker_Mode_Flush   5
         Docker_Mode_Parser  cwagent_firstline
