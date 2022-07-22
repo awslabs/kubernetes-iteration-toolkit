@@ -111,7 +111,7 @@ data:
     [INPUT]
         Name                tail
         Tag                 application.*
-        Exclude_Path        /var/log/containers/cloudwatch-agent*, /var/log/containers/fluent-bit*
+        Exclude_Path        /var/log/containers/cloudwatch-agent*, /var/log/containers/fluent-bit*, /var/log/kubernetes/audit/audit.log
         Path                /var/log/containers/*.log
         Docker_Mode         On
         Docker_Mode_Flush   5
@@ -152,7 +152,22 @@ data:
         Refresh_Interval    10
         Read_from_Head      ${READ_FROM_HEAD}
         Path_Key            path
- 
+
+    [INPUT]
+        Name                tail
+        Tag                 audit.*
+        Path                /var/log/kubernetes/audit/*.log
+        Docker_Mode         On
+        Docker_Mode_Flush   5
+        Docker_Mode_Parser  cwagent_firstline
+        Parser              docker
+        DB                  /var/fluent-bit/state/flb_auditlog.db
+        Mem_Buf_Limit       5MB
+        Skip_Long_Lines     On
+        Refresh_Interval    10
+        Read_from_Head      ${READ_FROM_HEAD}
+        Path_Key            path
+
     [FILTER]
         Name                kubernetes
         Match               application.*
@@ -174,7 +189,17 @@ data:
         auto_create_group   true
         extra_user_agent    container-insights
         log_retention_days  30
- 
+
+    [OUTPUT]
+        Name                cloudwatch
+        Match               audit.*
+        region              ${AWS_REGION}
+        log_group_name      /${CLUSTER_NAME}
+        log_stream_prefix   apiserver-
+        auto_create_group   true
+        extra_user_agent    container-insights
+        log_retention_days  30
+
   parsers.conf: |
     [PARSER]
         Name                docker
@@ -333,12 +358,12 @@ func (t *FluentBit) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		return reconcile.Result{}, fmt.Errorf("initializing client, %w", err)
 	}
 
-  	// Apply fluentbit ns
-	  if err := client.ApplyYAML(ctx, []byte(fluentbitNS)); err != nil {
+	// Apply fluentbit ns
+	if err := client.ApplyYAML(ctx, []byte(fluentbitNS)); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying fluentbit ns, %w", err)
 	}
 
-  	// Apply fluentbit configmp
+	// Apply fluentbit configmp
 	if err := client.ApplyYAML(ctx, []byte(fmt.Sprintf(fluentbitCM, substrate.Name, *t.Region))); err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying fluentbit cm, %w", err)
 	}
