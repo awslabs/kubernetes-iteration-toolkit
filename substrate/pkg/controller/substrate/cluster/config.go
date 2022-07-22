@@ -18,12 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -32,6 +26,7 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/discovery"
+	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -44,7 +39,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
+	"os"
+	"path"
+	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"strings"
 )
 
 const (
@@ -207,9 +206,18 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 	} else {
 		logging.FromContext(ctx).Infof("Created s3 bucket %s", aws.StringValue(discovery.Name(substrate)))
 	}
+	//sets tags on a bucket. Any existing tags are replaced.
+	if _, err := c.S3.PutBucketTagging(&s3.PutBucketTaggingInput{
+		Bucket: discovery.Name(substrate),
+		Tagging: &s3.Tagging{TagSet: []*s3.Tag{{
+			Key:   aws.String("kit.aws/substrate"),
+			Value: aws.String(substrate.Name)},
+		}},
+	}); err != nil {
+		return fmt.Errorf("adding tag %w", err)
+	}
 	return nil
 }
-
 func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
 	localDir := path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
 	if _, err := os.Stat(localDir); err != nil {
