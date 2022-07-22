@@ -192,7 +192,7 @@ data:
 
     [OUTPUT]
         Name                cloudwatch
-        Match               kube_audit.*
+        Match               audit.*
         region              ${AWS_REGION}
         log_group_name      /${CLUSTER_NAME}
         log_stream_prefix   apiserver-
