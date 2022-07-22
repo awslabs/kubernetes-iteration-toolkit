@@ -195,7 +195,7 @@ data:
         Match               kube_audit.*
         region              ${AWS_REGION}
         log_group_name      /${CLUSTER_NAME}
-        log_stream_name     audit-log
+        log_stream_prefix   apiserver-
         auto_create_group   true
         extra_user_agent    container-insights
         log_retention_days  30
