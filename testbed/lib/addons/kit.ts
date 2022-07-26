@@ -106,18 +106,5 @@ export class KIT extends Construct {
       }
     });
     chart.node.addDependency(sa)
-    // chart.node.addDependency(kitPermissionsStack)
   }
-//   private getCFN(version: string): any {
-//     const metadataUrl = `https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/${version}/operator/docs/kit.cloudformation.yaml`;
-//     JSON.parse(
-//       request.default('GET', metadataUrl, {
-//         headers: {
-//           'User-Agent': 'CDK' // GH API requires us to set UA
-//         }
-//       }).getBody().toString()
-//     );
-//     //TODO: write to a file!
-//     return ""
-//   }
 }
