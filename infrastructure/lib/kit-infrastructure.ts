@@ -5,19 +5,18 @@ import { aws_eks as eks } from 'aws-cdk-lib';
 import { FluxV2 } from './addons/fluxv2';
 import { AWSEBSCSIDriver } from './addons/aws-ebs-csi-driver';
 import { Karpenter } from './addons/karpenter';
-import { Crossplane } from './addons/crossplane';
 import { AWSLoadBalancerController } from './addons/aws-lbc';
 import { KIT } from './addons/kit';
 import { SecurityGroup } from 'aws-cdk-lib/aws-ec2';
 
-export class InfraStack extends Stack {
+export class KITInfrastructure extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
     // The URL to the git repository to use for Flux
-    const repoUrl = this.node.tryGetContext('FluxRepoURL')
-    const repoBranch = this.node.tryGetContext('FluxRepoBranch')
-    const repoPath = this.node.tryGetContext('FluxRepoPath')
+    const repoUrl = this.getContextOrDefault('FluxRepoURL', "https://github.com/awslabs/kubernetes-iteration-toolkit") 
+    const repoBranch = this.getContextOrDefault('FluxRepoBranch', 'main')
+    const repoPath = this.getContextOrDefault('FluxRepoPath', './infrastructure/k8s-config/clusters/kit-infrastructure')
 
     const testRepoName = this.node.tryGetContext('TestFluxRepoName')
     const testRepoUrl = this.node.tryGetContext('TestFluxRepoURL')
@@ -172,12 +171,6 @@ export class InfraStack extends Stack {
       version: 'v2.4.2',
     }).node.addDependency(cluster);
 
-    new Crossplane(this, 'Crossplane', {
-      cluster: cluster,
-      namespace: 'crossplane-system',
-      version: 'v1.9.0',
-    }).node.addDependency(cluster);
-
     new KIT(this, 'KIT', {
       cluster: cluster,
       namespace: 'kit',
@@ -187,8 +180,16 @@ export class InfraStack extends Stack {
     new Karpenter(this, 'KarpenterController', {
       cluster: cluster,
       namespace: 'karpenter',
-      version: 'v0.13.2',
       nodeRoleName: workerRole.roleName,
     }).node.addDependency(cluster);
+  }
+
+  private getContextOrDefault(key: string, def: string | null): any {
+    const val = this.node.tryGetContext(key)
+    if (val === undefined) {
+      return def
+    } else {
+      return val
+    }
   }
 }

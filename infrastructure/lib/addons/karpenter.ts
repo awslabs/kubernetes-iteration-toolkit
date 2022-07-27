@@ -5,7 +5,6 @@ import { aws_eks as eks } from 'aws-cdk-lib';
 export interface KarpenterProps extends StackProps {
     cluster: eks.Cluster
     namespace: string
-    version: string
     nodeRoleName: string
 }
 
@@ -65,7 +64,7 @@ export class Karpenter extends Construct {
         const chart = props.cluster.addHelmChart('karpenter-chart', {
             chart: 'karpenter',
             release: 'karpenter',
-            version: props.version,
+            version: 'v0.13.2',
             repository: 'https://charts.karpenter.sh',
             namespace: props.namespace,
             createNamespace: false,

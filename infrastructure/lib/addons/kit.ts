@@ -2,8 +2,6 @@ import { Construct } from 'constructs';
 import { Aws, CfnStack, StackProps } from 'aws-cdk-lib';
 import { aws_eks as eks } from 'aws-cdk-lib';
 import { aws_iam as iam } from 'aws-cdk-lib';
-import * as request from 'sync-request';
-import { CfnInclude } from 'aws-cdk-lib/cloudformation-include';
 
 export interface KITProps extends StackProps {
   cluster: eks.Cluster;
@@ -28,11 +26,7 @@ export class KIT extends Construct {
       namespace: props.namespace
     });
 
-    // const kitPermissionsStack = new CfnInclude(this, 'kit-permissions-cfn', {
-    //   templateFile: this.getCFN(props.version),
-    // })
     sa.node.addDependency(ns)
-    //sa.role.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyName(this, 'kit-managed-policy', `KitControllerPolicy-${props.cluster.clusterName}`))
     sa.role.attachInlinePolicy(new iam.Policy(this, 'kit-controller-policy', {
       statements: [
           new iam.PolicyStatement({
