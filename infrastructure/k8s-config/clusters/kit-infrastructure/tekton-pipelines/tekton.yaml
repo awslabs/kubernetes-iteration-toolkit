@@ -1,0 +1,157 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tekton-pipelines
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: Bucket
+metadata:
+  name: tekton
+  namespace: tekton-pipelines
+spec:
+  bucketName: tekton-releases
+  endpoint: storage.googleapis.com
+  interval: 1m0s
+  provider: generic
+  ignore: |
+    # exclude all
+    /*
+    # include releases
+    !/pipeline/previous/v0.33.2/release.yaml
+    !/triggers/previous/v0.19.0/release.yaml
+    !/dashboard/previous/v0.24.1/tekton-dashboard-release.yaml
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: tekton-pipeline
+  namespace: tekton-pipelines
+spec:
+  interval: 2m0s
+  path: ./pipeline/previous/v0.33.2
+  prune: true
+  sourceRef:
+    kind: Bucket
+    name: tekton
+  patches:
+    - target:
+        kind: Deployment
+        name: tekton-pipelines-controller
+        namespace: tekton-pipelines
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: tekton-pipelines-controller
+          namespace: tekton-pipelines
+        spec:
+          template:
+            spec:
+              tolerations:
+                - key: CriticalAddonsOnly
+                  operator: Exists
+    - target:
+        kind: Deployment
+        name: tekton-pipelines-webhook
+        namespace: tekton-pipelines
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: tekton-pipelines-webhook
+          namespace: tekton-pipelines
+        spec:
+          template:
+            spec:
+              tolerations:
+                - key: CriticalAddonsOnly
+                  operator: Exists
+    - target:
+        kind: ConfigMap
+        name: config-defaults
+        namespace: tekton-pipelines
+      patch: |-
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: config-defaults
+          namespace: tekton-pipelines
+        data: 
+          default-task-run-workspace-binding: |
+            emptyDir: {}
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: tekton-triggers
+  namespace: tekton-pipelines
+spec:
+  interval: 2m0s
+  path: ./triggers/previous/v0.19.0
+  prune: true
+  sourceRef:
+    kind: Bucket
+    name: tekton
+  patches:
+    - target:
+        kind: Deployment
+        name: tekton-triggers-controller
+        namespace: tekton-pipelines
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: tekton-triggers-controller
+          namespace: tekton-pipelines
+        spec:
+          template:
+            spec:
+              tolerations:
+                - key: CriticalAddonsOnly
+                  operator: Exists
+    - target:
+        kind: Deployment
+        name: tekton-triggers-webhook
+        namespace: tekton-pipelines 
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: tekton-triggers-webhook
+          namespace: tekton-pipelines
+        spec:
+          template:
+            spec:
+              tolerations:
+                - key: CriticalAddonsOnly
+                  operator: Exists
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: tekton-dashboard
+  namespace: tekton-pipelines
+spec:
+  interval: 2m0s
+  path: ./dashboard/previous/v0.24.1
+  prune: true
+  sourceRef:
+    kind: Bucket
+    name: tekton
+  patches:
+    - target:
+        kind: Deployment
+        name: tekton-dashboard
+        namespace: tekton-pipelines
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: tekton-dashboard
+          namespace: tekton-pipelines
+        spec:
+          template:
+            spec:
+              tolerations:
+                - key: CriticalAddonsOnly
+                  operator: Exists
