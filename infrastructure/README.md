@@ -26,10 +26,10 @@ To launch the KIT infrastructure, ensure you have the following installed:
  - [CDK v2 installed](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)
  - [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/)
 
-By default, the CDK application will wire up a Flux config that will monitor for k8s manifests within the KIT repo at `k8s-config/clusters/test-infra`. 
+By default, the CDK application will wire up a Flux config that will monitor for k8s manifests within the KIT repo at `k8s-config/clusters/kit-infrastructure`. 
 The parameters supplied to the CDK app will allow you to wire up your own application's repo so that you can place tekton test files and other cluster components there.
  
- Below are the parameters used for the [Karpenter](https://github.com/aws/karpenter) project.
+ As an example, below are the parameters used for the [Karpenter](https://github.com/aws/karpenter) project.
  
  ```shell
 cdk deploy InfraStack --no-rollback \

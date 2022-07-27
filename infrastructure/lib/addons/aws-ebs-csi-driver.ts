@@ -29,7 +29,6 @@ export class AWSEBSCSIDriver extends Construct {
         sa.node.addDependency(ns)
         sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-ebs-csi-driver-policy', {document: iam.PolicyDocument.fromJson(this.getIAMPolicy(props.version))}))
 
-        // Install Karpenter
         const chart = props.cluster.addHelmChart('aws-ebs-csi-driver-chart', {
             chart: 'aws-ebs-csi-driver',
             release: 'aws-ebs-csi-driver',
