@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: teardown
+  name: kit-cluster-teardown
   namespace: tekton-pipelines
   annotations:
     tekton.dev/pipelines.minVersion: "0.17.0"
@@ -19,7 +19,7 @@ spec:
     description: Name of the guess cluster
   steps:
   - name: teardown
-    image: bitnami/kubectl
+    image: alpine/k8s:1.22.6
     script: |
       #!/bin/bash
       echo "Tear down guest cluster"
