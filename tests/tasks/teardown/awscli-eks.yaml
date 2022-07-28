@@ -16,6 +16,10 @@ spec:
     description: The region where the cluster is in.
   - name: endpoint
     default: ""
+  - name: slack-hook
+    default: ""
+  - name: slack-message
+    default: "Job is completed"
   steps:
   - name: delete-cluster
     image: alpine/k8s:1.22.6
@@ -33,3 +37,9 @@ spec:
           aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
       done;
       aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
+  - name: send-slack-notification
+    image: alpine/k8s:1.22.6
+    script: |
+      if [ -n "$(params.slack-hook)" ]; then
+        curl -H "Content-type: application/json" --data '{"Message": $(params.slack-message)"}' -X POST  $(params.slack-hook)
+      fi
