@@ -18,6 +18,7 @@ KIT Infrastructure creates a base K8s cluster with a few add-ons. Add-ons includ
 - Flux v2
 - Kubernetes Iteration Toolkit (KIT) Operator
 
+Flux is setup, by deafult, to monitor the KIT git repo path `./infrastructure/k8s-config/clusters/kit-infrastructure`, which includes other add-ons that do not require AWS credentials such as tekton, prometheus, grafana, and the metrics-server. 
 
 ### Getting Started:
 
@@ -26,14 +27,14 @@ To launch the KIT infrastructure, ensure you have the following installed:
  - [CDK v2 installed](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)
  - [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/)
 
-By default, the CDK application will wire up a Flux config that will monitor for k8s manifests within the KIT repo at `k8s-config/clusters/kit-infrastructure`.
+By default, the CDK application will wire up a Flux config that will monitor for k8s manifests within the KIT repo at `infrastructure/k8s-config/clusters/kit-infrastructure`.
 The parameters supplied to the CDK app will allow you to wire up your own application's repo so that you can place tekton test files and other cluster components there.
 
  As an example, below are the parameters used for the [Karpenter](https://github.com/aws/karpenter) project.
 
  ```shell
 cdk bootstrap
-cdk deploy InfraStack --no-rollback \
+cdk deploy KITInfrastructure --no-rollback \
   -c TestFluxRepoName="karpenter" \
   -c TestFluxRepoURL="https://github.com/aws/karpenter" \
   -c TestFluxRepoBranch="main" \
