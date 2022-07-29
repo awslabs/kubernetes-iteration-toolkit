@@ -33,7 +33,7 @@ The parameters supplied to the CDK app will allow you to wire up your own applic
 
  ```shell
 cdk bootstrap
-cdk deploy InfraStack --no-rollback \
+cdk deploy KITInfrastructure --no-rollback \
   -c TestFluxRepoName="karpenter" \
   -c TestFluxRepoURL="https://github.com/aws/karpenter" \
   -c TestFluxRepoBranch="main" \
