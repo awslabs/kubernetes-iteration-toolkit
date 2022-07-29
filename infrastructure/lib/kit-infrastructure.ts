@@ -1,20 +1,18 @@
-import { aws_ec2 as ec2, CfnParameter, Stack, StackProps, Tags } from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import { aws_iam as iam } from 'aws-cdk-lib';
-import { aws_eks as eks } from 'aws-cdk-lib';
-import { FluxV2 } from './addons/fluxv2';
-import { AWSEBSCSIDriver } from './addons/aws-ebs-csi-driver';
-import { Karpenter } from './addons/karpenter';
-import { AWSLoadBalancerController } from './addons/aws-lbc';
-import { KIT } from './addons/kit';
-import { SecurityGroup } from 'aws-cdk-lib/aws-ec2';
+import { aws_ec2 as ec2, aws_eks as eks, aws_iam as iam, Stack, StackProps, Tags } from 'aws-cdk-lib'
+import { SecurityGroup } from 'aws-cdk-lib/aws-ec2'
+import { Construct } from 'constructs'
+import { AWSEBSCSIDriver } from './addons/aws-ebs-csi-driver'
+import { AWSLoadBalancerController } from './addons/aws-lbc'
+import { FluxV2 } from './addons/fluxv2'
+import { Karpenter } from './addons/karpenter'
+import { KIT } from './addons/kit'
 
 export class KITInfrastructure extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
     // The URL to the git repository to use for Flux
-    const repoUrl = this.getContextOrDefault('FluxRepoURL', "https://github.com/awslabs/kubernetes-iteration-toolkit") 
+    const repoUrl = this.getContextOrDefault('FluxRepoURL', "https://github.com/awslabs/kubernetes-iteration-toolkit")
     const repoBranch = this.getContextOrDefault('FluxRepoBranch', 'main')
     const repoPath = this.getContextOrDefault('FluxRepoPath', './infrastructure/k8s-config/clusters/kit-infrastructure')
 
@@ -24,10 +22,10 @@ export class KITInfrastructure extends Stack {
     const testRepoPath = this.node.tryGetContext('TestFluxRepoPath')
     const testSA = this.node.tryGetContext("TestServiceAccount")
     const testNS = this.node.tryGetContext("TestNamespace")
-    
+
     // A VPC, including NAT GWs, IGWs, where we will run our cluster
     const vpc = new ec2.Vpc(this, 'VPC', {});
-    
+
     // The IAM role that will be used by EKS
     const clusterRole = new iam.Role(this, 'ClusterRole', {
       assumedBy: new iam.ServicePrincipal('eks.amazonaws.com'),
@@ -39,10 +37,11 @@ export class KITInfrastructure extends Stack {
 
     // The EKS cluster, without worker nodes as we'll add them later
     const cluster = new eks.Cluster(this, 'Cluster', {
+      clusterName: id,
       vpc: vpc,
       role: clusterRole,
       version: eks.KubernetesVersion.V1_21,
-      defaultCapacity: 0
+      defaultCapacity: 0,
     });
 
     // Worker node IAM role
@@ -56,7 +55,7 @@ export class KITInfrastructure extends Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore')
       ]
     });
-  
+
     cluster.awsAuth.addRoleMapping(workerRole, {
         username: 'system:node:{{EC2PrivateDNSName}}',
         groups: ['system:bootstrappers', 'system:nodes']
@@ -79,7 +78,7 @@ export class KITInfrastructure extends Stack {
       subnetType: ec2.SubnetType.PRIVATE_WITH_NAT,
     });
 
-    const ng = cluster.addNodegroupCapacity('WorkerNodeGroup', {
+    const ng = cluster.addNodegroupCapacity('SystemPool', {
       subnets: privateSubnets,
       nodeRole: workerRole,
       minSize: 3,
