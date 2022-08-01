@@ -14,7 +14,18 @@ spec:
   - name: nodes-per-namespace
   - name: cl2-load-test-throughput
   - name: results-bucket
+  - name: slack-hook
+  - name: slack-message
   tasks:
+  - name: slack-notification
+    params:
+    - name: slack-hook
+      value: $(params.slack-hook)
+    - name: slack-message
+      value: $(params.slack-message)+"job kicked off"
+    taskRef:
+      kind: Task
+      name:  slack-notification
   - name: create-eks-cluster
     params:
     - name: cluster-name
@@ -23,6 +34,8 @@ spec:
       value: $(params.servicerole)
     - name: endpoint
       value: $(params.endpoint)
+    runAfter:
+    - slack-notification
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-create
@@ -75,6 +88,10 @@ spec:
       value: $(params.cluster-name)
     - name: endpoint
       value: $(params.endpoint)
+    - name: slack-hook
+      value: $(params.slack-hook)
+    - name: slack-message
+      value: $(params.slack-message)+"job completed"
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-teardown
