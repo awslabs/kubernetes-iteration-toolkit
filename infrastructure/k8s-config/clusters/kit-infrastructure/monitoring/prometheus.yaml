@@ -61,4 +61,27 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-    
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: prometheus-crds
+  namespace: monitoring
+spec:
+  interval: 5m0s
+  url: https://github.com/prometheus-community/helm-charts
+  ref:
+    commit: 0e74668531467f47050f2980b3fcb62f859cf062
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: prometheus-crds
+  namespace: monitoring
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: prometheus-crds
+  path: "./charts/kube-prometheus-stack/crds"
+  prune: true

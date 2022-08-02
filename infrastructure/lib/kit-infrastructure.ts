@@ -67,7 +67,7 @@ export class KITInfrastructure extends Stack {
     });
     cluster.clusterSecurityGroup.addIngressRule(sg, ec2.Port.allTraffic())
     sg.addIngressRule(cluster.clusterSecurityGroup, ec2.Port.allTraffic())
-    sg.addIngressRule(cluster.clusterSecurityGroup, ec2.Port.allTraffic())
+    sg.addIngressRule(sg, ec2.Port.allTraffic())
     sg.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.allTraffic())
     sg.addEgressRule(ec2.Peer.anyIpv6(), ec2.Port.allTraffic())
     Tags.of(sg).add('kit.sh/stack', super.stackName)
@@ -162,6 +162,7 @@ export class KITInfrastructure extends Stack {
       testRepoUrl: testRepoUrl,
       testRepoBranch: testRepoBranch,
       testRepoPath: testRepoPath,
+      testNamespace: testNS,
     }).node.addDependency(cluster);
 
     new AWSLoadBalancerController(this, 'AWSLoadBalancerController', {

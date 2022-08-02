@@ -14,6 +14,7 @@ export interface FluxV2Props extends StackProps {
   testRepoUrl?: string;
   testRepoBranch?: string;
   testRepoPath?: string;
+  testNamespace?: string;
 }
 export class FluxV2 extends Construct {
   constructor(scope: Construct, id: string, props: FluxV2Props) {
@@ -132,7 +133,7 @@ export class FluxV2 extends Construct {
       kind: 'GitRepository',
       metadata: {
         name: props.testRepoName,
-        namespace: props.namespace
+        namespace: props.testNamespace
       },
       spec: {
         interval: '2m0s',
@@ -151,7 +152,7 @@ export class FluxV2 extends Construct {
       kind: 'Kustomization',
       metadata: {
         name: props.testRepoName,
-        namespace: props.namespace,
+        namespace: props.testNamespace,
       },
       spec: {
         interval: '2m0s',
