@@ -1,0 +1,59 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: eks-addon-cwagent
+  namespace: tekton-pipelines
+spec:
+  description: |
+    This Task can be used to create a EKS CW Agent Deamonset on EKS cluster
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to add addons for.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+  steps:
+  - name: create-cw-agent
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      #kubectl commands are purely for knowing state of cluster before kicking off the test.
+      kubectl version
+      kubectl config current-context
+      #install cw-agent addon
+      kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/cloudwatch-namespace.yaml
+      kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/cwagent/cwagent-serviceaccount.yaml
+      cat > "./cwagent-configmap.yaml" <<EOL
+      # create configmap for cwagent config
+      apiVersion: v1
+      data:
+        # Configuration is in Json format. No matter what configure change you make,
+        # please keep the Json blob valid.
+        cwagentconfig.json: |
+          {
+            "logs": {
+              "metrics_collected": {
+                "kubernetes": {
+                  "metrics_collection_interval": 60
+                }
+              },
+              "force_flush_interval": 5
+            }
+          }
+      kind: ConfigMap
+      metadata:
+        name: cwagentconfig
+        namespace: amazon-cloudwatch
+      EOL
+      kubectl apply -f ./cwagent-configmap.yaml
+      kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/cwagent/cwagent-daemonset.yaml
+      kubectl get pods -n amazon-cloudwatch
