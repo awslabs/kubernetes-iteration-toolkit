@@ -1,0 +1,112 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: awscli-eks-cl2loadtest-with-addons
+  namespace: tekton-pipelines
+spec:
+  params:
+  - name: cluster-name
+  - name: endpoint
+  - name: servicerole
+  - name: desired-nodes
+  - name: host-cluster-node-role-arn
+  - name: pods-per-node
+  - name: nodes-per-namespace
+  - name: cl2-load-test-throughput
+  - name: results-bucket
+  - name: slack-hook
+  - name: slack-message
+  tasks:
+  - name: slack-notification
+    params:
+    - name: slack-hook
+      value: $(params.slack-hook)
+    - name: slack-message
+      value: $(params.slack-message)+"job kicked off"
+    taskRef:
+      kind: Task
+      name:  slack-notification
+  - name: create-eks-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: servicerole
+      value: $(params.servicerole)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - slack-notification
+    taskRef:
+      kind: Task
+      name:  awscli-eks-cluster-create
+    workspaces:
+    - name: config
+      workspace: config
+  - name: create-mng-nodes
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: desired-nodes
+      value: $(params.desired-nodes)
+    - name: host-cluster-node-role-arn
+      value: $(params.host-cluster-node-role-arn)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name:  awscli-eks-nodegroup-create
+  - name: create-cw-agent-addon
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-mng-nodes
+    taskRef:
+      kind: Task
+      name:  eks-addon-cwagent
+  - name: generate
+    params:
+    - name: pods-per-node
+      value: $(params.pods-per-node)
+    - name: nodes-per-namespace
+      value: $(params.nodes-per-namespace)
+    - name: cl2-load-test-throughput
+      value: $(params.cl2-load-test-throughput)
+    - name: results-bucket
+      value: $(params.results-bucket)
+    - name: nodes
+      value: $(params.desired-nodes)
+    runAfter:
+    - create-mng-nodes
+    taskRef:
+      kind: Task
+      name: load
+    workspaces:
+    - name: source
+      workspace: source
+    - name: config
+      workspace: config
+    - name: results
+      workspace: results
+  finally:    
+  - name: teardown
+    params:   
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: slack-hook
+      value: $(params.slack-hook)
+    - name: slack-message
+      value: $(params.slack-message)+"job completed"
+    taskRef:
+      kind: Task
+      name:  awscli-eks-cluster-teardown
+  workspaces:
+  - name: config
+  - name: source
+  - name: results
