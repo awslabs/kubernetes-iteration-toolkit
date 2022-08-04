@@ -22,7 +22,7 @@ spec:
     - name: slack-hook
       value: $(params.slack-hook)
     - name: slack-message
-      value: $(params.slack-message)+"job kicked off"
+      value: "$(params.slack-message) job kicked off"
     taskRef:
       kind: Task
       name:  slack-notification
@@ -91,7 +91,7 @@ spec:
     - name: slack-hook
       value: $(params.slack-hook)
     - name: slack-message
-      value: $(params.slack-message)+"job completed"
+      value: "$(params.slack-message) job completed"
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-teardown
