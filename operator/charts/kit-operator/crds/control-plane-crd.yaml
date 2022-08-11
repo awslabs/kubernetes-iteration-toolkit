@@ -12,6 +12,8 @@ spec:
     listKind: ControlPlaneList
     plural: controlplanes
     singular: controlplane
+    shortNames:
+    - cp
   scope: Namespaced
   versions:
     - name: v1alpha1
