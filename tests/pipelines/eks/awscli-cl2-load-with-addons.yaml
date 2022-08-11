@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: awscli-eks-cl2loadtest
+  name: awscli-eks-cl2loadtest-with-addons
   namespace: tekton-pipelines
 spec:
   params:
@@ -22,7 +22,7 @@ spec:
     - name: slack-hook
       value: $(params.slack-hook)
     - name: slack-message
-      value: "$(params.slack-message) job kicked off"
+      value: $(params.slack-message)+"job kicked off"
     taskRef:
       kind: Task
       name:  slack-notification
@@ -57,6 +57,17 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
+  - name: create-cw-agent-addon
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-mng-nodes
+    taskRef:
+      kind: Task
+      name:  eks-addon-cwagent
   - name: generate
     params:
     - name: pods-per-node
@@ -91,7 +102,7 @@ spec:
     - name: slack-hook
       value: $(params.slack-hook)
     - name: slack-message
-      value: "$(params.slack-message) job completed"
+      value: $(params.slack-message)+"job completed"
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-teardown

@@ -1,0 +1,24 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: slack-notification
+  namespace: tekton-pipelines  
+spec:
+  description: |
+    sends slack notification for a given slack hook
+  params:
+  - name: slack-hook
+    description: The name of the EKS cluster you want to spin.
+  - name: slack-message
+    default: 'default'
+    description: The message you want to post.
+  steps:
+  - name: send-notification
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      if [ -n "$(params.slack-hook)" ]; then
+        curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)
+      fi
