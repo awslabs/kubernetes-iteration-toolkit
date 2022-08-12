@@ -55,10 +55,10 @@ spec:
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
   - name: run-loadtest
-    image: public.ecr.aws/kit/clusterloader2:v0.0.1
+    image: public.ecr.aws/kit/clusterloader2:0213bea
     onError: continue
     script: |
-      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=$(workspaces.config.path)/kubeconfig --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=6
+      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=$(workspaces.config.path)/kubeconfig --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
     timeout: 30000s
   - name: upload-results
     image: alpine/k8s:1.22.6

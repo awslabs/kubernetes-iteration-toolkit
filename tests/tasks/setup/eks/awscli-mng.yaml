@@ -37,8 +37,8 @@ spec:
       # Todo: remove this workaround for nodes less than 5k when our scaling system can scale up instantly
       if [ $(params.desired-nodes) -lt 5001  ] && [ $(params.desired-nodes) -gt 500 ]
       then
-        echo "sleeping for 3hrs to workaround VAS cool off time"
-        sleep 12000
+        echo "sleeping for 15 mins to workaround VAS cool off time"
+        sleep 900
       fi
 
       if [ -n "$(params.endpoint)" ]; then
