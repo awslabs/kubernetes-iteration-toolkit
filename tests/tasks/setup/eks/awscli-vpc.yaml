@@ -1,0 +1,26 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-vpc-create
+  namespace: tekton-pipelines 
+spec:
+  description: |
+    Creates VPC.
+    This Task can be used to create VPC resources that could be used for EKS clusters. This stack outputs resources SubnetIds, SecurityGroups, VpcId.
+  params:
+  - name: stack-name
+    description: The name of the VPC name you want to spin.
+  - name: vpc-cfn-url
+    description: The url of the CFN YAML/JSON to create VPC resources 
+  - name: region
+    default: "us-west-2"
+  steps:
+  - name: create-vpc
+    image: alpine/k8s:1.22.6
+    script: |
+      #!/usr/bin/env bash
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      curl -s $(params.vpc-cfn-url) -o ./amazon-vpc-eks
+      aws cloudformation --region $(params.region) deploy --stack-name $(params.stack-name)  --template-file file://$(pwd)/amazon-vpc-eks 

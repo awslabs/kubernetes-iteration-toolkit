@@ -55,6 +55,7 @@ spec:
       create_dp()
       {
         CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$asg_name-$1'`]' --output text)
+        #ToDo: paramterize instance-types
         if [ "$CREATED_NODEGROUP" == "" ]; then
           #create node group
           aws eks $ENDPOINT_FLAG create-nodegroup \
@@ -62,7 +63,7 @@ spec:
           --nodegroup-name $asg_name-$1 \
           --node-role $(params.host-cluster-node-role-arn) \
           --region $(params.region) \
-          --instance-types m5.4xlarge m4.4xlarge m5d.4xlarge m5a.4xlarge m5ad.4xlarge \
+          --instance-types c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
           --subnets $NG_SUBNETS
         fi

@@ -4,6 +4,9 @@ metadata:
   name: awscli-eks-cl2loadtest
   namespace: tekton-pipelines
 spec:
+  description: |
+    This pipeline sends slack notifcation before it spins up an EKS cluster with in it's own VPC 
+    and runs cl2 loadtest and upload results to s3 and tearsdown the cluster and sends slack notification.
   params:
   - name: cluster-name
   - name: endpoint
@@ -16,6 +19,7 @@ spec:
   - name: results-bucket
   - name: slack-hook
   - name: slack-message
+  - name: vpc-stack-name
   tasks:
   - name: slack-notification
     params:
@@ -26,6 +30,15 @@ spec:
     taskRef:
       kind: Task
       name:  slack-notification
+  - name: awscli-vpc-create
+    params:
+    - name: stack-name
+      value: $(params.vpc-stack-name)
+    - name: vpc-cfn-url
+      value: "$(params.vpc-cfn-url)"
+    taskRef:
+      kind: Task
+      name:  awscli-vpc-create
   - name: create-eks-cluster
     params:
     - name: cluster-name
@@ -34,11 +47,13 @@ spec:
       value: $(params.servicerole)
     - name: endpoint
       value: $(params.endpoint)
+    - name: vpc-stack-name
+      value: $(params.vpc-stack-name)
     runAfter:
-    - slack-notification
+    - awscli-vpc-create
     taskRef:
       kind: Task
-      name:  awscli-eks-cluster-create
+      name:  awscli-eks-cluster-create-with-vpc-stack
     workspaces:
     - name: config
       workspace: config

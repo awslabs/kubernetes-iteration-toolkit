@@ -1,0 +1,51 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-cluster-create-with-vpc-stack
+  namespace: tekton-pipelines  
+spec:
+  description: |
+    Create an EKS cluster.
+    This Task can be used to create an EKS cluster for a given service role, region in an AWS account 
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin.
+  - name: kubernetes-version
+    default: "1.23"
+    description: The EKS version to install.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+    description: "aws eks enpoint to create clusters against"
+  - name: servicerole
+    description: servicerole arn to be used for eks cluster to perform operations in customer account to setup cluster
+  - name: vpc-stack-name
+    description: The name of the VPC name you want to use for EKS cluster.
+  steps:
+  - name: create-eks
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      CREATED_CLUSTER=$(aws eks $ENDPOINT_FLAG list-clusters --region $(params.region) --query 'clusters[?@==`'$(params.cluster-name)'`]' --output text )
+      echo "CREATED_CLUSTER=$CREATED_CLUSTER"
+
+      subnets=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.vpc-stack-name) --query='Stacks[].Outputs[?OutputKey==`SubnetIds`].OutputValue' --output text | sed -e 's/ /,/')
+      echo "subnets=$subnets"
+      sg=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.vpc-stack-name) --query='Stacks[].Outputs[?OutputKey==`SecurityGroups`].OutputValue' --output text)
+      echo "securitygroup=$sg"
+      
+      if [ "$CREATED_CLUSTER" == "" ]; then
+        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $(params.servicerole) --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
+      fi
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      # enable PD on the cluster 
+      kubectl set env ds aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
