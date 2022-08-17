@@ -23,7 +23,7 @@ spec:
   chart:
     spec:
       chart: node-problem-detector
-      version: 0.8.10
+      version: 2.2.2
       sourceRef:
         kind: HelmRepository
         name: node-problem-detector
