@@ -25,7 +25,7 @@ spec:
       chart: aws-node-termination-handler
       sourceRef:
         kind: HelmRepository
-        name: aws-node-termination-handler
+        name: eks-charts
         namespace: aws-node-termination-handler
       interval: 1m
   upgrade:
