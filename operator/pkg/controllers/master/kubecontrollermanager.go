@@ -17,6 +17,7 @@ package master
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
@@ -82,7 +83,7 @@ func kcmLabels(clustername string) map[string]string {
 
 func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
-	return v1.PodSpec{
+	return kcmPodSpecForVersion(controlPlane.Spec.KubernetesVersion, &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
@@ -98,10 +99,6 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 					v1.ResourceCPU: resource.MustParse("1"),
 				},
 			},
-			Ports: []v1.ContainerPort{{
-				ContainerPort: 10252,
-				Name:          "metrics",
-			}},
 			Args: []string{
 				"--authentication-kubeconfig=/etc/kubernetes/config/kcm/controller-manager.conf",
 				"--authorization-kubeconfig=/etc/kubernetes/config/kcm/controller-manager.conf",
@@ -152,9 +149,9 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Host:   "127.0.0.1",
-						Scheme: v1.URISchemeHTTP,
+						Scheme: kcmHealthCheckSchemeForVersion(controlPlane.Spec.KubernetesVersion),
 						Path:   "/healthz",
-						Port:   intstr.FromInt(10252),
+						Port:   kcmHealthCheckPortForVersion(controlPlane.Spec.KubernetesVersion),
 					},
 				},
 				InitialDelaySeconds: 10,
@@ -233,7 +230,7 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				},
 			},
 		}},
-	}
+	})
 }
 
 func CloudConfigMapName(clusterName string) string {
@@ -253,3 +250,38 @@ data:
     KubernetesClusterID={{ .ClusterName}}
 `
 )
+
+var (
+	disabledFlagsForKube122 = map[string]struct{}{"--horizontal-pod-autoscaler-use-rest-clients": {}}
+)
+
+func kcmPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
+	switch version {
+	case "1.22":
+		args := []string{}
+		for _, arg := range defaultSpec.Containers[0].Args {
+			if _, skip := disabledFlagsForKube122[strings.Split(arg, "=")[0]]; skip {
+				continue
+			}
+			args = append(args, arg)
+		}
+		defaultSpec.Containers[0].Args = args
+	}
+	return *defaultSpec
+}
+
+func kcmHealthCheckPortForVersion(version string) intstr.IntOrString {
+	switch version {
+	case "1.22":
+		return intstr.FromInt(10257)
+	}
+	return intstr.FromInt(10252)
+}
+
+func kcmHealthCheckSchemeForVersion(version string) v1.URIScheme {
+	switch version {
+	case "1.22":
+		return v1.URISchemeHTTPS
+	}
+	return v1.URISchemeHTTP
+}
