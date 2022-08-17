@@ -12,6 +12,8 @@ spec:
     kind: DataPlane
     listKind: DataPlaneList
     plural: dataplanes
+    shortNames:
+    - dp
     singular: dataplane
   scope: Namespaced
   versions:
