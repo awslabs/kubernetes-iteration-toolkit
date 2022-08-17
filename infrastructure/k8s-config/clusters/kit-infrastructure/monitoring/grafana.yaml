@@ -7,20 +7,6 @@ spec:
   interval: 5m0s
   url: https://grafana.github.io/helm-charts
 ---
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmChart
-metadata:
-  name: grafana
-  namespace: monitoring
-spec:
-  interval: 5m0s
-  chart: grafana
-  reconcileStrategy: ChartVersion
-  sourceRef:
-    kind: HelmRepository
-    name: grafana
-  version: '6.*'
----
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:

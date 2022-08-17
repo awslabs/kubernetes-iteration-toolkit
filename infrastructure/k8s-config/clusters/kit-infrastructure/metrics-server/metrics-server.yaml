@@ -13,20 +13,6 @@ spec:
   interval: 5m0s
   url: https://kubernetes-sigs.github.io/metrics-server/
 ---
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmChart
-metadata:
-  name: metrics-server
-  namespace: metrics-server
-spec:
-  interval: 5m0s
-  chart: metrics-server
-  reconcileStrategy: ChartVersion
-  sourceRef:
-    kind: HelmRepository
-    name: metrics-server
-  version: '3.*'
----
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
