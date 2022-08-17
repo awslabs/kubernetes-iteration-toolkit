@@ -20,6 +20,7 @@ import (
 
 // DataPlane is the Schema for the DataPlanes API
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=dp
 // +kubebuilder:subresource:status
 type DataPlane struct {
 	metav1.TypeMeta   `json:",inline"`

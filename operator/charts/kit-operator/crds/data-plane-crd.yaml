@@ -12,9 +12,9 @@ spec:
     kind: DataPlane
     listKind: DataPlaneList
     plural: dataplanes
-    singular: dataplane
     shortNames:
     - dp
+    singular: dataplane
   scope: Namespaced
   versions:
   - name: v1alpha1

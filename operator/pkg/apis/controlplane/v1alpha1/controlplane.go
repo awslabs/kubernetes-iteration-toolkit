@@ -21,6 +21,7 @@ import (
 
 // ControlPlane is the Schema for the ControlPlanes API
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName=cp
 // +kubebuilder:subresource:status
 type ControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
