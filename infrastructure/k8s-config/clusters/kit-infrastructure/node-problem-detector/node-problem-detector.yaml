@@ -12,20 +12,6 @@ spec:
   interval: 5m0s
   url: https://charts.deliveryhero.io/
 ---
-apiVersion: source.toolkit.fluxcd.io/v1beta2
-kind: HelmChart
-metadata:
-  name: node-problem-detector
-  namespace: node-problem-detector
-spec:
-  interval: 5m0s
-  chart: node-problem-detector
-  reconcileStrategy: ChartVersion
-  sourceRef:
-    kind: HelmRepository
-    name: node-problem-detector
-  version: '2.*'
----
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
@@ -37,6 +23,7 @@ spec:
   chart:
     spec:
       chart: node-problem-detector
+      version: 0.8.10
       sourceRef:
         kind: HelmRepository
         name: node-problem-detector
