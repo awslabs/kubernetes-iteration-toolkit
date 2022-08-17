@@ -37,7 +37,7 @@ spec:
       operator: Exists
     enableSpotInterruptionDraining: true
     enableRebalanceMonitoring: true
-    enableRebalanceDraining: true
+    enableRebalanceDraining: false
     enableScheduledEventDraining: true
       
     
