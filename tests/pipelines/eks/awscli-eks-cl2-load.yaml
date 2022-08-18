@@ -19,7 +19,6 @@ spec:
   - name: results-bucket
   - name: slack-hook
   - name: slack-message
-  - name: vpc-stack-name
   tasks:
   - name: slack-notification
     params:
@@ -33,7 +32,7 @@ spec:
   - name: awscli-vpc-create
     params:
     - name: stack-name
-      value: $(params.vpc-stack-name)
+      value: $(params.cluster-name)
     - name: vpc-cfn-url
       value: "$(params.vpc-cfn-url)"
     taskRef:
@@ -48,7 +47,7 @@ spec:
     - name: endpoint
       value: $(params.endpoint)
     - name: vpc-stack-name
-      value: $(params.vpc-stack-name)
+      value: $(params.cluster-name)
     runAfter:
     - awscli-vpc-create
     taskRef:

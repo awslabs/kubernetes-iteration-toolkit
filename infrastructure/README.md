@@ -8,15 +8,15 @@ All other components are able to be installed via Flux resources.
 
 ### Components:
 
-KIT Infrastructure creates a base K8s cluster with a few add-ons. Add-ons include permissions scoped to the pod using IAM Roles for Service Accounts (IRSA).
+KIT Infrastructure creates a base K8s cluster with below  add-ons by default  but also provides an ability to not install some of these addons optionally through CDK context. Add-ons include permissions scoped to the pod using IAM Roles for Service Accounts (IRSA).
 
 - EKS Cluster (host cluster)
 - EKS Managed Node Group (for critical add-ons mentioned below)
-- EBS CSI Driver
+- EBS CSI Driver (optional)
 - AWS Load Balancer Controller
-- Karpenter
+- Karpenter (optional)
 - Flux v2
-- Kubernetes Iteration Toolkit (KIT) Operator
+- Kubernetes Iteration Toolkit (KIT) Operator (optional)
 
 Flux is setup, by deafult, to monitor the KIT git repo path `./infrastructure/k8s-config/clusters/kit-infrastructure`, which includes other add-ons that do not require AWS credentials such as tekton, prometheus, grafana, and the metrics-server. 
 
@@ -43,16 +43,30 @@ cdk deploy KITInfrastructure --no-rollback \
   -c TestServiceAccount="karpenter-tests"
  ```
 
+  As an example, below are the parmeters used if you want to selectively disable some addons like Karpenter, EBSCSIDriver, KIT.
+ ```shell
+cdk bootstrap
+cdk deploy KITInfrastructure --no-rollback \
+  -c TestNamespace="tekton-pipelines" \
+  -c TestServiceAccount="tekton-pipelines-executor" \
+  -c AWSEBSCSIDriverAddon=false \
+  -c KarpenterAddon=false \
+  -c KITAddon=false \
+ ```
+
 ### Context Parameters:
 
-| Context Param      | Description                                                                                | Default                                                 |   |   |
-|--------------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------|---|---|
-| FluxRepoURL        | Flux Source git repo URL to synchronize KIT infrastructure like Tekton                     | https://github.com/awslabs/kubernetes-iteration-toolkit |   |   |
-| FluxRepoBranch     | Flux Source git repo branch to synchronize KIT infrastructure                              | main                                                    |   |   |
-| FluxRepoPath       | Flux Source git repo path to Kubernetes resources                                          | ./infrastructure/k8s-config/clusters/kit-infrastructure |   |   |
-| TestFluxRepoName   | Flux Source git repo name to synchronize application tests like Tekton Tasks and Pipelines |                                                         |   |   |
-| TestFluxRepoURL    | Flux Source git repo URL to synchronize application tests                                  |                                                         |   |   |
-| TestFluxRepoBranch | Flux Source git repo branch to synchronize application tests                               |                                                         |   |   |
-| TestFluxRepoPath   | Flux Source git repo path to Kubernetes resources                                          |                                                         |   |   |
-| TestNamespace      | Namespace for application tests to run in                                                  |                                                         |   |   |
-| TestServiceAccount | Service Account for application tests to run with                                          |                                                         |   |   |
+| Context Param       | Description                                                                                | Default                                                 |   |   |
+|-------------------- |--------------------------------------------------------------------------------------------|---------------------------------------------------------|---|---|
+| FluxRepoURL         | Flux Source git repo URL to synchronize KIT infrastructure like Tekton                     | https://github.com/awslabs/kubernetes-iteration-toolkit |   |   |
+| FluxRepoBranch      | Flux Source git repo branch to synchronize KIT infrastructure                              | main                                                    |   |   |
+| FluxRepoPath        | Flux Source git repo path to Kubernetes resources                                          | ./infrastructure/k8s-config/clusters/kit-infrastructure |   |   |
+| TestFluxRepoName    | Flux Source git repo name to synchronize application tests like Tekton Tasks and Pipelines |                                                         |   |   |
+| TestFluxRepoURL     | Flux Source git repo URL to synchronize application tests                                  |                                                         |   |   |
+| TestFluxRepoBranch  | Flux Source git repo branch to synchronize application tests                               |                                                         |   |   |
+| TestFluxRepoPath    | Flux Source git repo path to Kubernetes resources                                          |                                                         |   |   |
+| TestNamespace       | Namespace for application tests to run in                                                  |                                                         |   |   |
+| TestServiceAccount  | Service Account for application tests to run with                                          |                                                         |   |   |
+| KITAddon            | KIT CRD addon that gets installed on KIT Infrastructure by default                         | true                                                    |   |   |                               
+| KarpenterAddon      | Karpenter CRD addon that gets installed on KIT Infrastructure by default                   | true                                                    |   |   | 
+| AWSEBSCSIDriverAddon| AWSEBSCSIDriver CRD addon that gets installed on KIT Infrastructure by default             | true                                                    |   |   |
