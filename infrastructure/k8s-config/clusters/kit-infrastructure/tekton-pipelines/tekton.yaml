@@ -79,6 +79,18 @@ spec:
         data: 
           default-task-run-workspace-binding: |
             emptyDir: {}
+    - target:
+        kind: Service
+        name: tekton-dashboard
+        namespace: tekton-pipelines
+      patch: |-
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: tekton-dashboard
+          namespace: tekton-pipelines
+        spec:
+          type: NodePort
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
 kind: Kustomization

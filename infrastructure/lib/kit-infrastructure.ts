@@ -15,6 +15,9 @@ export class KITInfrastructure extends Stack {
     const repoUrl = this.getContextOrDefault('FluxRepoURL', "https://github.com/awslabs/kubernetes-iteration-toolkit")
     const repoBranch = this.getContextOrDefault('FluxRepoBranch', 'main')
     const repoPath = this.getContextOrDefault('FluxRepoPath', './infrastructure/k8s-config/clusters/kit-infrastructure')
+    const installEBSCSIDriverAddon = this.getContextOrDefault("AWSEBSCSIDriverAddon", "true")
+    const installKarpenterAddon = this.getContextOrDefault('KarpenterAddon', "true")
+    const installKitAddon = this.getContextOrDefault("KITAddon", "true")
 
     const testRepoName = this.node.tryGetContext('TestFluxRepoName')
     const testRepoUrl = this.node.tryGetContext('TestFluxRepoURL')
@@ -145,13 +148,14 @@ export class KITInfrastructure extends Stack {
     })
 
     // Install cluster add-ons for the host cluster
-
-    new AWSEBSCSIDriver(this, 'AWSEBSCSIDriver', {
-      cluster: cluster,
-      namespace: 'aws-ebs-csi-driver',
-      version: 'v1.9.0',
-      chartVersion: 'v2.8.1',
-    }).node.addDependency(cluster);
+    if (installEBSCSIDriverAddon == "true") {
+      new AWSEBSCSIDriver(this, 'AWSEBSCSIDriver', {
+        cluster: cluster,
+        namespace: 'aws-ebs-csi-driver',
+        version: 'v1.9.0',
+        chartVersion: 'v2.8.1',
+      }).node.addDependency(cluster);
+    }
 
     new FluxV2(this, 'Flux', {
       cluster: cluster,
@@ -172,17 +176,21 @@ export class KITInfrastructure extends Stack {
       version: 'v2.4.2',
     }).node.addDependency(cluster);
 
-    new KIT(this, 'KIT', {
-      cluster: cluster,
-      namespace: 'kit',
-      version: 'v0.0.18',
-    }).node.addDependency(cluster);
+    if(installKitAddon == "true"){
+      new KIT(this, 'KIT', {
+        cluster: cluster,
+        namespace: 'kit',
+        version: 'v0.0.18',
+      }).node.addDependency(cluster);
+    }
 
-    new Karpenter(this, 'KarpenterController', {
-      cluster: cluster,
-      namespace: 'karpenter',
-      nodeRoleName: workerRole.roleName,
-    }).node.addDependency(cluster);
+    if(installKarpenterAddon == "true") {
+      new Karpenter(this, 'KarpenterController', {
+        cluster: cluster,
+        namespace: 'karpenter',
+        nodeRoleName: workerRole.roleName,
+      }).node.addDependency(cluster);
+    }
   }
 
   private getContextOrDefault(key: string, def: string | null): any {
