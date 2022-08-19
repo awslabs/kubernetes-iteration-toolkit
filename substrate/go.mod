@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/aws/aws-sdk-go v1.43.8
-	github.com/awslabs/kubernetes-iteration-toolkit/operator v0.0.0-20220314194613-591115b03ecd
+	github.com/awslabs/kubernetes-iteration-toolkit/operator v0.0.0-20220818192233-b51328aa42d4
 	github.com/imdario/mergo v0.3.12
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/spf13/cobra v1.4.0
@@ -158,7 +158,6 @@ require (
 )
 
 replace (
-	github.com/awslabs/kubernetes-iteration-toolkit/operator => ../operator
 	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => k8s.io/api v0.24.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.24.0
