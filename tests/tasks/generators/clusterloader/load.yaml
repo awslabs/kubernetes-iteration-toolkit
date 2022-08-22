@@ -26,7 +26,6 @@ spec:
     description: "Results bucket with path of s3 to upload results"
   workspaces:
   - name: source
-  - name: config
   - name: results
   steps:
   - name: git-clone      

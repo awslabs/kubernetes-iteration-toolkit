@@ -44,6 +44,9 @@ export class AWSLoadBalancerController extends Construct {
             'eks.amazonaws.com/role-arn': sa.role.roleArn
           }
         },
+        clusterSecretsPermissions: {
+          allowAllSecrets: true  
+        },
         tolerations: [
           {
               key: 'CriticalAddonsOnly',

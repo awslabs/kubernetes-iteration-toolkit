@@ -3,6 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: kit-cluster-teardown
+  namespace: tekton-pipelines
 spec:
   description: |
     Teardown an KIT cluster.

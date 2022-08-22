@@ -19,8 +19,7 @@ spec:
   - name: create-vpc
     image: alpine/k8s:1.22.6
     script: |
-      #!/usr/bin/env bash
       echo "Approving KCM requests"
       kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       curl -s $(params.vpc-cfn-url) -o ./amazon-vpc-eks
-      aws cloudformation --region $(params.region) deploy --stack-name $(params.stack-name)  --template-file file://$(pwd)/amazon-vpc-eks 
+      aws cloudformation --region $(params.region) deploy --stack-name $(params.stack-name)  --template-file ./amazon-vpc-eks || true

@@ -3,6 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: kit-cluster-create
+  namespace: tekton-pipelines
 spec:
   description: |
     Create a KIT cluster.
