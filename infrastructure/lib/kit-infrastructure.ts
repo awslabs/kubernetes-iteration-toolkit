@@ -137,6 +137,7 @@ export class KITInfrastructure extends Stack {
                     "eks:*",
                     "pricing:GetProducts",
                     "sts:AssumeRole",
+                    "s3:*"
                 ],
             }),
         ],
