@@ -3,6 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: kitloadtest
+  namespace: tekton-pipelines
 spec:
   workspaces:
     - name: config

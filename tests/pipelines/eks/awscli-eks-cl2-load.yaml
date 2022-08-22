@@ -19,6 +19,7 @@ spec:
   - name: results-bucket
   - name: slack-hook
   - name: slack-message
+  - name: vpc-cfn-url
   tasks:
   - name: slack-notification
     params:
@@ -53,9 +54,6 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-create-with-vpc-stack
-    workspaces:
-    - name: config
-      workspace: config
   - name: create-mng-nodes
     params:
     - name: cluster-name
@@ -91,8 +89,6 @@ spec:
     workspaces:
     - name: source
       workspace: source
-    - name: config
-      workspace: config
     - name: results
       workspace: results
   finally:    
@@ -110,6 +106,5 @@ spec:
       kind: Task
       name:  awscli-eks-cluster-teardown
   workspaces:
-  - name: config
   - name: source
   - name: results

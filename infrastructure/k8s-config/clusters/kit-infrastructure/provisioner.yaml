@@ -30,4 +30,4 @@ spec:
       memory: 1000Gi
   providerRef: 
       name: default
-  ttlSecondsAfterEmpty: 300
+  ttlSecondsAfterEmpty: 864000
