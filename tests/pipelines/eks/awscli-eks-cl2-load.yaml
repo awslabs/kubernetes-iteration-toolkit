@@ -81,6 +81,10 @@ spec:
       value: $(params.results-bucket)
     - name: nodes
       value: $(params.desired-nodes)
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
     runAfter:
     - create-mng-nodes
     taskRef:
