@@ -10,6 +10,9 @@ spec:
   - name: giturl
     description: "git url to clone the package"
     default: https://github.com/kubernetes/perf-tests.git
+  - name: cl2-branch
+    description: "The branch of clusterloader2 you want to use"
+    default: "release-1.23"
   - name: nodes-per-namespace
     description: "nodes per namespace to get created for load test "
     default: "100"
@@ -39,7 +42,12 @@ spec:
   - name: git-clone      
     image: alpine/git
     workingDir: $(workspaces.source.path)
-    args: ["clone", "$(params.giturl)"]
+    script: |
+      git clone $(params.giturl)
+      cd $(workspaces.source.path)/perf-tests/
+      git fetch origin --verbose --tags
+      git checkout $(params.cl2-branch)
+      git branch
   - name: prepare-loadtest
     image: alpine/k8s:1.22.6
     workingDir: $(workspaces.source.path)
@@ -70,6 +78,7 @@ spec:
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
     timeout: 30000s
   - name: upload-results

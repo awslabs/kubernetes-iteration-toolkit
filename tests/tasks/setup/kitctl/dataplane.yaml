@@ -49,4 +49,3 @@ spec:
           sleep 5
       done 
       kubectl --kubeconfig=/tmp/kubeconfig get nodes
-
