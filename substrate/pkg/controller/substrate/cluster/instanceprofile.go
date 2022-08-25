@@ -39,7 +39,7 @@ type role struct {
 
 func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	for _, desired := range desiredRolesFor(substrate) {
-		result, err := i.create(ctx, desired.name, desired.policy, desired.managedPolicies)
+		result, err := i.CreateInstanceProfile(ctx, desired.name, desired.policy, desired.managedPolicies)
 		if err != nil {
 			return result, err
 		}
@@ -47,7 +47,7 @@ func (i *InstanceProfile) Create(ctx context.Context, substrate *v1alpha1.Substr
 	return reconcile.Result{}, nil
 }
 
-func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *string, managedPolicies []string) (reconcile.Result, error) {
+func (i *InstanceProfile) CreateInstanceProfile(ctx context.Context, resourceName, policy *string, managedPolicies []string) (reconcile.Result, error) {
 	//Todo: remove fargate service principle when we have this in place - https://github.com/awslabs/kubernetes-iteration-toolkit/issues/186
 	// Role
 	if _, err := i.IAM.CreateRole(&iam.CreateRoleInput{RoleName: resourceName, AssumeRolePolicyDocument: aws.String(`{
@@ -108,7 +108,7 @@ func (i *InstanceProfile) create(ctx context.Context, resourceName, policy *stri
 
 func (i *InstanceProfile) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
 	for _, desired := range desiredRolesFor(substrate) {
-		result, err := i.delete(ctx, desired.name, desired.policy, desired.managedPolicies)
+		result, err := i.DeleteInstanceProfile(ctx, desired.name, desired.policy, desired.managedPolicies)
 		if err != nil {
 			return result, err
 		}
@@ -116,7 +116,7 @@ func (i *InstanceProfile) Delete(ctx context.Context, substrate *v1alpha1.Substr
 	return reconcile.Result{}, nil
 }
 
-func (i *InstanceProfile) delete(ctx context.Context, resourceName, policy *string, managedPolicies []string) (reconcile.Result, error) {
+func (i *InstanceProfile) DeleteInstanceProfile(ctx context.Context, resourceName, policy *string, managedPolicies []string) (reconcile.Result, error) {
 	// Policy
 	if policy != nil {
 		if _, err := i.IAM.DeleteRolePolicyWithContext(ctx, &iam.DeleteRolePolicyInput{RoleName: resourceName, PolicyName: resourceName}); err != nil {
