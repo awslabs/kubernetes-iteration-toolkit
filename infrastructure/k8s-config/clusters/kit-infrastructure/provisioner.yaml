@@ -9,6 +9,11 @@ spec:
     aws-cdk:subnet-type: Private
   securityGroupSelector:
     kit.sh/stack: KITInfrastructure
+  blockDeviceMappings:
+  - deviceName: /dev/xvda
+    ebs:
+      volumeSize: 100Gi
+      volumeType: gp3
 ---
 apiVersion: karpenter.sh/v1alpha5
 kind: Provisioner
