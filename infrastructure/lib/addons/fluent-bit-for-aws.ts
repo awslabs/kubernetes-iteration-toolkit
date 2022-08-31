@@ -5,8 +5,6 @@ import { aws_eks as eks } from 'aws-cdk-lib';
 export interface AWSFluentBitProps extends StackProps {
     cluster: eks.Cluster
     namespace: string
-    version: string
-    chartVersion: string
 }
 
 export class AWSFluentBit extends Construct {
@@ -31,7 +29,6 @@ export class AWSFluentBit extends Construct {
         const chart = props.cluster.addHelmChart('aws-fluent-bit-chart', {
             chart: 'aws-for-fluent-bit',
             release: 'aws-fluent-bit',
-            version: props.chartVersion,
             repository: 'https://aws.github.io/eks-charts',
             namespace: props.namespace,
             createNamespace: false,

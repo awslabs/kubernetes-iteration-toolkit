@@ -3,6 +3,7 @@ import { SecurityGroup } from 'aws-cdk-lib/aws-ec2'
 import { Construct } from 'constructs'
 import { AWSEBSCSIDriver } from './addons/aws-ebs-csi-driver'
 import { AWSLoadBalancerController } from './addons/aws-lbc'
+import { AWSFluentBit } from './addons/fluent-bit-for-aws'
 import { FluxV2 } from './addons/fluxv2'
 import { Karpenter } from './addons/karpenter'
 import { KIT } from './addons/kit'
@@ -157,6 +158,11 @@ export class KITInfrastructure extends Stack {
         chartVersion: 'v2.8.1',
       }).node.addDependency(cluster);
     }
+
+    new AWSFluentBit(this, 'AWSFluentBit', {
+      cluster: cluster,
+      namespace: 'aws-fluent-bit',
+    }).node.addDependency(cluster);
 
     new FluxV2(this, 'Flux', {
       cluster: cluster,
