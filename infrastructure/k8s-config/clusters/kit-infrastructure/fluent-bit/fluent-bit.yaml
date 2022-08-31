@@ -35,11 +35,15 @@ spec:
     tolerations:
     - key: CriticalAddonsOnly
       operator: Exists
-    cloudWatch.region: us-east-2
-    cloudwatch.logRetentionDays: 90
-    firehose.enabled: false
-    kinesis.enabled: false
-    elasticsearch.enabled: false
+    cloudWatch:
+      region: us-east-2
+      logRetentionDays: 90
+    firehose:
+      enabled: false
+    kinesis:
+      enabled: false
+    elasticsearch:
+      enabled: false
 
       
     
