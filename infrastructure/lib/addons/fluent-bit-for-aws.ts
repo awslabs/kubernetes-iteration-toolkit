@@ -20,11 +20,22 @@ export class AWSFluentBit extends Construct {
 
         // Controller Role
         const sa = props.cluster.addServiceAccount('aws-fluent-bit-sa', {
-            name: "aws-fluent-bit",
+            name: "fluent-bit",
             namespace: props.namespace
         })
         sa.node.addDependency(ns)
         sa.role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchAgentServerPolicy'))
+        sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-fluent-bit-inline-policy', {
+            statements: [
+                new iam.PolicyStatement({
+                    resources: ['*'],
+                    actions: [
+                      "logs:PutRetentionPolicy",
+                    ],
+                }),
+            ],
+        }));
+      
 
         const chart = props.cluster.addHelmChart('aws-fluent-bit-chart', {
             chart: 'aws-for-fluent-bit',
@@ -34,21 +45,23 @@ export class AWSFluentBit extends Construct {
             createNamespace: false,
             values: {
                 serviceAccount: {
-                    create: "false",
-                    name: sa.serviceAccountName,
+                    create: false,
+                    name: 'fluent-bit',
                 },
                 cloudWatch: {
                   region: Stack.of(this).region,
                   logRetentionDays: "90",
+                  logKey: "log",
+                  logGroupName: Stack.of(this).stackName,
                 },
                 firehose: {
-                  enabled: "false",
+                  enabled: false,
                 },
                 kinesis: {
-                  enabled: "false",
+                  enabled: false,
                 },
                 elasticsearch: {
-                  enabled: "false",
+                  enabled: false,
                 },
                 tolerations: [
                     {
