@@ -60,7 +60,7 @@ func (a *Address) Create(ctx context.Context, substrate *v1alpha1.Substrate) (re
 }
 
 func (a *Address) ensure(ctx context.Context, tagValue *string, substrate *v1alpha1.Substrate) (*addressOutput, error) {
-	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate, tagValue)})
+	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate.Name, tagValue)})
 	if err != nil {
 		return nil, fmt.Errorf("describing addresses, %w", err)
 	}
@@ -71,7 +71,7 @@ func (a *Address) ensure(ctx context.Context, tagValue *string, substrate *v1alp
 	output, err := a.EC2.AllocateAddressWithContext(ctx, &ec2.AllocateAddressInput{
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeElasticIp),
-			Tags:         discovery.Tags(substrate, tagValue),
+			Tags:         discovery.Tags(substrate.Name, tagValue),
 		}},
 	})
 	if err != nil {
@@ -82,7 +82,7 @@ func (a *Address) ensure(ctx context.Context, tagValue *string, substrate *v1alp
 }
 
 func (a *Address) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate)})
+	addressesOutput, err := a.EC2.DescribeAddressesWithContext(ctx, &ec2.DescribeAddressesInput{Filters: discovery.Filters(substrate.Name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing addresses, %w", err)
 	}

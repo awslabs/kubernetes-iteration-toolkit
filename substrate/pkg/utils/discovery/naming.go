@@ -22,5 +22,9 @@ import (
 )
 
 func Name(substrate *v1alpha1.Substrate, suffixes ...string) *string {
-	return aws.String(strings.Join(append([]string{substrate.Name}, suffixes...), "-"))
+	return NameFrom(substrate.Name, suffixes...)
+}
+
+func NameFrom(name string, suffixes ...string) *string {
+	return aws.String(strings.Join(append([]string{name}, suffixes...), "-"))
 }

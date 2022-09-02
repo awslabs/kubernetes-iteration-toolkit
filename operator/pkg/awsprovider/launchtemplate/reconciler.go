@@ -72,8 +72,33 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 	return nil
 }
 
+func (c *Controller) CreateResource(
+	ctx context.Context, spec *v1alpha1.DataPlaneSpec,
+	securityGroupID, clusterEndpoint, amiID, instanceProfile string,
+	clusterCA []byte,
+) error {
+	// get launch template
+	templates, err := c.getLaunchTemplates(ctx, spec.ClusterName)
+	if err != nil && !errors.IsLaunchTemplateDoNotExist(err) {
+		return fmt.Errorf("getting launch template, %w", err)
+	}
+	if !existingTemplateMatchesDesired(templates, spec.ClusterName) { // TODO check if existing LT is same as desired LT
+		// create launch template
+		if err := c.createLaunchTemplateResource(ctx, spec, securityGroupID, clusterEndpoint, amiID, instanceProfile, clusterCA); err != nil {
+			return fmt.Errorf("creating launch template, %w", err)
+		}
+		zap.S().Infof("[%s] Created launch template", spec.ClusterName)
+		return nil
+	}
+	return nil
+}
+
 func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	return c.deleteLaunchTemplate(ctx, TemplateName(dataplane.Spec.ClusterName))
+}
+
+func (c *Controller) DeleteResource(ctx context.Context, name string) error {
+	return c.deleteLaunchTemplate(ctx, TemplateName(name))
 }
 
 func (c *Controller) deleteLaunchTemplate(ctx context.Context, templateName string) error {
@@ -109,6 +134,15 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 	if err != nil {
 		return fmt.Errorf("getting ami id for worker nodes, %w", err)
 	}
+	instanceProfile := iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)
+	return c.createLaunchTemplateResource(ctx, &dataplane.Spec, securityGroupID, clusterEndpoint, amiID, instanceProfile, clusterCA)
+}
+
+func (c *Controller) createLaunchTemplateResource(
+	ctx context.Context, spec *v1alpha1.DataPlaneSpec,
+	securityGroupID, clusterEndpoint, amiID, instanceProfile string,
+	clusterCA []byte,
+) error {
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
 			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{{
@@ -123,17 +157,17 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 			InstanceType: ptr.String("t2.xlarge"), // TODO get this from dataplane spec
 			ImageId:      ptr.String(amiID),
 			IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileSpecificationRequest{
-				Name: aws.String(iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)),
+				Name: aws.String(instanceProfile),
 			},
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
 			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
 			UserData: ptr.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
-				dataplane.Spec.ClusterName, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
+				spec.ClusterName, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
 		},
-		LaunchTemplateName: ptr.String(TemplateName(dataplane.Spec.ClusterName)),
-		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),
+		LaunchTemplateName: ptr.String(TemplateName(spec.ClusterName)),
+		TagSpecifications:  generateEC2Tags("launch-template", spec.ClusterName),
 	}
-	if _, err := c.ec2api.CreateLaunchTemplate(input); err != nil {
+	if _, err := c.ec2api.CreateLaunchTemplateWithContext(ctx, input); err != nil {
 		return fmt.Errorf("creating launch template, %w", err)
 	}
 	return nil

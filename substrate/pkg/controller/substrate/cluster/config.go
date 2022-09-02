@@ -106,12 +106,22 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		return reconcile.Result{}, fmt.Errorf("generating authenticator config, %w", err)
 	}
 	// upload to s3 bucket
-	if err := c.S3Uploader.UploadWithIterator(ctx, NewDirectoryIterator(
-		aws.StringValue(discovery.Name(substrate)), path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate))))); err != nil {
+	directoyIterator, err := NewDirectoryIterator(
+		aws.StringValue(discovery.Name(substrate)),
+		path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate))),
+	)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("building directory iterator %w", err)
+	}
+
+	if err := c.S3Uploader.UploadWithIterator(ctx, directoyIterator); err != nil {
 		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
+
 	logging.FromContext(ctx).Debugf("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
+
 	substrate.Status.Cluster.KubeConfig = ptr.String(path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), kubeconfigFile))
+
 	return reconcile.Result{}, nil
 }
 
@@ -369,22 +379,29 @@ type DirectoryIterator struct {
 }
 
 // NewDirectoryIterator builds a new DirectoryIterator
-func NewDirectoryIterator(bucket, dir string) s3manager.BatchUploadIterator {
+func NewDirectoryIterator(bucket, dir string) (s3manager.BatchUploadIterator, error) {
 	var paths []string
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			paths = append(paths, path)
-		}
-		return nil
-	})
+	err := filepath.Walk(
+		dir,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() {
+				paths = append(paths, path)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	return &DirectoryIterator{
 		filePaths: paths,
 		bucket:    bucket,
 		localDir:  dir,
-	}
+	}, nil
 }
 
 // Next returns whether next file exists or not

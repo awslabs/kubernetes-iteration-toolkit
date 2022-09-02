@@ -32,47 +32,62 @@ type RouteTable struct {
 }
 
 func (r *RouteTable) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.Infrastructure.VPCID == nil {
+	return r.CreateResource(ctx, substrate.Name, &substrate.Spec, &substrate.Status)
+}
+
+func (r *RouteTable) CreateResource(ctx context.Context, name string, spec *v1alpha1.SubstrateSpec, status *v1alpha1.SubstrateStatus) (reconcile.Result, error) {
+	if status.Infrastructure.VPCID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	publicRouteTable, err := r.ensure(ctx, substrate, discovery.Name(substrate, "public"))
+	publicRouteTable, err := r.ensure(ctx, name, spec, status, true)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	substrate.Status.Infrastructure.PublicRouteTableID = publicRouteTable.RouteTableId
-	privateRouteTable, err := r.ensure(ctx, substrate, discovery.Name(substrate, "private"))
+	status.Infrastructure.PublicRouteTableID = publicRouteTable.RouteTableId
+	privateRouteTable, err := r.ensure(ctx, name, spec, status, false)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	substrate.Status.Infrastructure.PrivateRouteTableID = privateRouteTable.RouteTableId
+	status.Infrastructure.PrivateRouteTableID = privateRouteTable.RouteTableId
 	return reconcile.Result{}, nil
 }
 
-func (r *RouteTable) ensure(ctx context.Context, substrate *v1alpha1.Substrate, name *string) (*ec2.RouteTable, error) {
-	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate, name)})
+func (r *RouteTable) ensure(ctx context.Context, name string, spec *v1alpha1.SubstrateSpec, status *v1alpha1.SubstrateStatus, isPublic bool) (*ec2.RouteTable, error) {
+	var tableName *string
+	if isPublic {
+		tableName = discovery.NameFrom(name, "public")
+	} else {
+		tableName = discovery.NameFrom(name, "private")
+	}
+
+	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(name, tableName)})
 	if err != nil {
 		return nil, fmt.Errorf("describing route tables, %w", err)
 	}
 	if len(describeRouteTablesOutput.RouteTables) > 0 {
-		logging.FromContext(ctx).Debugf("Found route table %s, %v", aws.StringValue(name), *describeRouteTablesOutput.RouteTables[0].RouteTableId)
+		logging.FromContext(ctx).Debugf("Found route table %s, %v", aws.StringValue(tableName), *describeRouteTablesOutput.RouteTables[0].RouteTableId)
 		return describeRouteTablesOutput.RouteTables[0], nil
 	}
 	createRouteTableOutput, err := r.EC2.CreateRouteTableWithContext(ctx, &ec2.CreateRouteTableInput{
-		VpcId: substrate.Status.Infrastructure.VPCID,
+		VpcId: status.Infrastructure.VPCID,
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeRouteTable),
-			Tags:         discovery.Tags(substrate, name),
+			Tags:         discovery.Tags(name, tableName),
 		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating route table, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Created route table %s", aws.StringValue(name))
+	logging.FromContext(ctx).Infof("Created route table %s", aws.StringValue(tableName))
 	return createRouteTableOutput.RouteTable, nil
 }
 
 func (r *RouteTable) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(substrate)})
+	return r.DeleteResource(ctx, substrate.Name)
+}
+
+func (r *RouteTable) DeleteResource(ctx context.Context, name string) (reconcile.Result, error) {
+	describeRouteTablesOutput, err := r.EC2.DescribeRouteTablesWithContext(ctx, &ec2.DescribeRouteTablesInput{Filters: discovery.Filters(name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing route tables, %w", err)
 	}

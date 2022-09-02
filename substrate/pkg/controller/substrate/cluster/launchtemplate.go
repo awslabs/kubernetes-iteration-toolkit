@@ -117,7 +117,7 @@ chmod a+x /etc/kit/sync.sh
 		LaunchTemplateName: discovery.Name(substrate),
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeLaunchTemplate),
-			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+			Tags:         discovery.Tags(substrate.Name, discovery.Name(substrate)),
 		}},
 		LaunchTemplateData: launchTemplateData,
 	}); err != nil {
@@ -147,7 +147,7 @@ chmod a+x /etc/kit/sync.sh
 }
 
 func (l *LaunchTemplate) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	launchTemplatesOutput, err := l.EC2.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
+	launchTemplatesOutput, err := l.EC2.DescribeLaunchTemplatesWithContext(ctx, &ec2.DescribeLaunchTemplatesInput{Filters: discovery.Filters(substrate.Name, discovery.Name(substrate))})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing launch templates, %w", err)
 	}

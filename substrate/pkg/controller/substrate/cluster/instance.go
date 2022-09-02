@@ -35,7 +35,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 	if len(substrate.Status.Infrastructure.PublicSubnetIDs) == 0 || substrate.Status.Cluster.LaunchTemplateVersion == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate)})
+	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate.Name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing instances, %w", err)
 	}
@@ -70,19 +70,25 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		},
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeInstance),
-			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+			Tags:         discovery.Tags(substrate.Name, discovery.Name(substrate)),
 		}},
 		OnDemandOptions: &ec2.OnDemandOptionsRequest{AllocationStrategy: aws.String(ec2.FleetOnDemandAllocationStrategyLowestPrice)},
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating fleet, %w", err)
 	}
+
+	createFleetErrMsgs := make([]string, 0)
 	for _, err := range createFleetOutput.Errors {
 		if strings.Contains(aws.StringValue(err.ErrorMessage), "Invalid IAM Instance Profile name") {
 			return reconcile.Result{Requeue: true}, nil
 		}
-		return reconcile.Result{}, fmt.Errorf("creating fleet %v", aws.StringValue(err.ErrorMessage))
+		createFleetErrMsgs = append(createFleetErrMsgs, aws.StringValue(err.ErrorMessage))
 	}
+	if len(createFleetErrMsgs) > 0 {
+		return reconcile.Result{}, fmt.Errorf("creating fleet %v", strings.Join(createFleetErrMsgs, " "))
+	}
+
 	logging.FromContext(ctx).Infof("Created instance %s", aws.StringValue(createFleetOutput.Instances[0].InstanceIds[0]))
 
 	if err := i.delete(ctx, substrate, func(instance *ec2.Instance) bool {
@@ -105,7 +111,7 @@ func (i *Instance) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (r
 }
 
 func (i *Instance) delete(ctx context.Context, substrate *v1alpha1.Substrate, predicate func(*ec2.Instance) bool) error {
-	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate)})
+	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate.Name)})
 	if err != nil {
 		return fmt.Errorf("describing instances, %w", err)
 	}

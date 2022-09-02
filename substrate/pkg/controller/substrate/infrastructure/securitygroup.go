@@ -32,14 +32,18 @@ type SecurityGroup struct {
 }
 
 func (s *SecurityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.Infrastructure.VPCID == nil {
+	return s.CreateResource(ctx, substrate.Name, &substrate.Spec, &substrate.Status)
+}
+
+func (s *SecurityGroup) CreateResource(ctx context.Context, name string, spec *v1alpha1.SubstrateSpec, status *v1alpha1.SubstrateStatus) (reconcile.Result, error) {
+	if status.Infrastructure.VPCID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	securityGroup, err := s.ensure(ctx, substrate)
+	securityGroup, err := s.ensure(ctx, name, spec, status)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	substrate.Status.Infrastructure.SecurityGroupID = securityGroup.GroupId
+	status.Infrastructure.SecurityGroupID = securityGroup.GroupId
 	if _, err := s.EC2.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: securityGroup.GroupId,
 		IpPermissions: []*ec2.IpPermission{{
@@ -58,29 +62,29 @@ func (s *SecurityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrat
 		if err.(awserr.Error).Code() != "InvalidPermission.Duplicate" {
 			return reconcile.Result{}, fmt.Errorf("authorizing security group ingress, %w", err)
 		}
-		logging.FromContext(ctx).Debugf("Found ingress rules for security group %s", aws.StringValue(discovery.Name(substrate)))
+		logging.FromContext(ctx).Debugf("Found ingress rules for security group %s", aws.StringValue(discovery.NameFrom(name)))
 	} else {
-		logging.FromContext(ctx).Infof("Created ingress rules for security group %s", aws.StringValue(discovery.Name(substrate)))
+		logging.FromContext(ctx).Infof("Created ingress rules for security group %s", aws.StringValue(discovery.NameFrom(name)))
 	}
 	return reconcile.Result{}, nil
 }
 
-func (s *SecurityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.SecurityGroup, error) {
-	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
+func (s *SecurityGroup) ensure(ctx context.Context, name string, spec *v1alpha1.SubstrateSpec, status *v1alpha1.SubstrateStatus) (*ec2.SecurityGroup, error) {
+	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(name, discovery.NameFrom(name))})
 	if err != nil {
 		return nil, fmt.Errorf("describing security groups, %w", err)
 	}
 	if len(describeSecurityGroupsOutput.SecurityGroups) > 0 {
-		logging.FromContext(ctx).Debugf("Found security group %s", aws.StringValue(discovery.Name(substrate)))
+		logging.FromContext(ctx).Debugf("Found security group %s", aws.StringValue(discovery.NameFrom(name)))
 		return describeSecurityGroupsOutput.SecurityGroups[0], nil
 	}
 	createSecurityGroupOutput, err := s.EC2.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
-		Description: aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
-		GroupName:   discovery.Name(substrate),
-		VpcId:       substrate.Status.Infrastructure.VPCID,
+		Description: aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", name)),
+		GroupName:   discovery.NameFrom(name),
+		VpcId:       status.Infrastructure.VPCID,
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeSecurityGroup),
-			Tags:         append(discovery.Tags(substrate, discovery.Name(substrate)), &ec2.Tag{Key: aws.String("kubernetes.io/cluster/" + substrate.Name), Value: aws.String("owned")}),
+			Tags:         append(discovery.Tags(name, discovery.NameFrom(name)), &ec2.Tag{Key: aws.String("kubernetes.io/cluster/" + name), Value: aws.String("owned")}),
 		}},
 	})
 	if err != nil {
@@ -91,7 +95,11 @@ func (s *SecurityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrat
 }
 
 func (s *SecurityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(substrate)})
+	return s.DeleteResource(ctx, substrate.Name)
+}
+
+func (s *SecurityGroup) DeleteResource(ctx context.Context, name string) (reconcile.Result, error) {
+	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing security groups, %w", err)
 	}

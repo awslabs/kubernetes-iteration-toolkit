@@ -17,6 +17,7 @@ package main
 import (
 	"os"
 	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/controller/substrate"

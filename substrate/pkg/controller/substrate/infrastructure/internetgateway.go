@@ -32,24 +32,28 @@ type InternetGateway struct {
 }
 
 func (i *InternetGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.Infrastructure.VPCID == nil || substrate.Status.Infrastructure.PublicRouteTableID == nil {
+	return i.CreateResource(ctx, substrate.Name, &substrate.Spec, &substrate.Status)
+}
+
+func (i *InternetGateway) CreateResource(ctx context.Context, name string, spec *v1alpha1.SubstrateSpec, status *v1alpha1.SubstrateStatus) (reconcile.Result, error) {
+	if status.Infrastructure.VPCID == nil || status.Infrastructure.PublicRouteTableID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	internetGateway, err := i.ensure(ctx, substrate)
+	internetGateway, err := i.ensure(ctx, name)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	if _, err := i.EC2.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{InternetGatewayId: internetGateway.InternetGatewayId, VpcId: substrate.Status.Infrastructure.VPCID}); err != nil {
+	if _, err := i.EC2.AttachInternetGatewayWithContext(ctx, &ec2.AttachInternetGatewayInput{InternetGatewayId: internetGateway.InternetGatewayId, VpcId: status.Infrastructure.VPCID}); err != nil {
 		if err.(awserr.Error).Code() == "Resource.AlreadyAssociated" {
-			logging.FromContext(ctx).Debugf("Found internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
+			logging.FromContext(ctx).Debugf("Found internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(status.Infrastructure.VPCID))
 		} else {
 			return reconcile.Result{}, fmt.Errorf("attaching internet gateway, %w", err)
 		}
 	} else {
-		logging.FromContext(ctx).Debugf("Created internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(substrate.Status.Infrastructure.VPCID))
+		logging.FromContext(ctx).Debugf("Created internet gateway attachment %s to %s", aws.StringValue(internetGateway.InternetGatewayId), aws.StringValue(status.Infrastructure.VPCID))
 	}
 	if _, err := i.EC2.CreateRouteWithContext(ctx, &ec2.CreateRouteInput{
-		RouteTableId:         substrate.Status.Infrastructure.PublicRouteTableID,
+		RouteTableId:         status.Infrastructure.PublicRouteTableID,
 		DestinationCidrBlock: aws.String("0.0.0.0/0"),
 		GatewayId:            internetGateway.InternetGatewayId,
 	}); err != nil {
@@ -60,37 +64,41 @@ func (i *InternetGateway) Create(ctx context.Context, substrate *v1alpha1.Substr
 	return reconcile.Result{}, nil
 }
 
-func (i *InternetGateway) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.InternetGateway, error) {
-	descrbeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
+func (i *InternetGateway) ensure(ctx context.Context, name string) (*ec2.InternetGateway, error) {
+	descrbeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: discovery.Filters(name, discovery.NameFrom(name))})
 	if err != nil {
 		return nil, fmt.Errorf("describing internet gateways, %w", err)
 	}
 	if len(descrbeInternetGatewaysOutput.InternetGateways) > 0 {
-		logging.FromContext(ctx).Debugf("Found internet gateway %s", substrate.Name)
+		logging.FromContext(ctx).Debugf("Found internet gateway %s", name)
 		return descrbeInternetGatewaysOutput.InternetGateways[0], nil
 	}
 	createInternetGatewayOutput, err := i.EC2.CreateInternetGatewayWithContext(ctx, &ec2.CreateInternetGatewayInput{
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeInternetGateway),
-			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
+			Tags:         discovery.Tags(name, discovery.NameFrom(name)),
 		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating internet gateway, %w", err)
 	}
-	logging.FromContext(ctx).Infof("Created internet gateway %s", substrate.Name)
+	logging.FromContext(ctx).Infof("Created internet gateway %s", name)
 	return createInternetGatewayOutput.InternetGateway, nil
 }
 
 func (i *InternetGateway) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	describeVpcsOutput, err := i.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate)})
+	return i.DeleteResource(ctx, substrate.Name)
+}
+
+func (i *InternetGateway) DeleteResource(ctx context.Context, name string) (reconcile.Result, error) {
+	describeVpcsOutput, err := i.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
 	if len(describeVpcsOutput.Vpcs) == 0 {
 		return reconcile.Result{}, nil
 	}
-	describeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: discovery.Filters(substrate)})
+	describeInternetGatewaysOutput, err := i.EC2.DescribeInternetGatewaysWithContext(ctx, &ec2.DescribeInternetGatewaysInput{Filters: discovery.Filters(name)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing internet gateways, %w", err)
 	}
