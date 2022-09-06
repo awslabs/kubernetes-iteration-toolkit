@@ -72,22 +72,18 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 	return nil
 }
 
-func (c *Controller) CreateResource(
-	ctx context.Context, spec *v1alpha1.DataPlaneSpec,
-	securityGroupID, clusterEndpoint, amiID, instanceProfile string,
-	clusterCA []byte,
-) error {
+func (c *Controller) CreateResource(ctx context.Context, dataplane *v1alpha1.DataPlane, clusterCA []byte) error {
 	// get launch template
-	templates, err := c.getLaunchTemplates(ctx, spec.ClusterName)
+	templates, err := c.getLaunchTemplates(ctx, dataplane.Spec.ClusterName)
 	if err != nil && !errors.IsLaunchTemplateDoNotExist(err) {
 		return fmt.Errorf("getting launch template, %w", err)
 	}
-	if !existingTemplateMatchesDesired(templates, spec.ClusterName) { // TODO check if existing LT is same as desired LT
+	if !existingTemplateMatchesDesired(templates, dataplane.Spec.ClusterName) { // TODO check if existing LT is same as desired LT
 		// create launch template
-		if err := c.createLaunchTemplateResource(ctx, spec, securityGroupID, clusterEndpoint, amiID, instanceProfile, clusterCA); err != nil {
+		if err := c.createLaunchTemplateWithClusterCA(ctx, dataplane, clusterCA); err != nil {
 			return fmt.Errorf("creating launch template, %w", err)
 		}
-		zap.S().Infof("[%s] Created launch template", spec.ClusterName)
+		zap.S().Infof("[%s] Created launch template", dataplane.Spec.ClusterName)
 		return nil
 	}
 	return nil
@@ -114,35 +110,55 @@ func (c *Controller) deleteLaunchTemplate(ctx context.Context, templateName stri
 }
 
 func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	// Currently, we get the same security group assigned to control plane instances
-	// At some point, we will be creating dataplane specific security groups
-	securityGroupID, err := securitygroup.New(c.ec2api, c.kubeclient).For(ctx, dataplane.Spec.ClusterName)
-	if err != nil {
-		return fmt.Errorf("getting security group for control plane nodes, %w", err)
-	}
-	clusterEndpoint, err := master.GetClusterEndpoint(ctx, c.kubeclient, types.NamespacedName{Namespace: dataplane.Namespace, Name: dataplane.Spec.ClusterName})
-	if err != nil {
-		return fmt.Errorf("getting cluster endpoint, %w", err)
-	}
 	caSecret, err := keypairs.Reconciler(c.kubeclient).GetSecretFromServer(ctx,
 		object.NamespacedName(master.RootCASecretNameFor(dataplane.Spec.ClusterName), dataplane.Namespace))
 	if err != nil {
 		return fmt.Errorf("getting control plane ca certificate, %w", err)
 	}
 	_, clusterCA := secrets.Parse(caSecret)
-	amiID, err := c.amiID(ctx, dataplane)
-	if err != nil {
-		return fmt.Errorf("getting ami id for worker nodes, %w", err)
-	}
-	instanceProfile := iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)
-	return c.createLaunchTemplateResource(ctx, &dataplane.Spec, securityGroupID, clusterEndpoint, amiID, instanceProfile, clusterCA)
+	return c.createLaunchTemplateWithClusterCA(ctx, dataplane, clusterCA)
 }
 
-func (c *Controller) createLaunchTemplateResource(
-	ctx context.Context, spec *v1alpha1.DataPlaneSpec,
-	securityGroupID, clusterEndpoint, amiID, instanceProfile string,
-	clusterCA []byte,
-) error {
+func (c *Controller) createLaunchTemplateWithClusterCA(ctx context.Context, dataplane *v1alpha1.DataPlane, clusterCA []byte) error {
+	var (
+		securityGroupID string
+		err             error
+	)
+	if dataplane.Spec.SecurityGroupSelector != nil {
+		groupIDs, err := c.securityGroupForSelector(ctx, dataplane.Spec.SecurityGroupSelector)
+		if err != nil {
+			return fmt.Errorf("getting security groups by selector, %w", err)
+		}
+		if len(groupIDs) != 1 {
+			return fmt.Errorf("wrong number of security groups by selector, %d", len(groupIDs))
+		}
+	} else {
+		// Currently, we get the same security group assigned to control plane instances
+		// At some point, we will be creating dataplane specific security groups
+		securityGroupID, err = securitygroup.New(c.ec2api, c.kubeclient).For(ctx, dataplane.Spec.ClusterName)
+		if err != nil {
+			return fmt.Errorf("getting security group for control plane nodes, %w", err)
+		}
+	}
+	clusterEndpoint := dataplane.Spec.ClusterEndpoint
+	if len(clusterEndpoint) == 0 {
+		clusterEndpoint, err = master.GetClusterEndpoint(ctx, c.kubeclient, types.NamespacedName{Namespace: dataplane.Namespace, Name: dataplane.Spec.ClusterName})
+		if err != nil {
+			return fmt.Errorf("getting cluster endpoint, %w", err)
+		}
+	}
+	amiID := dataplane.Spec.AmiID
+	if len(amiID) == 0 {
+		amiID, err = c.amiID(ctx, dataplane)
+		if err != nil {
+			return fmt.Errorf("getting ami id for worker nodes, %w", err)
+		}
+	}
+	instanceProfile := dataplane.Spec.InstanceProfileName
+	if len(instanceProfile) == 0 {
+		instanceProfile = iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)
+	}
+
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
 			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{{
@@ -162,15 +178,42 @@ func (c *Controller) createLaunchTemplateResource(
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
 			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
 			UserData: ptr.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
-				spec.ClusterName, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
+				dataplane.Spec.ClusterName, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), clusterEndpoint)))),
 		},
-		LaunchTemplateName: ptr.String(TemplateName(spec.ClusterName)),
-		TagSpecifications:  generateEC2Tags("launch-template", spec.ClusterName),
+		LaunchTemplateName: ptr.String(TemplateName(dataplane.Spec.ClusterName)),
+		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),
 	}
 	if _, err := c.ec2api.CreateLaunchTemplateWithContext(ctx, input); err != nil {
 		return fmt.Errorf("creating launch template, %w", err)
 	}
 	return nil
+}
+
+func (c *Controller) securityGroupForSelector(ctx context.Context, selector map[string]string) ([]string, error) {
+	filters := []*ec2.Filter{}
+	// Filter by selector
+	for key, value := range selector {
+		if value == "*" {
+			filters = append(filters, &ec2.Filter{
+				Name:   aws.String("tag-key"),
+				Values: []*string{aws.String(key)},
+			})
+		} else {
+			filters = append(filters, &ec2.Filter{
+				Name:   aws.String(fmt.Sprintf("tag:%s", key)),
+				Values: []*string{aws.String(value)},
+			})
+		}
+	}
+	output, err := c.ec2api.DescribeSecurityGroupsWithContext(ctx, &ec2.DescribeSecurityGroupsInput{Filters: filters})
+	if err != nil {
+		return nil, fmt.Errorf("describing subnets %+v, %w", filters, err)
+	}
+	result := []string{}
+	for _, o := range output.SecurityGroups {
+		result = append(result, *o.GroupId)
+	}
+	return result, nil
 }
 
 func (c *Controller) amiID(ctx context.Context, dataplane *v1alpha1.DataPlane) (string, error) {

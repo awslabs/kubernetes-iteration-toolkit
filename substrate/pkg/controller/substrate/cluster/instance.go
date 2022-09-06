@@ -35,7 +35,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 	if len(substrate.Status.Infrastructure.PublicSubnetIDs) == 0 || substrate.Status.Cluster.LaunchTemplateVersion == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate.Name)})
+	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing instances, %w", err)
 	}
@@ -70,7 +70,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		},
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeInstance),
-			Tags:         discovery.Tags(substrate.Name, discovery.Name(substrate)),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
 		}},
 		OnDemandOptions: &ec2.OnDemandOptionsRequest{AllocationStrategy: aws.String(ec2.FleetOnDemandAllocationStrategyLowestPrice)},
 	})
@@ -111,7 +111,7 @@ func (i *Instance) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (r
 }
 
 func (i *Instance) delete(ctx context.Context, substrate *v1alpha1.Substrate, predicate func(*ec2.Instance) bool) error {
-	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate.Name)})
+	instancesOutput, err := i.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return fmt.Errorf("describing instances, %w", err)
 	}

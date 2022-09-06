@@ -32,32 +32,28 @@ type VPC struct {
 }
 
 func (v *VPC) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	return v.CreateResource(ctx, substrate.Name, &substrate.Spec, &substrate.Status)
-}
-
-func (v *VPC) CreateResource(ctx context.Context, name string, spec *v1alpha1.SubstrateSpec, status *v1alpha1.SubstrateStatus) (reconcile.Result, error) {
-	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(name, discovery.NameFrom(name))})
+	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}
 	if len(describeVpcsOutput.Vpcs) > 0 {
-		status.Infrastructure.VPCID = describeVpcsOutput.Vpcs[0].VpcId
-		logging.FromContext(ctx).Infof("Found vpc %s", aws.StringValue(status.Infrastructure.VPCID))
+		substrate.Status.Infrastructure.VPCID = describeVpcsOutput.Vpcs[0].VpcId
+		logging.FromContext(ctx).Infof("Found vpc %s", aws.StringValue(substrate.Status.Infrastructure.VPCID))
 		return reconcile.Result{}, nil
 	}
 	createVpcOutput, err := v.EC2.CreateVpc(&ec2.CreateVpcInput{
 		// create VPC with a CIDR here and add additional CIDR blocks below
-		CidrBlock: aws.String(spec.VPC.CIDR[0]),
+		CidrBlock: aws.String(substrate.Spec.VPC.CIDR[0]),
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeVpc),
-			Tags:         discovery.Tags(name, discovery.NameFrom(name)),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
 		}},
 	})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating VPC, %w", err)
 	}
 	// add additional CIDRs to VPC here.
-	for _, cidr := range spec.VPC.CIDR[1:] {
+	for _, cidr := range substrate.Spec.VPC.CIDR[1:] {
 		_, err = v.EC2.AssociateVpcCidrBlock(&ec2.AssociateVpcCidrBlockInput{
 			CidrBlock: aws.String(cidr),
 			VpcId:     createVpcOutput.Vpc.VpcId,
@@ -66,17 +62,13 @@ func (v *VPC) CreateResource(ctx context.Context, name string, spec *v1alpha1.Su
 			return reconcile.Result{}, fmt.Errorf("associating CIDR to VPC, %w", err)
 		}
 	}
-	status.Infrastructure.VPCID = createVpcOutput.Vpc.VpcId
-	logging.FromContext(ctx).Infof("Created vpc %s", aws.StringValue(status.Infrastructure.VPCID))
+	substrate.Status.Infrastructure.VPCID = createVpcOutput.Vpc.VpcId
+	logging.FromContext(ctx).Infof("Created vpc %s", aws.StringValue(substrate.Status.Infrastructure.VPCID))
 	return reconcile.Result{}, err
 }
 
 func (v *VPC) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	return v.DeleteResource(ctx, substrate.Name)
-}
-
-func (v *VPC) DeleteResource(ctx context.Context, name string) (reconcile.Result, error) {
-	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(name)})
+	describeVpcsOutput, err := v.EC2.DescribeVpcsWithContext(ctx, &ec2.DescribeVpcsInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing vpc, %w", err)
 	}

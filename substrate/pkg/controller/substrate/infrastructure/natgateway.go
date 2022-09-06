@@ -57,7 +57,7 @@ func (n *NatGateway) Create(ctx context.Context, substrate *v1alpha1.Substrate) 
 }
 
 func (n *NatGateway) getNatGateway(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.NatGateway, error) {
-	output, err := n.EC2.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{Filter: discovery.Filters(substrate.Name, discovery.Name(substrate))})
+	output, err := n.EC2.DescribeNatGatewaysWithContext(ctx, &ec2.DescribeNatGatewaysInput{Filter: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return nil, fmt.Errorf("describing nat-gateway, %w", err)
 	}
@@ -92,7 +92,7 @@ func (n *NatGateway) ensure(ctx context.Context, substrate *v1alpha1.Substrate) 
 		SubnetId:     aws.String(substrate.Status.Infrastructure.PublicSubnetIDs[0]),
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeNatgateway),
-			Tags:         discovery.Tags(substrate.Name, discovery.Name(substrate)),
+			Tags:         discovery.Tags(substrate, discovery.Name(substrate)),
 		}},
 	})
 	if err != nil {

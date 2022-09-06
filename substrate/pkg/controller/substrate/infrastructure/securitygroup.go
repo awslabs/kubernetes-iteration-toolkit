@@ -32,25 +32,14 @@ type SecurityGroup struct {
 }
 
 func (s *SecurityGroup) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	return s.CreateResource(ctx, substrate.Name, &substrate.Spec, &substrate.Status)
-}
-
-func (s *SecurityGroup) CreateResource(ctx context.Context, name string, spec *v1alpha1.SubstrateSpec, status *v1alpha1.SubstrateStatus) (reconcile.Result, error) {
-	vpcID := status.Infrastructure.VPCID
-	if vpcID == nil {
+	if substrate.Status.Infrastructure.VPCID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	securityGroupID, err := s.CreateAndAuthorizeSecurityGroupIngress(ctx, name, aws.StringValue(vpcID))
-	status.Infrastructure.SecurityGroupID = securityGroupID
-	return reconcile.Result{}, err
-}
-
-func (s *SecurityGroup) CreateAndAuthorizeSecurityGroupIngress(ctx context.Context, name string, vpcID string) (*string, error) {
-	securityGroup, err := s.ensure(ctx, name, vpcID)
+	securityGroup, err := s.ensure(ctx, substrate)
 	if err != nil {
-		return nil, err
+		return reconcile.Result{}, err
 	}
-	securityGroupID := securityGroup.GroupId
+	substrate.Status.Infrastructure.SecurityGroupID = securityGroup.GroupId
 	if _, err := s.EC2.AuthorizeSecurityGroupIngressWithContext(ctx, &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: securityGroup.GroupId,
 		IpPermissions: []*ec2.IpPermission{{
@@ -67,31 +56,31 @@ func (s *SecurityGroup) CreateAndAuthorizeSecurityGroupIngress(ctx context.Conte
 		}},
 	}); err != nil {
 		if err.(awserr.Error).Code() != "InvalidPermission.Duplicate" {
-			return securityGroupID, fmt.Errorf("authorizing security group ingress, %w", err)
+			return reconcile.Result{}, fmt.Errorf("authorizing security group ingress, %w", err)
 		}
-		logging.FromContext(ctx).Debugf("Found ingress rules for security group %s", aws.StringValue(discovery.NameFrom(name)))
+		logging.FromContext(ctx).Debugf("Found ingress rules for security group %s", aws.StringValue(discovery.Name(substrate)))
 	} else {
-		logging.FromContext(ctx).Infof("Created ingress rules for security group %s", aws.StringValue(discovery.NameFrom(name)))
+		logging.FromContext(ctx).Infof("Created ingress rules for security group %s", aws.StringValue(discovery.Name(substrate)))
 	}
-	return securityGroupID, nil
+	return reconcile.Result{}, nil
 }
 
-func (s *SecurityGroup) ensure(ctx context.Context, name string, vpcID string) (*ec2.SecurityGroup, error) {
-	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(name, discovery.NameFrom(name))})
+func (s *SecurityGroup) ensure(ctx context.Context, substrate *v1alpha1.Substrate) (*ec2.SecurityGroup, error) {
+	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(substrate, discovery.Name(substrate))})
 	if err != nil {
 		return nil, fmt.Errorf("describing security groups, %w", err)
 	}
 	if len(describeSecurityGroupsOutput.SecurityGroups) > 0 {
-		logging.FromContext(ctx).Debugf("Found security group %s", aws.StringValue(discovery.NameFrom(name)))
+		logging.FromContext(ctx).Debugf("Found security group %s", aws.StringValue(discovery.Name(substrate)))
 		return describeSecurityGroupsOutput.SecurityGroups[0], nil
 	}
 	createSecurityGroupOutput, err := s.EC2.CreateSecurityGroupWithContext(ctx, &ec2.CreateSecurityGroupInput{
-		Description: aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", name)),
-		GroupName:   discovery.NameFrom(name),
-		VpcId:       aws.String(vpcID),
+		Description: aws.String(fmt.Sprintf("Substrate node to allow access to substrate cluster endpoint for %s", substrate.Name)),
+		GroupName:   discovery.Name(substrate),
+		VpcId:       substrate.Status.Infrastructure.VPCID,
 		TagSpecifications: []*ec2.TagSpecification{{
 			ResourceType: aws.String(ec2.ResourceTypeSecurityGroup),
-			Tags:         append(discovery.Tags(name, discovery.NameFrom(name)), &ec2.Tag{Key: aws.String("kubernetes.io/cluster/" + name), Value: aws.String("owned")}),
+			Tags:         append(discovery.Tags(substrate, discovery.Name(substrate)), &ec2.Tag{Key: aws.String("kubernetes.io/cluster/" + substrate.Name), Value: aws.String("owned")}),
 		}},
 	})
 	if err != nil {
@@ -102,11 +91,7 @@ func (s *SecurityGroup) ensure(ctx context.Context, name string, vpcID string) (
 }
 
 func (s *SecurityGroup) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	return s.DeleteResource(ctx, substrate.Name)
-}
-
-func (s *SecurityGroup) DeleteResource(ctx context.Context, name string) (reconcile.Result, error) {
-	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(name)})
+	describeSecurityGroupsOutput, err := s.EC2.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{Filters: discovery.Filters(substrate)})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("describing security groups, %w", err)
 	}

@@ -19,24 +19,25 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 )
 
 const (
 	OwnerTagKey = "kit.aws/substrate"
 )
 
-func Tags(ownerName string, name *string) []*ec2.Tag {
+func Tags(substrate *v1alpha1.Substrate, name *string) []*ec2.Tag {
 	return []*ec2.Tag{
-		{Key: aws.String(OwnerTagKey), Value: aws.String(ownerName)},
+		{Key: aws.String(OwnerTagKey), Value: aws.String(substrate.Name)},
 		{Key: aws.String("Name"), Value: name},
 	}
 }
 
-func Filters(name string, optionalName ...*string) (filters []*ec2.Filter) {
+func Filters(substrate *v1alpha1.Substrate, optionalName ...*string) (filters []*ec2.Filter) {
 	if len(optionalName) > 1 {
 		panic("name cannot have more than one value")
 	}
-	filters = append(filters, &ec2.Filter{Name: aws.String(fmt.Sprintf("tag:%s", OwnerTagKey)), Values: []*string{aws.String(name)}})
+	filters = append(filters, &ec2.Filter{Name: aws.String(fmt.Sprintf("tag:%s", OwnerTagKey)), Values: []*string{aws.String(substrate.Name)}})
 	if len(optionalName) > 0 {
 		filters = append(filters, &ec2.Filter{Name: aws.String(fmt.Sprintf("tag:%s", "Name")), Values: optionalName})
 	}
