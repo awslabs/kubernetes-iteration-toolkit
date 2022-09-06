@@ -158,7 +158,6 @@ func (c *Controller) createLaunchTemplateWithClusterCA(ctx context.Context, data
 	if len(instanceProfile) == 0 {
 		instanceProfile = iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)
 	}
-
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
 			BlockDeviceMappings: []*ec2.LaunchTemplateBlockDeviceMappingRequest{{
