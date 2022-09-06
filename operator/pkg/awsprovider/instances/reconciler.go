@@ -49,10 +49,18 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 	if err != nil {
 		return fmt.Errorf("getting subnet for %s, %w", dataplane.Spec.ClusterName, err)
 	}
-	return c.CreateResource(ctx, dataplane.Name, &dataplane.Spec, subnets)
+	return c.ensureResource(ctx, dataplane.Name, &dataplane.Spec, subnets)
 }
 
-func (c *Controller) CreateResource(ctx context.Context, name string, spec *v1alpha1.DataPlaneSpec, subnets []string) error {
+func (c *Controller) CreateResource(ctx context.Context, name string, spec *v1alpha1.DataPlaneSpec) error {
+	subnets, err := c.subnetsForSelector(ctx, spec.SubnetSelector)
+	if err != nil {
+		return fmt.Errorf("getting subnet for %s, %w", spec.ClusterName, err)
+	}
+	return c.ensureResource(ctx, name, spec, subnets)
+}
+
+func (c *Controller) ensureResource(ctx context.Context, name string, spec *v1alpha1.DataPlaneSpec, subnets []string) error {
 	asg, err := c.getAutoScalingGroup(ctx, AutoScalingGroupNameFor(spec.ClusterName, name))
 	if err != nil {
 		return fmt.Errorf("getting auto scaling group for %v, %w", spec.ClusterName, err)
