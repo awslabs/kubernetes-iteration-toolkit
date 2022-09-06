@@ -77,4 +77,8 @@ type DataPlaneSpec struct {
 	// If not provided, use the name for the current kit cluster
 	// +optional
 	InstanceProfileName string `json:"instanceProfileName,omitempty"`
+	// ClusterCA helps user create the launch template for work nodes
+	// If not provided, get it from the current k8s cluster
+	// +optional
+	ClusterCA []byte `json:"clusterCA,omitempty"`
 }

@@ -45,6 +45,11 @@ spec:
                   nodes If not provided, it's obtained by getting the recommended
                   image id for the current k8s version
                 type: string
+              clusterCA:
+                description: ClusterCA helps user create the launch template for work
+                  nodes If not provided, get it from the current k8s cluster
+                format: byte
+                type: string
               clusterEndpoint:
                 description: ClusterEndpoint helps user create the launch template
                   for work nodes If not provided, it's obtained from master instance

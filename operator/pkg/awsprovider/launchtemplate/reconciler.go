@@ -72,29 +72,8 @@ func (c *Controller) Reconcile(ctx context.Context, dataplane *v1alpha1.DataPlan
 	return nil
 }
 
-func (c *Controller) CreateResource(ctx context.Context, dataplane *v1alpha1.DataPlane, clusterCA []byte) error {
-	// get launch template
-	templates, err := c.getLaunchTemplates(ctx, dataplane.Spec.ClusterName)
-	if err != nil && !errors.IsLaunchTemplateDoNotExist(err) {
-		return fmt.Errorf("getting launch template, %w", err)
-	}
-	if !existingTemplateMatchesDesired(templates, dataplane.Spec.ClusterName) { // TODO check if existing LT is same as desired LT
-		// create launch template
-		if err := c.createLaunchTemplateWithClusterCA(ctx, dataplane, clusterCA); err != nil {
-			return fmt.Errorf("creating launch template, %w", err)
-		}
-		zap.S().Infof("[%s] Created launch template", dataplane.Spec.ClusterName)
-		return nil
-	}
-	return nil
-}
-
 func (c *Controller) Finalize(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
 	return c.deleteLaunchTemplate(ctx, TemplateName(dataplane.Spec.ClusterName))
-}
-
-func (c *Controller) DeleteResource(ctx context.Context, name string) error {
-	return c.deleteLaunchTemplate(ctx, TemplateName(name))
 }
 
 func (c *Controller) deleteLaunchTemplate(ctx context.Context, templateName string) error {
@@ -110,16 +89,6 @@ func (c *Controller) deleteLaunchTemplate(ctx context.Context, templateName stri
 }
 
 func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alpha1.DataPlane) error {
-	caSecret, err := keypairs.Reconciler(c.kubeclient).GetSecretFromServer(ctx,
-		object.NamespacedName(master.RootCASecretNameFor(dataplane.Spec.ClusterName), dataplane.Namespace))
-	if err != nil {
-		return fmt.Errorf("getting control plane ca certificate, %w", err)
-	}
-	_, clusterCA := secrets.Parse(caSecret)
-	return c.createLaunchTemplateWithClusterCA(ctx, dataplane, clusterCA)
-}
-
-func (c *Controller) createLaunchTemplateWithClusterCA(ctx context.Context, dataplane *v1alpha1.DataPlane, clusterCA []byte) error {
 	var (
 		securityGroupID string
 		err             error
@@ -157,6 +126,15 @@ func (c *Controller) createLaunchTemplateWithClusterCA(ctx context.Context, data
 	instanceProfile := dataplane.Spec.InstanceProfileName
 	if len(instanceProfile) == 0 {
 		instanceProfile = iam.KitNodeInstanceProfileNameFor(dataplane.Spec.ClusterName)
+	}
+	clusterCA := dataplane.Spec.ClusterCA
+	if len(clusterCA) == 0 {
+		caSecret, err := keypairs.Reconciler(c.kubeclient).GetSecretFromServer(ctx,
+			object.NamespacedName(master.RootCASecretNameFor(dataplane.Spec.ClusterName), dataplane.Namespace))
+		if err != nil {
+			return fmt.Errorf("getting control plane ca certificate, %w", err)
+		}
+		_, clusterCA = secrets.Parse(caSecret)
 	}
 	input := &ec2.CreateLaunchTemplateInput{
 		LaunchTemplateData: &ec2.RequestLaunchTemplateData{
