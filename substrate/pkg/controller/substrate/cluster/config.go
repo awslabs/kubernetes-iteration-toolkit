@@ -106,8 +106,14 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 		return reconcile.Result{}, fmt.Errorf("generating authenticator config, %w", err)
 	}
 	// upload to s3 bucket
-	if err := c.S3Uploader.UploadWithIterator(ctx, NewDirectoryIterator(
-		aws.StringValue(discovery.Name(substrate)), path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate))))); err != nil {
+	directoyIterator, err := NewDirectoryIterator(
+		aws.StringValue(discovery.Name(substrate)),
+		path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate))),
+	)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("building directory iterator %w", err)
+	}
+	if err := c.S3Uploader.UploadWithIterator(ctx, directoyIterator); err != nil {
 		return reconcile.Result{}, fmt.Errorf("uploading to S3 %w", err)
 	}
 	logging.FromContext(ctx).Debugf("Uploaded cluster configuration to s3://%s", aws.StringValue(discovery.Name(substrate)))
@@ -369,9 +375,9 @@ type DirectoryIterator struct {
 }
 
 // NewDirectoryIterator builds a new DirectoryIterator
-func NewDirectoryIterator(bucket, dir string) s3manager.BatchUploadIterator {
+func NewDirectoryIterator(bucket, dir string) (s3manager.BatchUploadIterator, error) {
 	var paths []string
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	walkFunc := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -379,12 +385,15 @@ func NewDirectoryIterator(bucket, dir string) s3manager.BatchUploadIterator {
 			paths = append(paths, path)
 		}
 		return nil
-	})
+	}
+	if err := filepath.Walk(dir, walkFunc); err != nil {
+		return nil, err
+	}
 	return &DirectoryIterator{
 		filePaths: paths,
 		bucket:    bucket,
 		localDir:  dir,
-	}
+	}, nil
 }
 
 // Next returns whether next file exists or not

@@ -58,4 +58,27 @@ type DataPlaneSpec struct {
 	// defaults to "lowest-price"
 	// +optional
 	AllocationStrategy string `json:"allocationStrategy,omitempty"`
+
+	// SecurityGroupSelector lets user define label key and values for kit to select the security group
+	// for worker nodes. It can contain key:value to select security group with particular label,
+	// or a specific key:"*" to select all security group with a specific key.
+	// If no selector is provided, security group is discovered with control plane nodes
+	// +optional
+	SecurityGroupSelector map[string]string `json:"securityGroupSelector,omitempty"`
+	// APIServerEndpoint helps user create the launch template for work nodes
+	// If not provided, it's obtained from master instance
+	// +optional
+	APIServerEndpoint string `json:"apiServerEndpoint,omitempty"`
+	// AmiID helps user create the launch template for work nodes
+	// If not provided, it's obtained by getting the recommended image id for the current k8s version
+	// +optional
+	AmiID string `json:"amiID,omitempty"`
+	// InstanceProfileName if provided is assigned to the kube nodes created
+	// If not provided, use the name for the current kit cluster
+	// +optional
+	InstanceProfileName string `json:"instanceProfileName,omitempty"`
+	// ClusterCA helps user create the launch template for work nodes
+	// If not provided, get it from the current k8s cluster
+	// +optional
+	ClusterCA []byte `json:"clusterCA,omitempty"`
 }

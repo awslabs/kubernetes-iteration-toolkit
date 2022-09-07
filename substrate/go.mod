@@ -3,7 +3,7 @@ module github.com/awslabs/kubernetes-iteration-toolkit/substrate
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go v1.43.8
+	github.com/aws/aws-sdk-go v1.43.16
 	github.com/awslabs/kubernetes-iteration-toolkit/operator v0.0.0-20220818192233-b51328aa42d4
 	github.com/imdario/mergo v0.3.12
 	github.com/mitchellh/hashstructure/v2 v2.0.2

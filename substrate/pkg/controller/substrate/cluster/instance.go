@@ -77,11 +77,15 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("creating fleet, %w", err)
 	}
+	createFleetErrMsgs := make([]string, 0)
 	for _, err := range createFleetOutput.Errors {
 		if strings.Contains(aws.StringValue(err.ErrorMessage), "Invalid IAM Instance Profile name") {
 			return reconcile.Result{Requeue: true}, nil
 		}
-		return reconcile.Result{}, fmt.Errorf("creating fleet %v", aws.StringValue(err.ErrorMessage))
+		createFleetErrMsgs = append(createFleetErrMsgs, aws.StringValue(err.ErrorMessage))
+	}
+	if len(createFleetErrMsgs) > 0 {
+		return reconcile.Result{}, fmt.Errorf("creating fleet %v", strings.Join(createFleetErrMsgs, ","))
 	}
 	logging.FromContext(ctx).Infof("Created instance %s", aws.StringValue(createFleetOutput.Instances[0].InstanceIds[0]))
 
