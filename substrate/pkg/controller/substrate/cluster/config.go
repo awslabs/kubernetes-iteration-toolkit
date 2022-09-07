@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -69,6 +70,7 @@ type Config struct {
 	STS               *sts.STS
 	S3Uploader        *s3manager.Uploader
 	clusterConfigPath string
+	EC2               *ec2.EC2
 }
 
 func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
@@ -95,7 +97,7 @@ func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (rec
 	if err := c.generateStaticPodManifests(cfg, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("generating manifests, %w", err)
 	}
-	if err := c.kubeletSystemService(cfg, substrate); err != nil {
+	if err := c.kubeletSystemService(ctx, cfg, substrate); err != nil {
 		return reconcile.Result{}, fmt.Errorf("generating kubelet service config, %w", err)
 	}
 	// deploy aws IAM authenticator
@@ -224,7 +226,15 @@ func (c *Config) ensureBucket(ctx context.Context, substrate *v1alpha1.Substrate
 	}
 	return nil
 }
-func (c *Config) kubeletSystemService(cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
+func (c *Config) kubeletSystemService(ctx context.Context, cfg *kubeadm.InitConfiguration, substrate *v1alpha1.Substrate) error {
+	instancesOutput, err := c.EC2.DescribeInstancesWithContext(ctx, &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{substrate.Status.Infrastructure.MasterInstanceID}})
+	if err != nil {
+		return fmt.Errorf("describing ec2 instance, %w", err)
+	}
+	if len(instancesOutput.Reservations) != 1 || len(instancesOutput.Reservations[0].Instances) != 1 {
+		return fmt.Errorf("finding the ec2 instance")
+	}
 	localDir := path.Join(c.clusterConfigPath, aws.StringValue(discovery.Name(substrate)), kubeletSystemdPath)
 	if _, err := os.Stat(localDir); err != nil {
 		if !os.IsNotExist(err) {
@@ -239,8 +249,8 @@ After=docker.service iptables-restore.service
 Requires=docker.service
 
 [Service]
-ExecStart=/usr/bin/kubelet --cluster-dns=10.96.0.10 --cluster-domain=cluster.local --hostname-override=%s --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1 --node-labels=kit.aws/substrate=control-plane
-Restart=always`, substrate.Name)), 0644); err != nil {
+ExecStart=/usr/bin/kubelet --cluster-dns=10.96.0.10 --cluster-domain=cluster.local --hostname-override=%s --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1  --provider-id=aws:///%s/%s --node-labels=kit.aws/substrate=control-plane
+Restart=always`, substrate.Name, aws.StringValue(instancesOutput.Reservations[0].Instances[0].Placement.AvailabilityZone), aws.StringValue(substrate.Status.Infrastructure.MasterInstanceID))), 0644); err != nil {
 		return fmt.Errorf("writing kubelet configuration, %w", err)
 	}
 	return nil
