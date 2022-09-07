@@ -88,7 +88,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		return reconcile.Result{}, fmt.Errorf("creating fleet %v", strings.Join(createFleetErrMsgs, ","))
 	}
 	logging.FromContext(ctx).Infof("Created instance %s", aws.StringValue(createFleetOutput.Instances[0].InstanceIds[0]))
-	        substrate.Status.Infrastructure.MasterInstanceID = createFleetOutput.Instances[0].InstanceIds[0]
+	    substrate.Status.Infrastructure.MasterInstanceID = createFleetOutput.Instances[0].InstanceIds[0]
 
 	if err := i.delete(ctx, substrate, func(instance *ec2.Instance) bool {
 		if aws.StringValue(instance.InstanceId) == aws.StringValue(createFleetOutput.Instances[0].InstanceIds[0]) {
