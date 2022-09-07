@@ -65,15 +65,15 @@ type DataPlaneSpec struct {
 	// If no selector is provided, security group is discovered with control plane nodes
 	// +optional
 	SecurityGroupSelector map[string]string `json:"securityGroupSelector,omitempty"`
-	// ClusterEndpoint helps user create the launch template for work nodes
+	// APIServerEndpoint helps user create the launch template for work nodes
 	// If not provided, it's obtained from master instance
 	// +optional
-	ClusterEndpoint string `json:"clusterEndpoint,omitempty"`
+	APIServerEndpoint string `json:"apiServerEndpoint,omitempty"`
 	// AmiID helps user create the launch template for work nodes
 	// If not provided, it's obtained by getting the recommended image id for the current k8s version
 	// +optional
 	AmiID string `json:"amiID,omitempty"`
-	// InstanceProfileName helps user create the launch template for work nodes
+	// InstanceProfileName if provided is assigned to the kube nodes created
 	// If not provided, use the name for the current kit cluster
 	// +optional
 	InstanceProfileName string `json:"instanceProfileName,omitempty"`

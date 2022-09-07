@@ -386,8 +386,7 @@ func NewDirectoryIterator(bucket, dir string) (s3manager.BatchUploadIterator, er
 		}
 		return nil
 	}
-	err := filepath.Walk(dir, walkFunc)
-	if err != nil {
+	if err := filepath.Walk(dir, walkFunc); err != nil {
 		return nil, err
 	}
 	return &DirectoryIterator{

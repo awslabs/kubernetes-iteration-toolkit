@@ -85,7 +85,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 		createFleetErrMsgs = append(createFleetErrMsgs, aws.StringValue(err.ErrorMessage))
 	}
 	if len(createFleetErrMsgs) > 0 {
-		return reconcile.Result{}, fmt.Errorf("creating fleet %v", strings.Join(createFleetErrMsgs, " "))
+		return reconcile.Result{}, fmt.Errorf("creating fleet %v", strings.Join(createFleetErrMsgs, ","))
 	}
 	logging.FromContext(ctx).Infof("Created instance %s", aws.StringValue(createFleetOutput.Instances[0].InstanceIds[0]))
 
