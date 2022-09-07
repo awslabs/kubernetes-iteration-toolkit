@@ -101,6 +101,7 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 		if len(groupIDs) != 1 {
 			return fmt.Errorf("wrong number of security groups by selector, %d", len(groupIDs))
 		}
+		securityGroupID = groupIDs[0]
 	} else {
 		// Currently, we get the same security group assigned to control plane instances
 		// At some point, we will be creating dataplane specific security groups
