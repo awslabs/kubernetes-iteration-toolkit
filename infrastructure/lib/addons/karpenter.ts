@@ -64,7 +64,7 @@ export class Karpenter extends Construct {
         const chart = props.cluster.addHelmChart('karpenter-chart', {
             chart: 'karpenter',
             release: 'karpenter',
-            version: 'v0.13.2',
+            version: 'v0.16.1',
             repository: 'https://charts.karpenter.sh',
             namespace: props.namespace,
             createNamespace: false,
