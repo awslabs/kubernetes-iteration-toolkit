@@ -34,6 +34,7 @@ type InfrastructureStatus struct {
 	PrivateRouteTableID *string  `json:"privateRouteTableID,omitempty"`
 	PublicRouteTableID  *string  `json:"publicRouteTableID,omitempty"`
 	SecurityGroupID     *string  `json:"securityGroupID,omitempty"`
+	MasterInstanceID    *string  `json:"masterInstanceID,omitempty"`
 	PrivateSubnetIDs    []string `json:"privateSubnetIDs,omitempty"`
 	PublicSubnetIDs     []string `json:"publicSubnetIDs,omitempty"`
 }
