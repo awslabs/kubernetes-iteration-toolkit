@@ -63,7 +63,7 @@ func NewController(ctx context.Context) *Controller {
 			&cluster.LaunchTemplate{EC2: EC2, SSM: ssm.New(session), Region: session.Config.Region},
 			&cluster.InstanceProfile{IAM: IAM},
 			&cluster.Instance{EC2: EC2},
-			&cluster.Config{S3: s3.New(session), STS: sts.New(session), S3Uploader: s3manager.NewUploader(session)},
+			&cluster.Config{S3: s3.New(session), STS: sts.New(session), S3Uploader: s3manager.NewUploader(session), EC2: EC2},
 			&cluster.Readiness{},
 			&addons.AWSEBSCSIDriver{},
 			&addons.AWSLoadBalancer{EC2: EC2},

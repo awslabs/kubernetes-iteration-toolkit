@@ -74,7 +74,7 @@ type Config struct {
 }
 
 func (c *Config) Create(ctx context.Context, substrate *v1alpha1.Substrate) (reconcile.Result, error) {
-	if substrate.Status.Cluster.APIServerAddress == nil {
+	if substrate.Status.Cluster.APIServerAddress == nil || substrate.Status.Infrastructure.MasterInstanceID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
 	if c.clusterConfigPath == "" {
