@@ -51,19 +51,19 @@ func bootstrap(cmd *cobra.Command, args []string) {
 	start := time.Now()
 	name := parseName(ctx, args)
 	logging.FromContext(ctx).Infof("Bootstrapping %q", name)
-	vpcCidrs := []string{"10.0.0.0/16", "10.1.0.0/16", "10.2.0.0/16", "10.3.0.0/16", "10.4.0.0/16"}
 	if err := substrate.NewController(ctx).Reconcile(ctx, &v1alpha1.Substrate{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 
 		Spec: v1alpha1.SubstrateSpec{
-			VPC:          &v1alpha1.VPCSpec{CIDR: vpcCidrs},
+			VPC:          &v1alpha1.VPCSpec{CIDR: []string{"10.0.0.0/16"}},
 			InstanceType: aws.String("r6g.8xlarge"),
 			Subnets: []*v1alpha1.SubnetSpec{
-				{Zone: "us-west-2a", CIDR: vpcCidrs[0]},
-				{Zone: "us-west-2b", CIDR: vpcCidrs[1]},
-				{Zone: "us-west-2c", CIDR: vpcCidrs[2]},
-				{Zone: "us-west-2a", CIDR: vpcCidrs[3], Public: true},
-				{Zone: "us-west-2b", CIDR: vpcCidrs[4], Public: true},
+				{Zone: "us-west-2a", CIDR: "10.0.1.0/24"},
+				{Zone: "us-west-2b", CIDR: "10.0.2.0/24"},
+				{Zone: "us-west-2c", CIDR: "10.0.3.0/24"},
+				{Zone: "us-west-2a", CIDR: "10.0.100.0/24", Public: true},
+				{Zone: "us-west-2b", CIDR: "10.0.101.0/24", Public: true},
+				{Zone: "us-west-2c", CIDR: "10.0.102.0/24", Public: true},
 			},
 		},
 	}); err != nil {
