@@ -72,7 +72,7 @@ kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090&
 kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 8080:80&
 ```
 
-Adding additional Grafana dashboards from [monitoring](monitoring/)
+Adding additional Grafana dashboards from [monitoring](monitoring/GrafanaDashboard/)
 
 ```bash
 kubectl create configmap master-dashboard -n monitoring --from-file=master-dashboard.json
@@ -81,6 +81,10 @@ kubectl label configmap master-dashboard -n monitoring  grafana_dashboard=1
 
 > Note: Coming soon, auto-load these dashboards when a KIT environment is created
 
+Accessing the grafana dashbaord externally using load balancer from [monitoring](monitoring/)
+```bash
+kubectl apply -f grafanalbservice.yaml
+```
 ### Allowing API server to trust kubelet endpoints for the guest cluster
 
 ```bash
