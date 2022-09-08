@@ -16,4 +16,3 @@ spec:
     app.kubernetes.io/name: grafana
   sessionAffinity: None
   type: LoadBalancer
-  

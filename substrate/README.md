@@ -81,9 +81,9 @@ kubectl label configmap master-dashboard -n monitoring  grafana_dashboard=1
 
 > Note: Coming soon, auto-load these dashboards when a KIT environment is created
 
-Accessing the grafana dashbaord externally using load balancer from [monitoring](monitoring/)
+To access Grafana Dashboard externally using an NLB
 ```bash
-kubectl apply -f grafanalbservice.yaml
+kubectl apply -f monitoring/grafanalbservice.yaml
 ```
 ### Allowing API server to trust kubelet endpoints for the guest cluster
 
