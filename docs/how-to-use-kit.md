@@ -109,6 +109,8 @@ As part of these tests, I want to capture-
     - latency for the API server calls is not impacted and SLO’s are not breached.
     - metrics for core Kubernetes components like scheduler, KCM, etcd etc.
 
+> Note: Kit environment created using `kitctl` supports 64k IP addresses. In case your use case needs kitctl to support additional IPs, feel free to open a github issue.
+
 ## Key Terms
 
 **KIT/clusters or guest clusters -** These are rapid prototyping vanilla Kubernetes clusters provisioned using using EKS-distro images. They take about 3-4 minutes to provision on ec2 nodes and less than 30 seconds to update their configurations. These clusters are provisioned by KIT-operator running in the KIT environment
