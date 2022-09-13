@@ -12,14 +12,8 @@ verify: codegen ## Verify code. Includes dependencies, linting, formatting, etc
 	go vet ./...
 	go fmt ./...
 	golangci-lint run
-	@git diff --quiet ||\
-		{ echo "New file modification detected in the Git working tree. Please check in before commit.";\
-		exit 1;}
 
 codegen: ## Generate code. Must be run if changes are made to ./pkg/apis/...
-	controller-gen \
-		object:headerFile="hack/boilerplate.go.txt" \
-		paths="./pkg/..."
-	hack/boilerplate.sh
+	hack/codegen.sh
 
 .PHONY: help dev test verify

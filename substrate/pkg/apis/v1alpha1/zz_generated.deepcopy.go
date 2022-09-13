@@ -82,6 +82,11 @@ func (in *InfrastructureStatus) DeepCopyInto(out *InfrastructureStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.MasterInstanceID != nil {
+		in, out := &in.MasterInstanceID, &out.MasterInstanceID
+		*out = new(string)
+		**out = **in
+	}
 	if in.PrivateSubnetIDs != nil {
 		in, out := &in.PrivateSubnetIDs, &out.PrivateSubnetIDs
 		*out = make([]string, len(*in))
