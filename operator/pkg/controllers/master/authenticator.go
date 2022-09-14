@@ -22,6 +22,7 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/awsprovider/iam"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/patch"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +46,24 @@ func (c *Controller) reconcileAuthenticator(ctx context.Context, controlPlane *v
 }
 
 func (c *Controller) ensureDaemonSet(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
+	authenticatorPodTemplateSpec := iamauthenticator.PodSpec(controlPlane.ClusterName(), func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
+		template.Spec.NodeSelector = APIServerLabels(controlPlane.ClusterName())
+		template.Spec.Volumes = append(template.Spec.Volumes, v1.Volume{Name: "config",
+			VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: iamauthenticator.AuthenticatorConfigMapName(controlPlane.ClusterName())},
+			}},
+		})
+		return template
+	})
+
+	if controlPlane.Spec.Master.Authenticator != nil {
+		var err error
+		authenticatorPodTemplateSpec.Spec, err = patch.PodSpec(&authenticatorPodTemplateSpec.Spec, controlPlane.Spec.Master.Authenticator.Spec)
+		if err != nil {
+			return fmt.Errorf("patch authenticator pod spec, %w", err)
+		}
+	}
+
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{}, object.WithOwner(controlPlane, &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-authenticator", controlPlane.ClusterName()),
@@ -54,15 +73,7 @@ func (c *Controller) ensureDaemonSet(ctx context.Context, controlPlane *v1alpha1
 		Spec: appsv1.DaemonSetSpec{
 			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType},
 			Selector:       &metav1.LabelSelector{MatchLabels: iamauthenticator.Labels(controlPlane.ClusterName())},
-			Template: iamauthenticator.PodSpec(controlPlane.ClusterName(), func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
-				template.Spec.NodeSelector = APIServerLabels(controlPlane.ClusterName())
-				template.Spec.Volumes = append(template.Spec.Volumes, v1.Volume{Name: "config",
-					VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{
-						LocalObjectReference: v1.LocalObjectReference{Name: iamauthenticator.AuthenticatorConfigMapName(controlPlane.ClusterName())},
-					}},
-				})
-				return template
-			}),
+			Template:       authenticatorPodTemplateSpec,
 		},
 	}))
 }

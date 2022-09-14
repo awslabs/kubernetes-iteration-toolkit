@@ -1,4 +1,5 @@
 #!/bin/bash
+set -ex
 
 controller-gen crd \
     object:headerFile="hack/boilerplate.go.txt" \

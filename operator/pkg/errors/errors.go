@@ -43,7 +43,7 @@ func IsDNSLookUpNoSuchHost(err error) bool {
 
 func IsNetIOTimeOut(err error) bool {
 	netErr := net.Error(nil)
-	return errors.As(err, &netErr) && netErr.Temporary() && netErr.Timeout()
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 func IsConnectionRefused(err error) bool {
