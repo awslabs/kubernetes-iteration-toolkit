@@ -87,7 +87,7 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				},
 			},
 			Ports: []v1.ContainerPort{{
-				ContainerPort: 10251,
+				ContainerPort: int32(kschHealthCheckPortForVersion(controlPlane.Spec.KubernetesVersion)),
 				Name:          "metrics",
 			}},
 			Args: []string{
@@ -112,9 +112,9 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Host:   "127.0.0.1",
-						Scheme: v1.URISchemeHTTP,
+						Scheme: kschHealthCheckSchemeForVersion(controlPlane.Spec.KubernetesVersion),
 						Path:   "/healthz",
-						Port:   intstr.FromInt(10251),
+						Port:   intstr.FromInt(kschHealthCheckPortForVersion(controlPlane.Spec.KubernetesVersion)),
 					},
 				},
 				InitialDelaySeconds: 10,
@@ -145,4 +145,19 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			},
 		}},
 	}
+}
+
+func kschHealthCheckPortForVersion(version string) int {
+	switch version {
+	case "1.23", "1.24":
+		return 10259
+	}
+	return 10251
+}
+func kschHealthCheckSchemeForVersion(version string) v1.URIScheme {
+	switch version {
+	case "1.23", "1.24":
+		return v1.URISchemeHTTPS
+	}
+	return v1.URISchemeHTTP
 }
