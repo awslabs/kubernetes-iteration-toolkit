@@ -19,6 +19,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// NOTE: if you make changes to this file, run `make codegen` to update the
+// appropriate crds and yamls.
+
 // ControlPlane is the Schema for the ControlPlanes API
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:shortName=cp
@@ -61,6 +64,7 @@ type MasterSpec struct {
 	Scheduler         *Component `json:"scheduler,omitempty"`
 	ControllerManager *Component `json:"controllerManager,omitempty"`
 	APIServer         *Component `json:"apiServer,omitempty"`
+	Authenticator     *Component `json:"authenticator,omitempty"`
 }
 
 // Component provides a generic way to pass in args and images to master and etcd

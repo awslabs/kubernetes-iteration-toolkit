@@ -1,0 +1,31 @@
+# To create this cluster, run:
+# * export GUEST_CLUSTER_NAME="foobar"
+# * envsubst < auth-stage2.yaml | kubectl --kubeconfig $KUBECONFIG apply -f -
+
+apiVersion: kit.k8s.sh/v1alpha1
+kind: ControlPlane
+metadata:
+  name: $GUEST_CLUSTER_NAME
+spec:
+  master:
+    apiServer:
+      replicas: 3
+    authenticator:
+      spec:
+        containers:
+        - name: aws-iam-authenticator
+          image: public.ecr.aws/eks-distro/kubernetes-sigs/aws-iam-authenticator:v0.5.9-eks-1-19-22
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10000
+          args:
+          - --backend-mode=MountedFile,EKSConfigMap
+          # TODO: scope down permissions
+          - --kubeconfig=/var/aws-iam-authenticator/auth-to-k8s-kubeconfig/config
+          volumeMounts:
+          - mountPath: /var/aws-iam-authenticator/auth-to-k8s-kubeconfig/
+            name: auth-to-k8s-kubeconfig
+        volumes:
+        - secret:
+            secretName: $GUEST_CLUSTER_NAME-kube-admin-config
+          name: auth-to-k8s-kubeconfig
