@@ -27,8 +27,12 @@ const (
 )
 
 func Tags(substrate *v1alpha1.Substrate, name *string) []*ec2.Tag {
+	return OwnerWithNameTag(aws.String(OwnerTagKey), aws.String(substrate.Name), name)
+}
+
+func OwnerWithNameTag(ownerTag, ownerValue, name *string) []*ec2.Tag {
 	return []*ec2.Tag{
-		{Key: aws.String(OwnerTagKey), Value: aws.String(substrate.Name)},
+		{Key: ownerTag, Value: ownerValue},
 		{Key: aws.String("Name"), Value: name},
 	}
 }

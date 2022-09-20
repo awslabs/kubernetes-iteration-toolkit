@@ -272,7 +272,7 @@ kubectl get secret ${GUEST_CLUSTER_NAME}-kube-admin-config -ojsonpath='{.data.co
 3. Deploy CNI plugin to the guest cluster for the nodes to be ready. If you are deploying in `us-west-2` region run the following command to install AWS CNI plugin
 
 ```bash
-kubectl --kubeconfig=/tmp/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.10/config/master/aws-k8s-cni.yaml
+kubectl --kubeconfig=/tmp/kubeconfig  apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/v1.11.4/config/master/aws-k8s-cni.yaml
 ```
 > For other regions, follow this guide to deploy the AWS CNI plugin- https://docs.aws.amazon.com/eks/latest/userguide/managing-vpc-cni.html
 
