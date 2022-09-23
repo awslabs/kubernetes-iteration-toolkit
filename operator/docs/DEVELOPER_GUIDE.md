@@ -6,8 +6,10 @@ If you are developing KIT operator, finish the installation steps listed in the 
 
 ### Prerequisites
 
- - Go version (1.16 or higher)
- - [Ko version](https://github.com/google/ko#install) (v0.8.2 or higher)
+ - Go version 1.16-1.17 (NOTE: 1.18+ fails to install pkg/operator toolchain). [instructions](https://gist.github.com/BigOokie/d5817e88f01e0d452ed585a1590f5aeb)
+ - [Ko version](https://github.com/google/ko#install) (v0.8.2 - 0.11.2, the
+   latest 0.12+ is broken right now)
+ - Run `make toolchain`
 
 ### Create a [Private ECR repository](https://docs.aws.amazon.com/AmazonECR/latest/userguide/repository-create.html) to push controller and webhook image for kit-operator
 
