@@ -46,9 +46,10 @@ type ControlPlaneList struct {
 // master and etcd are configured to run. By default, KIT uses all the default
 // values and ControlPlaneSpec can be empty.
 type ControlPlaneSpec struct {
-	KubernetesVersion string     `json:"kubernetesVersion,omitempty"`
-	Master            MasterSpec `json:"master,omitempty"`
-	Etcd              Etcd       `json:"etcd,omitempty"`
+	KubernetesVersion         string     `json:"kubernetesVersion,omitempty"`
+	ColocateAPIServerWithEtcd bool       `json:"colocateAPIServerWithEtcd,omitempty"`
+	Master                    MasterSpec `json:"master,omitempty"`
+	Etcd                      Etcd       `json:"etcd,omitempty"`
 }
 
 type Etcd struct {

@@ -21,10 +21,8 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/awsprovider"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/kubeprovider"
-	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/functional"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/keypairs"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/kubeconfigs"
-	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	"go.uber.org/zap"
 )
 
@@ -75,12 +73,4 @@ func (c *Controller) Reconcile(ctx context.Context, controlPlane *v1alpha1.Contr
 
 func (c *Controller) Finalize(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	return c.iamController.Finalize(ctx, controlPlane)
-}
-
-// Karpenter only created nodes for API server pods, as KCM and scheduler pods
-// are configured with pod afinity. So the control plane nodes for a cluster
-// will have 2 labels cluster name and clustername-apiserver
-func nodeSelector(clusterName string) map[string]string {
-	return functional.UnionStringMaps(APIServerLabels(clusterName),
-		map[string]string{object.ControlPlaneLabelKey: clusterName})
 }
