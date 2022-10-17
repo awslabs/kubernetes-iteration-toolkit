@@ -73,7 +73,7 @@ spec:
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
   - name: run-loadtest
-    image: 197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:latest
+    image: public.ecr.aws/kit/clusterloader2:0213bea
     onError: continue
     script: |
       #!/bin/bash
