@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: timestamp
+  namespace: tekton-pipelines
+spec:
+  results:
+    - name: timestamp
+      description: The current date in unix timestamp format
+  steps:
+    - name: date
+      image: bash:latest
+      script: |
+        #!/usr/bin/env bash
+        date +%s | tee $(results.timestamp.path)

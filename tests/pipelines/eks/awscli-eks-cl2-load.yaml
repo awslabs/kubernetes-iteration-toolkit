@@ -21,6 +21,9 @@ spec:
   - name: slack-message
   - name: vpc-cfn-url
   tasks:
+  - name: timestamp
+    taskRef:
+      name: timestamp
   - name: slack-notification
     params:
     - name: slack-hook
