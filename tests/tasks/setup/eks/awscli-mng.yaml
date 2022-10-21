@@ -106,5 +106,3 @@ spec:
           if [[ "$ready_node" -eq $(params.desired-nodes) ]]; then break; fi
           sleep 5
       done
-      # short-term mitigation - for node events to expire and purge from etcd - given default ttl is - 1hr
-      sleep 4500
