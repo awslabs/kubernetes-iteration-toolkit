@@ -31,8 +31,8 @@ spec:
       - amd64
   limits: 
     resources: 
-      cpu: 1000
-      memory: 1000Gi
+      cpu: 8000
+      memory: 2000Gi
   providerRef: 
       name: default
   ttlSecondsAfterEmpty: 864000
