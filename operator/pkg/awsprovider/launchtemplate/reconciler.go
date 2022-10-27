@@ -44,6 +44,10 @@ const (
 	dnsClusterIP = "10.100.0.10"
 )
 
+type Option func(string) string
+
+var Options = []Option{}
+
 type Controller struct {
 	ec2api     *awsprovider.EC2
 	ssm        *awsprovider.SSM
@@ -51,7 +55,7 @@ type Controller struct {
 }
 
 // NewController returns a controller for managing LaunchTemplates in AWS
-func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM, client *kubeprovider.Client) *Controller {
+func NewController(ec2api *awsprovider.EC2, ssm *awsprovider.SSM, client *kubeprovider.Client, opts ...Option) *Controller {
 	return &Controller{ec2api: ec2api, ssm: ssm, kubeclient: client}
 }
 
@@ -250,7 +254,11 @@ func generateEC2Tags(svcName, clusterName string) []*ec2.TagSpecification {
 }
 
 func TemplateName(clusterName string) string {
-	return fmt.Sprintf("kit-%s-cluster-nodes", clusterName)
+	name := fmt.Sprintf("kit-%s-cluster-nodes", clusterName)
+	for _, opt := range Options {
+		name = opt(name)
+	}
+	return name
 }
 
 var (
