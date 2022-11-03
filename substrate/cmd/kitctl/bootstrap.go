@@ -58,12 +58,12 @@ func bootstrap(cmd *cobra.Command, args []string) {
 			VPC:          &v1alpha1.VPCSpec{CIDR: []string{"10.0.0.0/16"}},
 			InstanceType: aws.String("r6g.8xlarge"),
 			Subnets: []*v1alpha1.SubnetSpec{
-				{Zone: "us-west-2a", CIDR: "10.0.1.0/24"},
-				{Zone: "us-west-2b", CIDR: "10.0.2.0/24"},
-				{Zone: "us-west-2c", CIDR: "10.0.3.0/24"},
-				{Zone: "us-west-2a", CIDR: "10.0.100.0/24", Public: true},
-				{Zone: "us-west-2b", CIDR: "10.0.101.0/24", Public: true},
-				{Zone: "us-west-2c", CIDR: "10.0.102.0/24", Public: true},
+				{Zone: "us-west-2a", CIDR: "10.0.32.0/19"},
+				{Zone: "us-west-2b", CIDR: "10.0.64.0/19"},
+				{Zone: "us-west-2c", CIDR: "10.0.96.0/19"},
+				{Zone: "us-west-2a", CIDR: "10.0.128.0/19", Public: true},
+				{Zone: "us-west-2b", CIDR: "10.0.160.0/19", Public: true},
+				{Zone: "us-west-2c", CIDR: "10.0.192.0/19", Public: true},
 			},
 		},
 	}); err != nil {
