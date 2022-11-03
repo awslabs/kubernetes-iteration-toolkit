@@ -29,7 +29,7 @@ spec:
       A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
   steps:
   - name: write-kubeconfig
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.13
     script: |
       echo "Approving KCM requests"
       kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
@@ -52,4 +52,4 @@ spec:
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cp  /root/.kube/config $(workspaces.config.path)/kubeconfig
       # enable PD on the cluster 
-      kubectl set env ds aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
+      kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
