@@ -26,7 +26,7 @@ spec:
     description: The name of the VPC name you want to use for EKS cluster.
   steps:
   - name: create-eks
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.13
     script: |
       echo "Approving KCM requests"
       kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
@@ -48,4 +48,4 @@ spec:
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       # enable PD on the cluster 
-      kubectl set env ds aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
+      kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
