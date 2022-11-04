@@ -90,6 +90,17 @@ spec:
     taskRef:
       kind: Task
       name: load
+  - name: cw-metrics
+    params:
+    - name: desired-nodes
+      value: $(params.desired-nodes)
+    - name: load-result
+      value: "$(tasks.generate.results.datapoint)" 
+    runAfter:
+      - generate
+    taskRef:
+      kind: Task
+      name: cloudwatch
     workspaces:
     - name: source
       workspace: source

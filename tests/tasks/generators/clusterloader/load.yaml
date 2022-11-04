@@ -35,6 +35,9 @@ spec:
     description: "aws eks enpoint to create clusters against"
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
+  results:
+    - name: datapoint
+      description: Stores the cl2 loadtest result to emit cw metrics to aws cloudwatch   
   workspaces:
   - name: source
   - name: results
@@ -80,6 +83,7 @@ spec:
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+      echo $? | tee $(results.datapoint.path) 
     timeout: 30000s
   - name: upload-results
     image: alpine/k8s:1.22.6

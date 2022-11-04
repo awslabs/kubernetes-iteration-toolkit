@@ -1,0 +1,22 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name:  cloudwatch
+  namespace: tekton-pipelines
+spec:
+  description: "cw task to push metrics relying on generate task."
+  params:
+    - name: region
+      default: "us-west-2"
+    - name: desired-nodes
+    - name: load-result
+  steps:
+  - name: cw-emit
+    image: alpine/k8s:1.22.6
+    script: |
+      #!/bin/bash
+      if [[ "$(params.load-result)" -eq 0 ]]; then
+      aws cloudwatch --region $(params.region) put-metric-data --metric-name Cl2Test --namespace Cl2Load-Tests --unit Count --value 0 --dimensions NumberofNodes=$(params.desired-nodes) 
+      else
+      aws cloudwatch --region $(params.region) put-metric-data --metric-name Cl2Test --namespace Cl2Load-Tests --unit Count --value 1 --dimensions NumberofNodes=$(params.desired-nodes) 
+      fi
