@@ -14,9 +14,8 @@ spec:
   - name: cw-emit
     image: alpine/k8s:1.22.6
     script: |
-      #!/bin/bash
       if [[ "$(params.load-result)" -eq 0 ]]; then
-      aws cloudwatch --region $(params.region) put-metric-data --metric-name Cl2Test --namespace Cl2Load-Tests --unit Count --value 0 --dimensions NumberofNodes=$(params.desired-nodes) 
+      aws cloudwatch --region $(params.region) put-metric-data --metric-name $(params.desired-nodes)_nodes --namespace Cl2Load-Tests --unit Count --value 1 --dimensions TypeOfTest=Cl2_Test
       else
-      aws cloudwatch --region $(params.region) put-metric-data --metric-name Cl2Test --namespace Cl2Load-Tests --unit Count --value 1 --dimensions NumberofNodes=$(params.desired-nodes) 
+      aws cloudwatch --region $(params.region) put-metric-data --metric-name $(params.desired-nodes)_nodes --namespace Cl2Load-Tests --unit Count --value 0 --dimensions TypeOfTest=Cl2_Test 
       fi

@@ -95,7 +95,7 @@ spec:
     - name: desired-nodes
       value: $(params.desired-nodes)
     - name: load-result
-      value: "$(tasks.generate.results.datapoint)" 
+      value: "$(tasks.generate.results.cl2-result)" 
     runAfter:
       - generate
     taskRef:
