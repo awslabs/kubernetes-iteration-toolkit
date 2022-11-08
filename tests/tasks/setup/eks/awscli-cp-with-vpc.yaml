@@ -45,7 +45,9 @@ spec:
       if [ "$CREATED_CLUSTER" == "" ]; then
         aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $(params.servicerole) --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
       fi
-      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      date
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
+      date 
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       # enable PD on the cluster 
       kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
