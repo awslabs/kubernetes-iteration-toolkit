@@ -50,4 +50,6 @@ spec:
       date 
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       # enable PD on the cluster 
+      # To do - remove this, temporarily adding because apparently apiserver is not recongnizing deamonset for sometime
+      sleep 300 
       kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
