@@ -142,6 +142,7 @@ export class KITInfrastructure extends Stack {
                     "s3:*",
                     "sqs:*",
                     "fis:*",
+                    "events:*"
                 ],
             }),
         ],
