@@ -37,7 +37,7 @@ spec:
     description: The name of the EKS cluster you want to spin.
   results:
     - name: datapoint
-      description: Stores the cl2 loadtest result to be consumed by cloudwatch  
+      description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
   workspaces:
   - name: source
   - name: results
