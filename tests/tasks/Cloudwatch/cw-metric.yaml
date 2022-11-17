@@ -1,0 +1,29 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name:  cloudwatch
+  namespace: tekton-pipelines
+spec:
+  description: "Cloudwatch task publishes the provided metric data points to Amazon CloudWatch. More details can be found in the aws cli reference doc: https://awscli.amazonaws.com/v2/documentation/api/2.1.29/reference/cloudwatch/put-metric-data.html"
+  params:
+    - name: region
+      default: "us-west-2"
+      description: "The region to use for publishing the metrics"
+    - name: metric-name 
+      default: "cl2-loadtest"
+      description: "The name of the metric you want to pass"
+    - name: namespace
+      description: "The namespace for the metric data"
+    - name: dimensions
+      description: "Dimensions to associate with the metrics"
+    - name: unit
+      default: "Count"
+      description: "The unit of the metrics"
+    - name: value
+      description: "The value for the metric"
+  steps:
+  - name: cw-emit
+    image: amazon/aws-cli
+    script: |
+      aws sts get-caller-identity
+      aws cloudwatch --region $(params.region) put-metric-data --metric-name $(params.metric-name) --namespace $(params.namespace) --dimensions Nodes=$(params.dimensions) --unit $(params.unit) --value $(params.value) 

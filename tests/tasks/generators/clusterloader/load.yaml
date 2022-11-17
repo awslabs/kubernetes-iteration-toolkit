@@ -35,6 +35,9 @@ spec:
     description: "aws eks enpoint to create clusters against"
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
+  results:
+    - name: datapoint
+      description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
   workspaces:
   - name: source
   - name: results
@@ -73,6 +76,7 @@ spec:
     image: public.ecr.aws/kit/clusterloader2:0213bea
     onError: continue
     script: |
+      #!/bin/bash
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
@@ -80,9 +84,14 @@ spec:
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+      if [ $? -eq 0 ]; then
+      echo "1" | tee $(results.datapoint.path)
+      else
+      echo "0" | tee $(results.datapoint.path)
+      fi
     timeout: 30000s
   - name: upload-results
-    image: alpine/k8s:1.22.6
+    image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
       aws sts get-caller-identity

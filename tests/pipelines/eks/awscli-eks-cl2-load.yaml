@@ -20,6 +20,8 @@ spec:
   - name: slack-hook
   - name: slack-message
   - name: vpc-cfn-url
+  - name: kubernetes-version
+    default: "1.23"
   tasks:
   - name: slack-notification
     params:
@@ -49,6 +51,8 @@ spec:
       value: $(params.endpoint)
     - name: vpc-stack-name
       value: $(params.cluster-name)
+    - name: kubernetes-version
+      value: "$(params.kubernetes-version)"
     runAfter:
     - awscli-vpc-create
     taskRef:
@@ -90,6 +94,19 @@ spec:
     taskRef:
       kind: Task
       name: load
+  - name: cw-metrics
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate.results.datapoint)
+    - name: namespace
+      value: $(params.kubernetes-version)
+    runAfter:
+      - generate
+    taskRef:
+      kind: Task
+      name: cloudwatch
     workspaces:
     - name: source
       workspace: source
