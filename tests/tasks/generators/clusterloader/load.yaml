@@ -90,7 +90,7 @@ spec:
       echo "1" | tee $(results.datapoint.path)
     timeout: 30000s
   - name: upload-results
-    image: alpine/k8s:1.22.6
+    image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
       aws sts get-caller-identity
