@@ -30,11 +30,11 @@ func IsKubeVersionSupported(version string) bool {
 }
 
 const (
-	kubeVersion119Tag = "v1.19.13-eks-1-19-9"
-	kubeVersion120Tag = "v1.20.7-eks-1-20-6"
-	kubeVersion121Tag = "v1.21.2-eks-1-21-4"
-	kubeVersion122Tag = "v1.22.6-eks-1-22-5"
-	kubeVersion123Tag = "v1.23.9-eks-1-23-5"
+	kubeVersion119Tag = "v1.19.13-eks-1-19-22"
+	kubeVersion120Tag = "v1.20.7-eks-1-20-22"
+	kubeVersion121Tag = "v1.21.2-eks-1-21-20"
+	kubeVersion122Tag = "v1.22.6-eks-1-22-12"
+	kubeVersion123Tag = "v1.23.9-eks-1-23-7"
 	repositoryName    = "public.ecr.aws/eks-distro/"
 	busyBoxImage      = "public.ecr.aws/docker/library/busybox:stable"
 )

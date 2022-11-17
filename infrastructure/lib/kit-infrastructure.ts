@@ -19,6 +19,7 @@ export class KITInfrastructure extends Stack {
     const installEBSCSIDriverAddon = this.getContextOrDefault("AWSEBSCSIDriverAddon", "true")
     const installKarpenterAddon = this.getContextOrDefault('KarpenterAddon', "true")
     const installKitAddon = this.getContextOrDefault("KITAddon", "true")
+    const repoAddonPaths = this.node.tryGetContext('FluxRepoAddonPaths')
 
     const testRepoName = this.node.tryGetContext('TestFluxRepoName')
     const testRepoUrl = this.node.tryGetContext('TestFluxRepoURL')
@@ -138,11 +139,31 @@ export class KITInfrastructure extends Stack {
                     "eks:*",
                     "pricing:GetProducts",
                     "sts:AssumeRole",
-                    "s3:*"
+                    "s3:*",
+                    "sqs:*",
+                    "fis:*",
+                    "events:*"
                 ],
             }),
         ],
     }));
+    // Add separate FIS role permissions for EC2 interruptions
+    const fisRole = new iam.Role(this, 'tektontest-fis-role', {
+      assumedBy: new iam.ServicePrincipal(
+        "fis.amazonaws.com", 
+        {
+          conditions: {
+            StringEquals: {
+              "aws:SourceAccount": Stack.of(this).account,
+            },
+            ArnLike: {
+              "aws:SourceArn": `arn:${Stack.of(this).partition}:fis:${Stack.of(this).region}:${Stack.of(this).account}:experiment/*`
+            }
+          }
+        }
+      )
+    });
+    fisRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSFaultInjectionSimulatorEC2Access'));
 
     cluster.awsAuth.addRoleMapping(sa.role, {
         username: 'system:node:{{EC2PrivateDNSName}}',
@@ -170,6 +191,7 @@ export class KITInfrastructure extends Stack {
       repoUrl: repoUrl,
       repoBranch: repoBranch,
       repoPath: repoPath,
+      repoAddonPaths: repoAddonPaths,
       testRepoName: testRepoName,
       testRepoUrl: testRepoUrl,
       testRepoBranch: testRepoBranch,
