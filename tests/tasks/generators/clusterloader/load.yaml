@@ -36,7 +36,7 @@ spec:
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
   results:
-    - name: cl2-result
+    - name: datapoint
       description: Stores the cl2 loadtest result to be consumed by cloudwatch  
   workspaces:
   - name: source
@@ -84,10 +84,13 @@ spec:
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
-      echo $? | tee $(results.cl2-result.path) 
+      if [ $? -eq 0 ]; then
+      echo "0" | tee $(results.datapoint.path)
+      else
+      echo "1" | tee $(results.datapoint.path)
     timeout: 30000s
   - name: upload-results
-    image: alpine/k8s:1.22.6
+    image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
       aws sts get-caller-identity
