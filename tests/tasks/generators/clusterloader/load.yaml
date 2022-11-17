@@ -88,6 +88,7 @@ spec:
       echo "1" | tee $(results.datapoint.path)
       else
       echo "0" | tee $(results.datapoint.path)
+      fi
     timeout: 30000s
   - name: upload-results
     image: amazon/aws-cli
