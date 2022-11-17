@@ -4,18 +4,26 @@ metadata:
   name:  cloudwatch
   namespace: tekton-pipelines
 spec:
-  description: "cw task to push metrics relying on generate task."
+  description: "cw task that can be used to create a metric and emit a datapoint based on the result that is passed after test."
   params:
     - name: region
       default: "us-west-2"
-    - name: desired-nodes
-    - name: load-result
+      description: "The region to use for publishing the metrics"
+    - name: metric-name 
+      default: "cl2-loadtest"
+      description: "The name of the metric you want to pass"
+    - name: namespace
+      description: "The namespace for the metric data"
+    - name: dimensions
+      description: "Name of the dimension that you want to associate with the metric"
+    - name: unit
+      default: "Count"
+      description: "Name of the unit you want to use when storing the metric."
+    - name: value
+      description: "The value for the metric"
   steps:
   - name: cw-emit
-    image: alpine/k8s:1.22.6
+    image: amazon/aws-cli
     script: |
-      if [[ "$(params.load-result)" -eq 0 ]]; then
-      aws cloudwatch --region $(params.region) put-metric-data --metric-name $(params.desired-nodes)_nodes --namespace Cl2Load-Tests --unit Count --value 1 --dimensions TypeOfTest=Cl2_Test
-      else
-      aws cloudwatch --region $(params.region) put-metric-data --metric-name $(params.desired-nodes)_nodes --namespace Cl2Load-Tests --unit Count --value 0 --dimensions TypeOfTest=Cl2_Test 
-      fi
+      aws sts get-caller-identity
+      aws cloudwatch --region $(params.region) put-metric-data --metric-name $(params.metric-name) --namespace $(params.namespace) --dimensions Nodes=$(params.dimensions) --unit $(params.unit) --value $(params.value) 
