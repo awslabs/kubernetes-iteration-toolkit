@@ -94,6 +94,11 @@ spec:
     taskRef:
       kind: Task
       name: load
+    workspaces:
+    - name: source
+      workspace: source
+    - name: results
+      workspace: results  
   - name: cw-metrics
     params:
     - name: dimensions
@@ -107,11 +112,6 @@ spec:
     taskRef:
       kind: Task
       name: cloudwatch
-    workspaces:
-    - name: source
-      workspace: source
-    - name: results
-      workspace: results
   finally:    
   - name: teardown
     params:   
