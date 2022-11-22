@@ -2,12 +2,14 @@ import { Construct } from 'constructs';
 import { aws_iam as iam, StackProps } from 'aws-cdk-lib';
 import { aws_eks as eks } from 'aws-cdk-lib';
 import * as request from 'sync-request';
+import * as fs from 'fs';
 
 export interface AWSEBSCSIDriverProps extends StackProps {
     cluster: eks.Cluster
     namespace: string
     version: string
     chartVersion: string
+    useCachedIAMPolicy: boolean
 }
 
 export class AWSEBSCSIDriver extends Construct {
@@ -27,7 +29,7 @@ export class AWSEBSCSIDriver extends Construct {
             namespace: props.namespace
         })
         sa.node.addDependency(ns)
-        sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-ebs-csi-driver-policy', {document: iam.PolicyDocument.fromJson(this.getIAMPolicy(props.version))}))
+        sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-ebs-csi-driver-policy', {document: iam.PolicyDocument.fromJson(this.getIAMPolicy(props.version, props.useCachedIAMPolicy))}))
 
         const chart = props.cluster.addHelmChart('aws-ebs-csi-driver-chart', {
             chart: 'aws-ebs-csi-driver',
@@ -56,11 +58,13 @@ export class AWSEBSCSIDriver extends Construct {
             }
         })
         chart.node.addDependency(ns)
-
-        
-        
     }
-    private getIAMPolicy(version: string): any {
+    private getIAMPolicy(version: string, useCachedIAMPolicy: boolean): any {
+        if (useCachedIAMPolicy){
+            return JSON.parse(
+                fs.readFileSync(`./cached/aws-ebs-csi-driver-iam-policy-${version}.json`,'utf8')
+            );
+        }
         const metadataUrl = `https://raw.githubusercontent.com/kubernetes-sigs/aws-ebs-csi-driver/${version}/docs/example-iam-policy.json`;
         return JSON.parse(
           request.default('GET', metadataUrl, {
