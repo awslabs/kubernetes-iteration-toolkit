@@ -9,7 +9,6 @@ export interface AWSEBSCSIDriverProps extends StackProps {
     namespace: string
     version: string
     chartVersion: string
-    useCachedIAMPolicy: boolean
 }
 
 export class AWSEBSCSIDriver extends Construct {
@@ -29,7 +28,7 @@ export class AWSEBSCSIDriver extends Construct {
             namespace: props.namespace
         })
         sa.node.addDependency(ns)
-        sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-ebs-csi-driver-policy', {document: iam.PolicyDocument.fromJson(this.getIAMPolicy(props.version, props.useCachedIAMPolicy))}))
+        sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-ebs-csi-driver-policy', {document: iam.PolicyDocument.fromJson(this.getIAMPolicy(props.version))}))
 
         const chart = props.cluster.addHelmChart('aws-ebs-csi-driver-chart', {
             chart: 'aws-ebs-csi-driver',
@@ -59,19 +58,10 @@ export class AWSEBSCSIDriver extends Construct {
         })
         chart.node.addDependency(ns)
     }
-    private getIAMPolicy(version: string, useCachedIAMPolicy: boolean): any {
-        if (useCachedIAMPolicy){
-            return JSON.parse(
-                fs.readFileSync(`./cached/aws-ebs-csi-driver-iam-policy-${version}.json`,'utf8')
-            );
-        }
-        const metadataUrl = `https://raw.githubusercontent.com/kubernetes-sigs/aws-ebs-csi-driver/${version}/docs/example-iam-policy.json`;
+    private getIAMPolicy(version: string): any {
+        // Update and run REPO_DIR/cache-iam-policies.sh to download and cache this policy
         return JSON.parse(
-          request.default('GET', metadataUrl, {
-            headers: {
-              'User-Agent': 'CDK' // GH API requires us to set UA
-            }
-          }).getBody().toString()
+            fs.readFileSync(`lib/addons/cached/aws-ebs-csi-driver-iam-policy-${version}.json`,'utf8')
         );
       }
 }

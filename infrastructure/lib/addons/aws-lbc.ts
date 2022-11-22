@@ -9,7 +9,6 @@ export interface AWSLoadBalancerControllerProps extends StackProps {
   cluster: eks.Cluster;
   namespace: string;
   version: string;
-  useCachedIAMPolicy: boolean;
 }
 
 export class AWSLoadBalancerController extends Construct {
@@ -29,7 +28,7 @@ export class AWSLoadBalancerController extends Construct {
       namespace: props.namespace
     });
     sa.node.addDependency(ns)
-    sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-lbc-policy', {document: iam.PolicyDocument.fromJson(this.getIAMPolicy(props.version, props.useCachedIAMPolicy))}))
+    sa.role.attachInlinePolicy(new iam.Policy(this, 'aws-lbc-policy', {document: iam.PolicyDocument.fromJson(this.getIAMPolicy(props.version))}))
 
     const chart = props.cluster.addHelmChart('AWSLBCHelmChart', {
       chart: 'aws-load-balancer-controller',
@@ -59,19 +58,10 @@ export class AWSLoadBalancerController extends Construct {
     });
     chart.node.addDependency(ns)
   }
-  private getIAMPolicy(version: string, useCachedIAMPolicy: boolean): any {
-    if (useCachedIAMPolicy){
+  private getIAMPolicy(version: string): any {
+      // Update and run REPO_DIR/cache-iam-policies.sh to download and cache this policy
       return JSON.parse(
-          fs.readFileSync(`./cached/aws-load-balancer-controller-iam-policy-${version}.json`,'utf8')
+          fs.readFileSync(`lib/addons/cached/aws-load-balancer-controller-iam-policy-${version}.json`,'utf8')
       );
-    }
-    const metadataUrl = `https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/${version}/docs/install/iam_policy.json`;
-    return JSON.parse(
-      request.default('GET', metadataUrl, {
-        headers: {
-          'User-Agent': 'CDK' // GH API requires us to set UA
-        }
-      }).getBody().toString()
-    );
   }
 }

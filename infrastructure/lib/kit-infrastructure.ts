@@ -28,9 +28,6 @@ export class KITInfrastructure extends Stack {
     const testSA = this.node.tryGetContext("TestServiceAccount")
     const testNS = this.node.tryGetContext("TestNamespace")
 
-    // If set to false it will attempt to download policies from Github
-    const useCachedIAMPolicy = this.getContextOrDefault("UseCachedIAMPolicy","false") == "true"
-
     // A VPC, including NAT GWs, IGWs, where we will run our cluster
     const vpc = new ec2.Vpc(this, 'VPC', {});
 
@@ -180,7 +177,6 @@ export class KITInfrastructure extends Stack {
         namespace: 'aws-ebs-csi-driver',
         version: 'v1.9.0', // When updating this ensure to also update and run cache-iam-policies.sh
         chartVersion: 'v2.8.1',
-        useCachedIAMPolicy: useCachedIAMPolicy,
       }).node.addDependency(cluster);
     }
 
@@ -207,7 +203,6 @@ export class KITInfrastructure extends Stack {
       cluster: cluster,
       namespace: 'aws-load-balancer-controller',
       version: 'v2.4.2', // When updating this ensure to also update and run cache-iam-policies.sh
-      useCachedIAMPolicy: useCachedIAMPolicy,
     }).node.addDependency(cluster);
 
     if(installKitAddon == "true"){
