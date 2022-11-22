@@ -1,0 +1,52 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: eks-addon-fluentbit
+  namespace: tekton-pipelines
+spec:
+  description: |
+    This task installs the FluentBit addon on an EKS cluster.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to add addons for.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+  steps:
+  - name: create-fluentbit-addon
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      #kubectl commands are purely for knowing state of cluster before kicking off the test.
+      kubectl version
+      kubectl config current-context
+      #install fluent bit addon
+      kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/cloudwatch-namespace.yaml
+      cat > "./fluentbit-configmap.yaml" <<EOL
+      # create configmap for fluentbit config
+      apiVersion: v1
+      data:
+        cluster.name: $(params.cluster-name)
+        http.server: 'On'
+        http.port: '2020'
+        read.head: 'Off'
+        read.tail: 'On'
+        logs.region: $(params.region)
+      kind: ConfigMap
+      metadata:
+        name: fluent-bit-cluster-info
+        namespace: amazon-cloudwatch
+      EOL
+      kubectl apply -f ./fluentbit-configmap.yaml
+      kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/fluent-bit/fluent-bit.yaml
+      sleep 30
+      kubectl get pods -n amazon-cloudwatch
