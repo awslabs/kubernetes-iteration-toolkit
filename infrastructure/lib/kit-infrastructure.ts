@@ -176,7 +176,7 @@ export class KITInfrastructure extends Stack {
       new AWSEBSCSIDriver(this, 'AWSEBSCSIDriver', {
         cluster: cluster,
         namespace: 'aws-ebs-csi-driver',
-        version: 'v1.9.0',
+        version: 'v1.9.0', // When updating this ensure to also update and run cache-iam-policies.sh
         chartVersion: 'v2.8.1',
       }).node.addDependency(cluster);
     }
@@ -203,7 +203,7 @@ export class KITInfrastructure extends Stack {
     new AWSLoadBalancerController(this, 'AWSLoadBalancerController', {
       cluster: cluster,
       namespace: 'aws-load-balancer-controller',
-      version: 'v2.4.2',
+      version: 'v2.4.2', // When updating this ensure to also update and run cache-iam-policies.sh
     }).node.addDependency(cluster);
 
     if(installKitAddon == "true"){

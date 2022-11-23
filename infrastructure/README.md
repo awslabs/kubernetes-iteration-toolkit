@@ -102,6 +102,15 @@ cdk deploy KITInfrastructure --no-rollback \
   -c FluxAddonPaths="./test/infrastructure/clusters/addons/perfdash"
 ```
 
+### Dependent IAM policies:
+
+The application is caching IAM policies of two components as static files in `lib/addons/cached/`:
+* aws-load-balancer-controller
+* aws-ebs-csi-driver
+
+These IAM policies are pinned to a version and downloaded form Github. When the version of these components change
+in an upgrade, the cache needs to be updated by modifying the version values in `cache-iam-policies.sh` and executing file.
+
 ### Context Parameters:
 
 | Context Param       | Description                                                                                | Default                                                 |   |   |
