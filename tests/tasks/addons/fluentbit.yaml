@@ -48,5 +48,4 @@ spec:
       EOL
       kubectl apply -f ./fluentbit-configmap.yaml
       kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/fluent-bit/fluent-bit.yaml
-      sleep 30
-      kubectl get pods -n amazon-cloudwatch
+      kubectl rollout status daemonset fluent-bit -n amazon-cloudwatch --timeout 5m
