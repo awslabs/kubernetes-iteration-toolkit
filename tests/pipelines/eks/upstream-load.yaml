@@ -47,6 +47,8 @@ spec:
     default: "15"
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
+  - name: amp-workspace-id
+    description: The remote amp workspace id where remote needs to happen.
   tasks:
   - name: create-eks-cluster
     taskRef:
@@ -97,6 +99,8 @@ spec:
         value: '$(params.results-bucket)'
       - name: nodes
         value: '$(params.desired-nodes)'
+      - name: amp-workspace-id
+        value: '$(params.amp-workspace-id)'
     workspaces:
       - name: source
         workspace: source
