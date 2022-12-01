@@ -90,7 +90,7 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		PriorityClassName:             "system-node-critical",
 		Tolerations:                   []v1.Toleration{{Operator: v1.TolerationOpExists}},
-		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
+		NodeSelector:                  nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd),
 		Containers: []v1.Container{{
 			Name:    "controller-manager",
 			Image:   imageprovider.KubeControllerManager(controlPlane.Spec.KubernetesVersion),

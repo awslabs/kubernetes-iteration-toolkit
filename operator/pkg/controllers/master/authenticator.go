@@ -47,7 +47,7 @@ func (c *Controller) reconcileAuthenticator(ctx context.Context, controlPlane *v
 
 func (c *Controller) ensureDaemonSet(ctx context.Context, controlPlane *v1alpha1.ControlPlane) error {
 	authenticatorPodTemplateSpec := iamauthenticator.PodSpec(controlPlane.ClusterName(), func(template v1.PodTemplateSpec) v1.PodTemplateSpec {
-		template.Spec.NodeSelector = APIServerLabels(controlPlane.ClusterName())
+		template.Spec.NodeSelector = nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd)
 		template.Spec.Volumes = append(template.Spec.Volumes, v1.Volume{Name: "config",
 			VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{
 				LocalObjectReference: v1.LocalObjectReference{Name: iamauthenticator.AuthenticatorConfigMapName(controlPlane.ClusterName())},

@@ -1,0 +1,21 @@
+apiVersion: kit.k8s.sh/v1alpha1
+kind: ControlPlane
+metadata:
+  name: example # Desired Cluster Name
+spec:
+  kubernetesVersion: "1.21"
+  colocateAPIServerWithEtcd: true
+  etcd:
+    replicas: 1    
+    spec:
+      nodeSelector: 
+        node.kubernetes.io/instance-type: m5.2xlarge
+      containers: 
+      - name: etcd
+  master:
+    apiServer:
+      spec:
+        nodeSelector: 
+          node.kubernetes.io/instance-type: m5.2xlarge
+        containers: 
+        - name: apiserver

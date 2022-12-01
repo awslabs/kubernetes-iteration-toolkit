@@ -64,7 +64,7 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 					Spec: v1.PodSpec{
 						PriorityClassName: "system-node-critical",
 						Tolerations:       []v1.Toleration{{Operator: v1.TolerationOpExists}},
-						NodeSelector:      nodeSelector(controlPlane.ClusterName()),
+						NodeSelector:      nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd),
 						Containers: []v1.Container{{
 							Name:    "aws-encryption-provider",
 							Image:   imageprovider.AWSEncryptionProvider(),
