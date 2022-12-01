@@ -71,8 +71,17 @@ spec:
     workspaces:
       - name: config    
         workspace: config
+  - name: install-fluentbit-addon
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: eks-addon-fluentbit
   - name: generate
-    runAfter: [create-eks-cluster]
+    runAfter: [install-fluentbit-addon]
     taskRef:
       name: load
     params:
