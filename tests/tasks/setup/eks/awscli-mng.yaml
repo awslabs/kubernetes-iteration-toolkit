@@ -49,13 +49,19 @@ spec:
       --query cluster.resourcesVpcConfig.subnetIds --output text \
       )
 
-      nodes=$(params.desired-nodes)
+      nodes=$(($(params.desired-nodes)-1))
       asgs=$((nodes/1000))
       asg_name=$(params.cluster-name)-nodes
       create_dp()
       {
         CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$asg_name-$1'`]' --output text)
-        #ToDo: paramterize instance-types
+        echo $3
+        EC2_INSTANCES=$3
+        echo $EC2_INSTANCES
+        if [ "$EC2_INSTANCES" == "" ]; then
+          # Defaulting to below instances if no other instances has been provided in the parameter.
+          EC2_INSTANCES="c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"
+        fi
         if [ "$CREATED_NODEGROUP" == "" ]; then
           #create node group
           aws eks $ENDPOINT_FLAG create-nodegroup \
@@ -63,7 +69,7 @@ spec:
           --nodegroup-name $asg_name-$1 \
           --node-role $(params.host-cluster-node-role-arn) \
           --region $(params.region) \
-          --instance-types $3 \
+          --instance-types $EC2_INSTANCES \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
           --subnets $NG_SUBNETS
         fi
@@ -77,15 +83,15 @@ spec:
       for i in $(seq 1 $asgs)
       do
         #max number of nodes MNG allows per ASG
-        create_dp $i 1000 c5.large,m5.large,r5.large,t3.large,t3a.large,c5a.large,m5a.large,r5a.large
+        create_dp $i 1000 
       done
-      remaining_nodes=$((nodes%1000))
+      remaining_nodes=$(((nodes)%1000))
       if [[ $remaining_nodes -gt 0 ]]
       then
         echo "The remaining_nodes var is greater than 0."
-        create_dp 0 $remaining_nodes c5.large,m5.large,r5.large,t3.large,t3a.large,c5a.large,m5a.large,r5a.large
+        create_dp 0 $remaining_nodes
       fi
-      # Creating an extra asg with 1 node for prometheus server pod scheduling.
+      # Creating an extra asg with 1 large node to ensure prometheus server has a scheduling space.
       create_dp $(($asgs + 1)) 1 m5.4xlarge
   - name: validate-nodes
     image: alpine/k8s:1.22.6
@@ -104,6 +110,6 @@ spec:
       while true; do
           ready_node=$(kubectl get nodes 2>/dev/null | grep -w Ready | wc -l)
           echo "ready-nodes=$ready_node"
-          if [[ "$ready_node" -eq $(($(params.desired-nodes) + 1)) ]]; then break; fi
+          if [[ "$ready_node" -eq $(params.desired-nodes) ]]; then break; fi
           sleep 5
       done

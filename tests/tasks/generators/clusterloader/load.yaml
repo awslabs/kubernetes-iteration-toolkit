@@ -36,7 +36,8 @@ spec:
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
   - name: amp-workspace-id
-    description: The remote amp workspace id where remote needs to happen.
+    description: The AMP workspace ID where remote write needs to happen.
+    default: ""
   results:
     - name: datapoint
       description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
@@ -76,7 +77,9 @@ spec:
       EOL
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
-
+      
+      # Enable Prometheus if the remote workspace id is provided
+      if [ -n "$(params.amp-workspace-id)" ]; then
       # TODO: Currently pathing the prometheus manifests for remote write. Move this to upsteam going forward.
       echo "volumeBindingMode: WaitForFirstConsumer" >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
@@ -100,6 +103,7 @@ spec:
           - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
+      fi
   - name: run-loadtest
     image: public.ecr.aws/kit/clusterloader2:0213bea
     onError: continue
@@ -109,9 +113,12 @@ spec:
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
+      if [ -n "$(params.amp-workspace-id)" ]; then
+        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-storage-class-provisioner kubernetes.io/aws-ebs --prometheus-storage-class-volume-type gp2 --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
+      fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
-      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
       if [ $? -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
       else

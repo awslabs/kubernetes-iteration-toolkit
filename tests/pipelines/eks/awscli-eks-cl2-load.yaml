@@ -23,6 +23,7 @@ spec:
   - name: kubernetes-version
     default: "1.23"
   - name: amp-workspace-id
+    default: ""
   tasks:
   - name: slack-notification
     params:

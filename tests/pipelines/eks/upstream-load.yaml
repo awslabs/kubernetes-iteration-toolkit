@@ -48,7 +48,8 @@ spec:
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
   - name: amp-workspace-id
-    description: The remote amp workspace id where remote needs to happen.
+    description: The AMP workspace ID where remote write needs to happen.
+    default: ""
   tasks:
   - name: create-eks-cluster
     taskRef:
