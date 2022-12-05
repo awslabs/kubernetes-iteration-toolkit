@@ -126,11 +126,13 @@ spec:
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
-      if [ $? -eq 0 ]; then
+      exit_code=$?
+      if [ $exit_code -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
       else
       echo "0" | tee $(results.datapoint.path)
       fi
+      exit $exit_code
     timeout: 30000s
   - name: upload-results
     image: amazon/aws-cli
