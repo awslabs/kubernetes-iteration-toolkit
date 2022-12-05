@@ -101,6 +101,8 @@ spec:
                 containerPort: 8005
         remoteWrite:
           - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
+        externalLabels:
+          cluster_name: $(params.cluster-name)
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       fi
