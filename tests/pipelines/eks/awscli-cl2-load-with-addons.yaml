@@ -16,6 +16,8 @@ spec:
   - name: results-bucket
   - name: slack-hook
   - name: slack-message
+  - name: amp-workspace-id
+    default: ""
   tasks:
   - name: slack-notification
     params:
@@ -91,6 +93,8 @@ spec:
       value: $(params.results-bucket)
     - name: nodes
       value: $(params.desired-nodes)
+    - name: amp-workspace-id
+      value: '$(params.amp-workspace-id)'
     runAfter:
     - install-fluentbit-addon
     - create-cw-agent-addon

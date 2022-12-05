@@ -22,6 +22,8 @@ spec:
   - name: vpc-cfn-url
   - name: kubernetes-version
     default: "1.23"
+  - name: amp-workspace-id
+    default: ""
   tasks:
   - name: slack-notification
     params:
@@ -100,6 +102,8 @@ spec:
       value: $(params.cluster-name)
     - name: endpoint
       value: $(params.endpoint)
+    - name: amp-workspace-id
+      value: '$(params.amp-workspace-id)'
     runAfter:
     - install-fluentbit-addon
     taskRef:

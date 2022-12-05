@@ -24,6 +24,9 @@ spec:
     description: servicerole arn to be used for eks cluster to perform operations in customer account to setup cluster
   - name: vpc-stack-name
     description: The name of the VPC name you want to use for EKS cluster.
+  - name: aws-ebs-csi-driver-version
+    default: release-1.13
+    description: The release version for aws ebs csi driver.
   steps:
   - name: create-eks
     image: alpine/k8s:1.23.13
@@ -49,3 +52,5 @@ spec:
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       # enable PD on the cluster 
       kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
+      # install csi drivers.
+      kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=$(params.aws-ebs-csi-driver-version)"
