@@ -27,6 +27,12 @@ spec:
     default: ""
   - name: host-cluster-node-role-arn
     description: arn of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups.
+  - name: mng-host-instance-types
+    description: Instance types for managed nodes.
+    default: "c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"
+  - name: monitoring-host-instance-types
+    description: Instance types for monitoring node. This is an extra node created for scheduling Prometheus, for choosing the right instance type check the cpu and memory requirement calculation from here https://github.com/kubernetes/perf-tests/blob/master/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L27 
+    default: "m5.4xlarge"
   steps:
   - name: create-nodegroup
     image: alpine/k8s:1.22.6
@@ -49,18 +55,15 @@ spec:
       --query cluster.resourcesVpcConfig.subnetIds --output text \
       )
 
-      nodes=$(($(params.desired-nodes)-1))
+      nodes=$(params.desired-nodes)
       asgs=$((nodes/1000))
       asg_name=$(params.cluster-name)-nodes
       create_dp()
       {
         CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$asg_name-$1'`]' --output text)
-        echo $3
         EC2_INSTANCES=$3
-        echo $EC2_INSTANCES
-        if [ "$EC2_INSTANCES" == "" ]; then
-          # Defaulting to below instances if no other instances has been provided in the parameter.
-          EC2_INSTANCES="c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"
+        if [ -n "$4" ]; then
+          TAINTS_FLAG="--taints $4"
         fi
         if [ "$CREATED_NODEGROUP" == "" ]; then
           #create node group
@@ -71,7 +74,7 @@ spec:
           --region $(params.region) \
           --instance-types $EC2_INSTANCES \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
-          --subnets $NG_SUBNETS
+          --subnets $NG_SUBNETS $TAINTS_FLAG
         fi
         echo "CREATED_NODEGROUP=$asg_name-$1"
         while [[ "$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $asg_name-$1 --query nodegroup.status --output text)" == "CREATING" ]]
@@ -83,16 +86,16 @@ spec:
       for i in $(seq 1 $asgs)
       do
         #max number of nodes MNG allows per ASG
-        create_dp $i 1000 
+        create_dp $i 1000 "$(params.mng-host-instance-types)"
       done
       remaining_nodes=$(((nodes)%1000))
       if [[ $remaining_nodes -gt 0 ]]
       then
         echo "The remaining_nodes var is greater than 0."
-        create_dp 0 $remaining_nodes
+        create_dp 0 $remaining_nodes "$(params.mng-host-instance-types)"
       fi
       # Creating an extra asg with 1 large node to ensure prometheus server has a scheduling space.
-      create_dp $(($asgs + 1)) 1 m5.4xlarge
+      create_dp "monitoring" 1 "$(params.monitoring-host-instance-types)" "key=monitoring,value=true,effect=NO_SCHEDULE"
   - name: validate-nodes
     image: alpine/k8s:1.22.6
     script: |
@@ -110,6 +113,6 @@ spec:
       while true; do
           ready_node=$(kubectl get nodes 2>/dev/null | grep -w Ready | wc -l)
           echo "ready-nodes=$ready_node"
-          if [[ "$ready_node" -eq $(params.desired-nodes) ]]; then break; fi
+          if [[ "$ready_node" -eq $(($(params.desired-nodes)+1)) ]]; then break; fi
           sleep 5
       done
