@@ -83,6 +83,8 @@ spec:
       # TODO: Currently pathing the prometheus manifests for remote write. Move this to upsteam going forward.
       echo "volumeBindingMode: WaitForFirstConsumer" >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
+      sed -i '/nodeSelector/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
+      sed -i '/kubernetes.io\/os: linux/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
         containers:
           - name: aws-sigv4-proxy-sidecar
@@ -103,6 +105,9 @@ spec:
           - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
         externalLabels:
           cluster_name: $(params.cluster-name)
+        nodeSelector:
+          kubernetes.io/os: linux
+          eks.amazonaws.com/nodegroup: $(params.cluster-name)-nodes-monitoring
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       fi
