@@ -59,6 +59,9 @@ spec:
     image: alpine/k8s:1.22.6
     workingDir: $(workspaces.source.path)
     script: |
+      S3_RESULT_PATH=$(params.results-bucket)
+      echo $S3_RESULT_PATH > $(workspaces.source.path)/s3_result_path.txt
+      echo "S3 Path: $S3_RESULT_PATH" 
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
       CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
@@ -105,6 +108,7 @@ spec:
           - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
         externalLabels:
           cluster_name: $(params.cluster-name)
+          s3_path: $S3_RESULT_PATH
         nodeSelector:
           kubernetes.io/os: linux
           eks.amazonaws.com/nodegroup: $(params.cluster-name)-nodes-monitoring
@@ -138,7 +142,9 @@ spec:
     image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
+      S3_RESULT_PATH=$(cat $(workspaces.source.path)/s3_result_path.txt)
+      echo "S3 Path: $S3_RESULT_PATH" 
       aws sts get-caller-identity
       # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
       ls -larth
-      aws s3 cp . s3://$(params.results-bucket)/  --recursive
+      aws s3 cp . s3://$S3_RESULT_PATH/  --recursive
