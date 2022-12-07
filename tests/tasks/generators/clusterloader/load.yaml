@@ -41,6 +41,8 @@ spec:
   results:
     - name: datapoint
       description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
+    - name: s3_result
+      description: Stores the S3 result path after compute
   workspaces:
   - name: source
     mountPath: /src/k8s.io/
@@ -60,7 +62,7 @@ spec:
     workingDir: $(workspaces.source.path)
     script: |
       S3_RESULT_PATH=$(params.results-bucket)
-      echo $S3_RESULT_PATH > $(workspaces.source.path)/s3_result_path.txt
+      echo $S3_RESULT_PATH > $(results.s3_result.path)
       echo "S3 Path: $S3_RESULT_PATH" 
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
@@ -111,7 +113,7 @@ spec:
           s3_path: $S3_RESULT_PATH
         nodeSelector:
           kubernetes.io/os: linux
-          eks.amazonaws.com/nodegroup: $(params.cluster-name)-nodes-monitoring
+          eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       fi
@@ -142,7 +144,7 @@ spec:
     image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
-      S3_RESULT_PATH=$(cat $(workspaces.source.path)/s3_result_path.txt)
+      S3_RESULT_PATH=$(cat $(results.s3_result.path))
       echo "S3 Path: $S3_RESULT_PATH" 
       aws sts get-caller-identity
       # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
