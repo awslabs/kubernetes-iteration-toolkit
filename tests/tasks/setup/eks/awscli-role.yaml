@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: awscli-eks-role-create-test-rnshis
+  name: awscli-eks-role-create
   namespace: tekton-pipelines
 spec:
   description: |

@@ -11,8 +11,10 @@ spec:
   - name: cluster-name
   - name: endpoint
   - name: servicerole
+    default: ""
   - name: desired-nodes
   - name: host-cluster-node-role-arn
+    default: ""
   - name: pods-per-node
   - name: nodes-per-namespace
   - name: cl2-load-test-throughput
@@ -43,6 +45,19 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-vpc-create
+  - name: create-cluster-roles
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: servicerole-arn
+      value: $(params.servicerole)
+    - name: host-cluster-node-role-arn
+      value:  $(params.host-cluster-node-role-arn)
+    runAfter:
+    - awscli-vpc-create
+    taskRef:
+      kind: Task
+      name: awscli-eks-role-create
   - name: create-eks-cluster
     params:
     - name: cluster-name
@@ -56,10 +71,33 @@ spec:
     - name: kubernetes-version
       value: "$(params.kubernetes-version)"
     runAfter:
-    - awscli-vpc-create
+    - create-cluster-roles
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-create-with-vpc-stack
+  - name: create-mng-monitoring-nodes
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: host-cluster-node-role-arn
+      value: $(params.host-cluster-node-role-arn)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: desired-nodes
+      value: "1"
+    - name: max-nodes
+      value: "1"
+    - name: mng-host-instance-types
+      value: "m5.4xlarge"
+    - name: host-taints
+      value: "key=monitoring,value=true,effect=NO_SCHEDULE"
+    - name: nodegroup-prefix
+      value: "monitoring-"
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name:  awscli-eks-nodegroup-create
   - name: create-mng-nodes
     params:
     - name: cluster-name
@@ -71,7 +109,7 @@ spec:
     - name: endpoint
       value: $(params.endpoint)
     runAfter:
-    - create-eks-cluster
+    - create-mng-monitoring-nodes
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
@@ -138,6 +176,10 @@ spec:
       value: $(params.slack-hook)
     - name: slack-message
       value: "$(params.slack-message) job completed"
+    - name: servicerole-arn
+      value: $(params.servicerole)
+    - name: host-cluster-node-role-arn
+      value:  $(params.host-cluster-node-role-arn)
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-teardown
