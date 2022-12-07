@@ -37,6 +37,10 @@ spec:
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
+      SERVICE_ROLE_ARN=$(params.servicerole)
+      if [ "$SERVICE_ROLE_ARN" == ""  ]; then
+        SERVICE_ROLE_ARN=$(aws iam get-role --role-name $(params.cluster-name)-service-role --query 'Role.[Arn]' --output text)
+      fi
       CREATED_CLUSTER=$(aws eks $ENDPOINT_FLAG list-clusters --region $(params.region) --query 'clusters[?@==`'$(params.cluster-name)'`]' --output text )
       echo "CREATED_CLUSTER=$CREATED_CLUSTER"
 
@@ -46,7 +50,7 @@ spec:
       echo "securitygroup=$sg"
       
       if [ "$CREATED_CLUSTER" == "" ]; then
-        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $(params.servicerole) --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
+        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
       fi
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)

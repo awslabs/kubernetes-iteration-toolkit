@@ -1,0 +1,16 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "eks-gamma.aws.internal",
+                    "eks.amazonaws.com",
+                    "eks-beta.aws.internal"
+                ]
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
