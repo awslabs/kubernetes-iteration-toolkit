@@ -19,10 +19,10 @@ spec:
     description: The desired number of nodes in the cluster.
   - name: min-nodes
     default: "1"
-    description: The minimum number of nodes in the cluster.
+    description: The minimum number of nodes in the cluster nodegroup.
   - name: max-nodes
     default: "1000"
-    description: The maximum number of nodes in the cluster.
+    description: The maximum number of nodes in the cluster nodegroup.
   - name: endpoint
     default: ""
   - name: host-cluster-node-role-arn
@@ -30,9 +30,12 @@ spec:
   - name: mng-host-instance-types
     description: Instance types for managed nodes.
     default: "c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"
-  - name: monitoring-host-instance-types
-    description: Instance types for monitoring node. This is an extra node created for scheduling Prometheus, for choosing the right instance type check the cpu and memory requirement calculation from here https://github.com/kubernetes/perf-tests/blob/master/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L27 
-    default: "m5.4xlarge"
+  - name: host-taints
+    description: Taints to be added to managed nodes
+    default: ""
+  - name: nodegroup-prefix
+    description: Prefix that needs to be appended to asg names.
+    default: ""
   steps:
   - name: create-nodegroup
     image: alpine/k8s:1.22.6
@@ -47,72 +50,75 @@ spec:
         sleep 900
       fi
 
+      NODE_ROLE_ARN=$(params.host-cluster-node-role-arn)
+      if [ "$NODE_ROLE_ARN" == ""  ]; then
+        NODE_ROLE_ARN=$(aws iam get-role --role-name $(params.cluster-name)-node-role --query 'Role.[Arn]' --output text)
+      fi
+
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
+
+      if [ -n "$(params.host-taints)" ]; then
+        TAINTS_FLAG="--taints $(params.host-taints)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
 
       NG_SUBNETS=$(aws eks $ENDPOINT_FLAG --region $(params.region)  describe-cluster --name $(params.cluster-name) \
       --query cluster.resourcesVpcConfig.subnetIds --output text \
       )
 
+      max_nodes=$(params.max-nodes)
       nodes=$(params.desired-nodes)
-      asgs=$((nodes/1000))
-      asg_name=$(params.cluster-name)-nodes
-      create_dp()
+      asgs=$((nodes/max_nodes))
+      echo "asgs: $asgs"
+      node_group=$(params.nodegroup-prefix)$(params.cluster-name)-nodes
+      create_and_validate_dp_nodes()
       {
-        CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$asg_name-$1'`]' --output text)
+        node_group_name=$node_group-$1
+        CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$node_group_name'`]' --output text)
         EC2_INSTANCES=$3
-        if [ -n "$4" ]; then
-          TAINTS_FLAG="--taints $4"
-        fi
         if [ "$CREATED_NODEGROUP" == "" ]; then
           #create node group
           aws eks $ENDPOINT_FLAG create-nodegroup \
           --cluster-name $(params.cluster-name) \
-          --nodegroup-name $asg_name-$1 \
-          --node-role $(params.host-cluster-node-role-arn) \
+          --nodegroup-name $node_group_name \
+          --node-role $NODE_ROLE_ARN \
           --region $(params.region) \
           --instance-types $EC2_INSTANCES \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
           --subnets $NG_SUBNETS $TAINTS_FLAG
         fi
-        echo "CREATED_NODEGROUP=$asg_name-$1"
-        while [[ "$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $asg_name-$1 --query nodegroup.status --output text)" == "CREATING" ]]
+        echo "CREATED_NODEGROUP=$node_group_name"
+        while [[ "$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $node_group_name --query nodegroup.status --output text)" == "CREATING" ]]
         do
-          echo "$asg_name-$1 is "CREATING" at $(date)"
+          echo "$node_group_name is "CREATING" at $(date)"
           sleep 2
+        done
+        while true; do
+          ready_node=$(kubectl get nodes -l eks.amazonaws.com/nodegroup=$node_group_name --no-headers 2>/dev/null | grep -w Ready | wc -l)
+          echo "ready-nodes=$ready_node out of $2, for nodegroup: $node_group_name"
+          if [[ "$ready_node" -eq $2 ]]; then break; fi
+          sleep 5
         done
       }
       for i in $(seq 1 $asgs)
       do
         #max number of nodes MNG allows per ASG
-        create_dp $i 1000 "$(params.mng-host-instance-types)"
+        create_and_validate_dp_nodes $i $max_nodes "$(params.mng-host-instance-types)"
       done
-      remaining_nodes=$(((nodes)%1000))
+      remaining_nodes=$(((nodes)%max_nodes))
+      echo "remaining nodes: $remaining_nodes"
       if [[ $remaining_nodes -gt 0 ]]
       then
         echo "The remaining_nodes var is greater than 0."
-        create_dp 0 $remaining_nodes "$(params.mng-host-instance-types)"
+        create_and_validate_dp_nodes 0 $remaining_nodes "$(params.mng-host-instance-types)"
       fi
-      # Creating an extra asg with 1 large node to ensure prometheus server has a scheduling space.
-      create_dp "monitoring" 1 "$(params.monitoring-host-instance-types)" "key=monitoring,value=true,effect=NO_SCHEDULE"
-  - name: validate-nodes
-    image: alpine/k8s:1.22.6
-    script: |
-      ENDPOINT_FLAG=""
-      if [ -n "$(params.endpoint)" ]; then
-        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
-      fi
-      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      
       #kubectl commands are purely for knowing state of cluster before kicking off the test.
       kubectl version
       kubectl config current-context
       kubectl describe clusterrole eks:node-manager
       kubectl get nodes -o wide
       kubectl get ns
-      while true; do
-          ready_node=$(kubectl get nodes 2>/dev/null | grep -w Ready | wc -l)
-          echo "ready-nodes=$ready_node"
-          if [[ "$ready_node" -eq $(($(params.desired-nodes)+1)) ]]; then break; fi
-          sleep 5
-      done
+      kubectl get cs
