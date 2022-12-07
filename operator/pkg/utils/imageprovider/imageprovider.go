@@ -29,12 +29,13 @@ func IsKubeVersionSupported(version string) bool {
 	return ok
 }
 
+// image tags come from EKS-D and are updated according to https://github.com/aws/eks-distro/issues/1174#issuecomment-1295638015
 const (
-	kubeVersion119Tag = "v1.19.13-eks-1-19-22"
-	kubeVersion120Tag = "v1.20.7-eks-1-20-22"
-	kubeVersion121Tag = "v1.21.2-eks-1-21-20"
-	kubeVersion122Tag = "v1.22.6-eks-1-22-12"
-	kubeVersion123Tag = "v1.23.9-eks-1-23-7"
+	kubeVersion119Tag = "v1.19.16-eks-1-19-22"
+	kubeVersion120Tag = "v1.20.15-eks-1-20-22"
+	kubeVersion121Tag = "v1.21.14-eks-1-21-21"
+	kubeVersion122Tag = "v1.22.16-eks-1-22-14"
+	kubeVersion123Tag = "v1.23.13-eks-1-23-9"
 	repositoryName    = "public.ecr.aws/eks-distro/"
 	busyBoxImage      = "public.ecr.aws/docker/library/busybox:stable"
 )
@@ -56,15 +57,15 @@ func KubeProxy(version string) string {
 }
 
 func ETCD() string {
-	return repositoryName + "etcd-io/etcd:v3.4.16-eks-1-21-4"
+	return repositoryName + "etcd-io/etcd:v3.5.4-eks-1-23-9"
 }
 
 func CoreDNS() string {
-	return repositoryName + "coredns/coredns:v1.8.3-eks-1-20-4"
+	return repositoryName + "coredns/coredns:v1.8.7-eks-1-23-9"
 }
 
 func AWSIamAuthenticator() string {
-	return repositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.3-eks-1-21-8"
+	return repositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.10-eks-1-23-9"
 }
 
 func AWSEncryptionProvider() string {
