@@ -1,61 +1,30 @@
----
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: awscli-eks-role-create
-  namespace: tekton-pipelines
+  namespace: tekton-pipelines 
 spec:
   description: |
-    Create an roles required for creating managed EKS clusters.
-    This Task creates role for creating a managed EKS clsuters if no roles are passed explictly via argument.
+    Creates Roles from CFN json stack.
+    This Task can be used to create IM Roles using the CFN json/yaml stack.
+  results:
+  - name: role-arn
+    description: Stores the role arn created by the task
   params:
-    - name: cluster-name
-      description: The name of the EKS cluster you want to spin managed nodegroups for.
-      default: ""
-    - name: host-cluster-node-role-arn
-      description: arn of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups.
-      default: ""
-    - name: servicerole-arn
-      description: servicerole arn to be used for eks cluster to perform operations in customer account to setup cluster
-      default: ""
-    - name: host-cluster-node-role-policy-url
-      description: Url for host cluster node role policy json file.
-      default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/role/tests/assets/eks_node_role_policy.json
-    - name: host-cluster-node-role-trust-policy-url
-      description: Url for host cluster node role trust policy json file.
-      default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/role/tests/assets/eks_node_role_trust_policy.json
-    - name: service-role-policy-url
-      description: Url for service role policy json file.
-      default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/role/tests/assets/eks_service_role_policy.json
-    - name: service-role-trust-policy-url
-      description: Url for service role trust policy json file.
-      default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/role/tests/assets/eks_service_role_trust_policy.json
+  - name: stack-name
+    description: The name of the Role name you want to spin.
+  - name: role-cfn-url
+    description: The url of the CFN YAML/JSON to create IAM Roles 
+  - name: region
+    default: "us-west-2"
+  - name: role-name
+    description: The name of the role that needs to be created.
   steps:
-  - name: create-eks-role
-    image: alpine/k8s:1.23.13
+  - name: create-vpc
+    image: alpine/k8s:1.22.6
     script: |
       echo "Approving KCM requests"
       kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
-      curl -s $(params.host-cluster-node-role-policy-url) -o ./node-role-policy
-      curl -s $(params.host-cluster-node-role-trust-policy-url) -o ./node-role-trust-policy
-      curl -s $(params.service-role-policy-url) -o ./service-role-policy
-      curl -s $(params.service-role-trust-policy-url) -o ./service-role-trust-policy
-      if [ "$(params.host-cluster-node-role-arn)" == "" ]; then
-        aws iam create-role --role-name $(params.cluster-name)-node-role --assume-role-policy-document file://node-role-trust-policy
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $(params.cluster-name)-node-role
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $(params.cluster-name)-node-role
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $(params.cluster-name)-node-role
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AdministratorAccess --role-name $(params.cluster-name)-node-role
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore --role-name $(params.cluster-name)-node-role
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $(params.cluster-name)-node-role
-        aws iam put-role-policy --role-name $(params.cluster-name)-node-role --policy-name $(params.cluster-name)-node-role-policy --policy-document file://node-role-policy
-      else
-        echo "Skipping node role creation since the role is already provided: $(params.host-cluster-node-role-arn)"
-      fi
-      if [ "$(params.servicerole-arn)" == "" ]; then
-        aws iam create-role --role-name $(params.cluster-name)-service-role --assume-role-policy-document file://service-role-trust-policy
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $(params.cluster-name)-service-role
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSServicePolicy --role-name $(params.cluster-name)-service-role
-      else
-        echo "Skipping service role creation since the role is already provided: $(params.servicerole-arn)"
-      fi
+      curl -s $(params.role-cfn-url) -o ./amazon-role-eks
+      aws cloudformation deploy --stack-name $(params.stack-name) --region $(params.region) --template-file ./amazon-role-eks --parameter-overrides Name=$(params.role-name) --capabilities CAPABILITY_NAMED_IAM || true
+      aws iam get-role --role-name $(params.role-name) --query 'Role.[Arn]' --output text > $(results.role-arn.path)

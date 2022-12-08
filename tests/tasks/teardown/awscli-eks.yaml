@@ -20,12 +20,8 @@ spec:
     default: ""
   - name: slack-message
     default: "Job is completed"
-  - name: host-cluster-node-role-arn
-    description: arn of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups.
-    default: ""
-  - name: servicerole-arn
-    description: servicerole arn to be used for eks cluster to perform operations in customer account to setup cluster
-    default: ""
+  - name: service-role-stack-name
+  - name: node-role-stack-name
   steps:
   - name: delete-cluster
     image: alpine/k8s:1.22.6
@@ -43,32 +39,11 @@ spec:
           aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
       done;
       aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
-  - name: teardown-eks-role
+  - name: teardown-eks-role-stack
     image: alpine/k8s:1.23.13
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
-      detach_role_policy() {
-        role_name=$1
-        for policy_arn in $(aws iam list-attached-role-policies --role-name $role_name --query 'AttachedPolicies[].PolicyArn' --output text)
-        do
-          aws iam detach-role-policy --role-name $role_name --policy-arn $policy_arn
-        done
-      }
-
-      if [ "$(params.host-cluster-node-role-arn)" == "" ]; then
-        detach_role_policy $(params.cluster-name)-node-role
-        aws iam delete-role-policy --role-name $(params.cluster-name)-node-role --policy-name $(params.cluster-name)-node-role-policy
-        aws iam delete-role --role-name $(params.cluster-name)-node-role 
-      else
-        echo "Skipping node role creation since the role is already provided: $(params.host-cluster-node-role-arn)"
-      fi
-      if [ "$(params.servicerole-arn)" == "" ]; then
-        detach_role_policy $(params.cluster-name)-service-role
-        aws iam delete-role --role-name $(params.cluster-name)-service-role
-      else
-        echo "Skipping service role creation since the role is already provided: $(params.servicerole-arn)"
-      fi
+      aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
+      aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
   - name: send-slack-notification
     image: alpine/k8s:1.22.6
     script: |

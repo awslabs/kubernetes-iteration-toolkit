@@ -27,7 +27,7 @@ spec:
     default: ""
   - name: host-cluster-node-role-arn
     description: arn of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups.
-  - name: mng-host-instance-types
+  - name: host-instance-types
     description: Instance types for managed nodes.
     default: "c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"
   - name: host-taints
@@ -105,14 +105,14 @@ spec:
       for i in $(seq 1 $asgs)
       do
         #max number of nodes MNG allows per ASG
-        create_and_validate_dp_nodes $i $max_nodes "$(params.mng-host-instance-types)"
+        create_and_validate_dp_nodes $i $max_nodes "$(params.host-instance-types)"
       done
       remaining_nodes=$(((nodes)%max_nodes))
       echo "remaining nodes: $remaining_nodes"
       if [[ $remaining_nodes -gt 0 ]]
       then
         echo "The remaining_nodes var is greater than 0."
-        create_and_validate_dp_nodes 0 $remaining_nodes "$(params.mng-host-instance-types)"
+        create_and_validate_dp_nodes 0 $remaining_nodes "$(params.host-instance-types)"
       fi
       
       #kubectl commands are purely for knowing state of cluster before kicking off the test.

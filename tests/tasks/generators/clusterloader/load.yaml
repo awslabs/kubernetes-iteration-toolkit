@@ -88,6 +88,7 @@ spec:
       # TODO: Currently pathing the prometheus manifests for remote write. Move this to upsteam going forward.
       echo "volumeBindingMode: WaitForFirstConsumer" >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
+      # TODO: Currently for v1.23 tests the node selector is hardcoded and can't be changed https://github.com/kubernetes/perf-tests/blob/release-1.23/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L15 via params. So for patching i am deleting the existing node selector and re-adding the updated node-selector later. Since this has been fixed in the current master https://github.com/kubernetes/perf-tests/blob/master/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L24 we can get rid of this going forward.
       sed -i '/nodeSelector/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       sed -i '/kubernetes.io\/os: linux/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml

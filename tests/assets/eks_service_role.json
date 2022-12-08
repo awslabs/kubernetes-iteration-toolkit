@@ -1,0 +1,40 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "Name": {
+            "Type": "String",
+            "Default": "eks-service-role",
+            "Description": "Names of the role."
+        }
+    },
+    "Resources": {
+        "RootRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "RoleName" : {
+                    "Ref": "Name"
+                },
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "eks-gamma.aws.internal",
+                                    "eks.amazonaws.com",
+                                    "eks-beta.aws.internal"
+                                ]
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+                    "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+                ]
+            }
+        }
+    }
+}
