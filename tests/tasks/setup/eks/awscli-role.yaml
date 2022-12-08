@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: awscli-eks-role-create
+  name: awscli-role-create
   namespace: tekton-pipelines 
 spec:
   description: |
@@ -20,7 +20,7 @@ spec:
   - name: role-name
     description: The name of the role that needs to be created.
   steps:
-  - name: create-vpc
+  - name: create-role
     image: alpine/k8s:1.22.6
     script: |
       echo "Approving KCM requests"

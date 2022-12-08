@@ -46,7 +46,7 @@ spec:
     - slack-notification
     taskRef:
       kind: Task
-      name: awscli-eks-role-create
+      name: awscli-role-create
   - name: create-cluster-node-role
     params:
     - name: stack-name
@@ -59,7 +59,7 @@ spec:
     - slack-notification
     taskRef:
       kind: Task
-      name: awscli-eks-role-create
+      name: awscli-role-create
   - name: get-preferred-role-decider
     runAfter:
       - create-cluster-node-role

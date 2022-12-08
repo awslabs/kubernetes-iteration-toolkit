@@ -59,7 +59,7 @@ spec:
       value: "$(params.cluster-name)-service-role"
     taskRef:
       kind: Task
-      name: awscli-eks-role-create
+      name: awscli-role-create
   - name: create-cluster-node-role
     params:
     - name: stack-name
@@ -70,7 +70,7 @@ spec:
       value: "$(params.cluster-name)-node-role"
     taskRef:
       kind: Task
-      name: awscli-eks-role-create
+      name: awscli-role-create
   - name: get-preferred-role-decider
     runAfter:
       - create-cluster-node-role
