@@ -80,7 +80,7 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 				MountPath: "/etc/kubernetes/",
 			}},
 			Command: []string{
-				"./etc/kubernetes/bootstrap.sh",
+				"/etc/kubernetes/bootstrap.sh",
 			},
 			Args: []string{
 				"--cert-file=/etc/kubernetes/pki/etcd/server/server.crt",

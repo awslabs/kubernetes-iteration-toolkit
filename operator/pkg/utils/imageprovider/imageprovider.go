@@ -57,7 +57,7 @@ func KubeProxy(version string) string {
 }
 
 func ETCD() string {
-	return repositoryName + "etcd-io/etcd:v3.5.4-eks-1-23-9"
+	return repositoryName + "etcd-io/etcd:v3.4.16-eks-1-21-4"
 }
 
 func CoreDNS() string {
