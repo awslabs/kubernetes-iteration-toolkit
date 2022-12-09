@@ -21,8 +21,9 @@ spec:
   - name: endpoint
     default: ""
     description: "aws eks enpoint to create clusters against"
-  - name: servicerole
-    description: servicerole arn to be used for eks cluster to perform operations in customer account to setup cluster
+  - name: service-role-name
+    description: servicerole name to be used for eks cluster to perform operations in customer account to setup cluster
+    default: ""
   workspaces:
   - name: config
     description: |
@@ -37,6 +38,14 @@ spec:
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
+      SERVICE_ROLE_NAME=$(params.service-role-name)
+      if [ "$SERVICE_ROLE_NAME" == ""  ]; then
+        # TODO: Depricate this assumption going forward.
+        SERVICE_ROLE_NAME=$(params.cluster-name)-service-role
+      fi
+
+      SERVICE_ROLE_ARN=$(aws iam get-role --role-name $SERVICE_ROLE_NAME --query 'Role.[Arn]' --output text)
+
       CREATED_CLUSTER=$(aws eks $ENDPOINT_FLAG list-clusters --region $(params.region) --query 'clusters[?@==`'$(params.cluster-name)'`]' --output text )
       echo "CREATED_CLUSTER=$CREATED_CLUSTER"
       TAG=$(kubectl get provisioner -oyaml | grep karpenter.sh/discovery | awk 'NR==1{ print $2}')
@@ -46,7 +55,7 @@ spec:
       echo "securitygroup=$sg"
       
       if [ "$CREATED_CLUSTER" == "" ]; then
-        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $(params.servicerole) --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
+        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
       fi
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)

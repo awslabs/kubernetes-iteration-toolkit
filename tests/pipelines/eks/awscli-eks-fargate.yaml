@@ -10,7 +10,7 @@ spec:
   params:
   - name: cluster-name
   - name: desired-nodes
-  - name: host-cluster-node-role-arn
+  - name: host-cluster-node-role-name
   tasks:
   - name: setup-control-plane
     taskRef:
@@ -30,5 +30,5 @@ spec:
         value: '$(params.cluster-name)'
       - name: desired-nodes
         value: '$(params.desired-nodes)'
-      - name: host-cluster-node-role-arn
-        value: '$(params.host-cluster-node-role-arn)'
+      - name: host-cluster-node-role-name
+        value: '$(params.host-cluster-node-role-name)'

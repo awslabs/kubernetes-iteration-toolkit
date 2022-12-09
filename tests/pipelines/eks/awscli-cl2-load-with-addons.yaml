@@ -7,10 +7,10 @@ spec:
   params:
   - name: cluster-name
   - name: endpoint
-  - name: servicerole
+  - name: service-role-name
     default: ""
   - name: desired-nodes
-  - name: host-cluster-node-role-arn
+  - name: host-cluster-node-role-name
     default: ""
   - name: pods-per-node
   - name: nodes-per-namespace
@@ -60,52 +60,16 @@ spec:
     taskRef:
       kind: Task
       name: awscli-role-create
-  - name: get-preferred-role-decider
-    runAfter:
-      - create-cluster-node-role
-      - create-cluster-service-role
-    params:
-      - name: cfn-service-role-arn
-        value: $(tasks.create-cluster-service-role.results.role-arn)
-      - name: cfn-node-role-arn
-        value: $(tasks.create-cluster-node-role.results.role-arn)
-      - name: param-host-cluster-node-role-arn
-        value: $(params.host-cluster-node-role-arn)
-      - name: param-service-role-arn
-        value: $(params.servicerole)
-    taskSpec:
-        results:
-          - name: service-role-arn
-            description: holds the preferred service role Arn
-          - name: node-role-arn
-            description: holds the preferred node role Arn
-        params:
-          - name: cfn-service-role-arn
-          - name: cfn-node-role-arn
-          - name: param-host-cluster-node-role-arn
-          - name: param-service-role-arn
-        steps:
-          - name: get-prefered-role
-            image: alpine/k8s:1.23.13
-            script: |
-              echo $(params.cfn-service-role-arn) > $(results.service-role-arn.path)
-              echo $(params.cfn-node-role-arn) > $(results.node-role-arn.path)
-              if [ -n "$(params.param-host-cluster-node-role-arn)" ]; then
-                echo $(params.param-host-cluster-node-role-arn) > $(results.node-role-arn.path)
-              fi
-              if [ -n "$(params.param-service-role-arn)" ]; then
-                echo $(params.param-service-role-arn) > $(results.service-role-arn.path)
-              fi 
   - name: create-eks-cluster
     params:
     - name: cluster-name
       value: $(params.cluster-name)
-    - name: servicerole
-      value: $(tasks.get-preferred-role-decider.results.service-role-arn)
+    - name: service-role-name
+      value: $(params.service-role-name)
     - name: endpoint
       value: $(params.endpoint)
     runAfter:
-    - get-preferred-role-decider
+    - create-cluster-node-role
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-create
@@ -116,8 +80,8 @@ spec:
     params:
     - name: cluster-name
       value: $(params.cluster-name)
-    - name: host-cluster-node-role-arn
-      value: $(tasks.get-preferred-role-decider.results.node-role-arn)
+    - name: host-cluster-node-role-name
+      value: $(params.host-cluster-node-role-name)
     - name: endpoint
       value: $(params.endpoint)
     - name: desired-nodes
@@ -141,8 +105,8 @@ spec:
       value: $(params.cluster-name)
     - name: desired-nodes
       value: $(params.desired-nodes)
-    - name: host-cluster-node-role-arn
-      value: $(tasks.get-preferred-role-decider.results.node-role-arn)
+    - name: host-cluster-node-role-name
+      value: "$(params.host-cluster-node-role-name)"
     - name: endpoint
       value: $(params.endpoint)
     runAfter:

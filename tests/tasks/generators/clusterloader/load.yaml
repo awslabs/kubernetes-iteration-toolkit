@@ -109,6 +109,10 @@ spec:
                 containerPort: 8005
         remoteWrite:
           - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
+            queueConfig:
+              capacity: 2500
+              maxSamplesPerSend: 1000
+              maxShards: 200
         externalLabels:
           cluster_name: $(params.cluster-name)
           s3_path: $S3_RESULT_PATH
