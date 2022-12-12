@@ -10,11 +10,7 @@ spec:
   params:
   - name: cluster-name
   - name: endpoint
-  - name: service-role-name
-    default: ""
   - name: desired-nodes
-  - name: host-cluster-node-role-name
-    default: ""
   - name: pods-per-node
   - name: nodes-per-namespace
   - name: cl2-load-test-throughput
@@ -76,7 +72,7 @@ spec:
     - name: cluster-name
       value: $(params.cluster-name)
     - name: service-role-name
-      value: $(params.service-role-name)
+      value: "$(params.cluster-name)-service-role"
     - name: endpoint
       value: $(params.endpoint)
     - name: vpc-stack-name
@@ -93,7 +89,7 @@ spec:
     - name: cluster-name
       value: $(params.cluster-name)
     - name: host-cluster-node-role-name
-      value: "$(params.host-cluster-node-role-name)"
+      value: "$(params.cluster-name)-node-role"
     - name: endpoint
       value: $(params.endpoint)
     - name: desired-nodes
@@ -118,7 +114,7 @@ spec:
     - name: desired-nodes
       value: $(params.desired-nodes)
     - name: host-cluster-node-role-name
-      value: "$(params.host-cluster-node-role-name)"
+      value: "$(params.cluster-name)-node-role"
     - name: endpoint
       value: $(params.endpoint)
     runAfter:
