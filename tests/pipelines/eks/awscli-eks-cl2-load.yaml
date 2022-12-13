@@ -81,6 +81,7 @@ spec:
     runAfter:
     - create-cluster-node-role
     - create-cluster-service-role
+    - awscli-vpc-create
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-create-with-vpc-stack
