@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: awscli-eks-nodegroup
+  name: awscli-eks-nodegroup-create
   namespace: tekton-pipelines
 spec:
   description: |
