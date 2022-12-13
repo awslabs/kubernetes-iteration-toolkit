@@ -26,7 +26,7 @@ spec:
   - name: endpoint
     default: ""
   - name: host-cluster-node-role-name
-    description: name of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups.
+    description: name of the hostcluster node role.
   - name: host-instance-types
     description: Instance types for managed nodes.
     default: "c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"

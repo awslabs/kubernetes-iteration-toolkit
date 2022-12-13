@@ -15,7 +15,6 @@ spec:
   - name: slack-hook
   - name: slack-message
   - name: amp-workspace-id
-    default: ""
   - name: service-role-cfn-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/role/tests/assets/eks_service_role.json"
   - name: node-role-cfn-url
@@ -66,6 +65,7 @@ spec:
       value: $(params.endpoint)
     runAfter:
     - create-cluster-node-role
+    - create-cluster-service-role
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-create
