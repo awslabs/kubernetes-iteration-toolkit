@@ -51,6 +51,10 @@ spec:
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       # enable PD on the cluster 
+      kubectl api-versions 
+      kubectl api-resources
+      # Apiserver is not recongnizing deamonset for sometime inconsistently, need to see if livez/readyz are healthy
+      while true; do date && kubectl get --raw "/readyz" --v=10 && break ; sleep 5; done
       kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
       # install csi drivers.
       kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=$(params.aws-ebs-csi-driver-version)"
