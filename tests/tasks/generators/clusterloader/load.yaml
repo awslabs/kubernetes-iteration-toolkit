@@ -62,7 +62,7 @@ spec:
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
       CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
-      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 20
+      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 70
       PODS_PER_NODE: $(params.pods-per-node)
       CL2_USE_HOST_NETWORK_PODS: false
       # we are not testing statefulsets at this point
@@ -105,7 +105,7 @@ spec:
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       fi
   - name: run-loadtest
-    image: public.ecr.aws/kit/clusterloader2:0213bea
+    image: 197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:latest
     onError: continue
     script: |
       #!/bin/bash
