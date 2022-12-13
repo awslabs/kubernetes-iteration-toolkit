@@ -20,6 +20,8 @@ spec:
     default: ""
   - name: slack-message
     default: "Job is completed"
+  - name: service-role-stack-name
+  - name: node-role-stack-name
   steps:
   - name: delete-cluster
     image: alpine/k8s:1.22.6
@@ -37,6 +39,11 @@ spec:
           aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
       done;
       aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
+  - name: teardown-eks-role-stack
+    image: alpine/k8s:1.23.13
+    script: |
+      aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
+      aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
   - name: send-slack-notification
     image: alpine/k8s:1.22.6
     script: |

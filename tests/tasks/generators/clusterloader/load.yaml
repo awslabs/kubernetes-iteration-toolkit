@@ -41,6 +41,8 @@ spec:
   results:
     - name: datapoint
       description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
+    - name: s3_result
+      description: Stores the S3 result path after compute
   workspaces:
   - name: source
     mountPath: /src/k8s.io/
@@ -59,6 +61,9 @@ spec:
     image: alpine/k8s:1.22.6
     workingDir: $(workspaces.source.path)
     script: |
+      S3_RESULT_PATH=$(params.results-bucket)
+      echo $S3_RESULT_PATH > $(results.s3_result.path)
+      echo "S3 Path: $S3_RESULT_PATH" 
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
       CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
@@ -83,6 +88,9 @@ spec:
       # TODO: Currently pathing the prometheus manifests for remote write. Move this to upsteam going forward.
       echo "volumeBindingMode: WaitForFirstConsumer" >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
+      # TODO: Currently for v1.23 tests the node selector is hardcoded and can't be changed https://github.com/kubernetes/perf-tests/blob/release-1.23/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L15 via params. So for patching i am deleting the existing node selector and re-adding the updated node-selector later. Since this has been fixed in the current master https://github.com/kubernetes/perf-tests/blob/master/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L24 we can get rid of this going forward.
+      sed -i '/nodeSelector/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
+      sed -i '/kubernetes.io\/os: linux/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
         containers:
           - name: aws-sigv4-proxy-sidecar
@@ -101,6 +109,16 @@ spec:
                 containerPort: 8005
         remoteWrite:
           - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
+            queueConfig:
+              capacity: 2500
+              maxSamplesPerSend: 1000
+              maxShards: 200
+        externalLabels:
+          cluster_name: $(params.cluster-name)
+          s3_path: $S3_RESULT_PATH
+        nodeSelector:
+          kubernetes.io/os: linux
+          eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       fi
@@ -119,17 +137,21 @@ spec:
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
-      if [ $? -eq 0 ]; then
+      exit_code=$?
+      if [ $exit_code -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
       else
       echo "0" | tee $(results.datapoint.path)
       fi
+      exit $exit_code
     timeout: 30000s
   - name: upload-results
     image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
+      S3_RESULT_PATH=$(cat $(results.s3_result.path))
+      echo "S3 Path: $S3_RESULT_PATH" 
       aws sts get-caller-identity
       # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
       ls -larth
-      aws s3 cp . s3://$(params.results-bucket)/  --recursive
+      aws s3 cp . s3://$S3_RESULT_PATH/  --recursive

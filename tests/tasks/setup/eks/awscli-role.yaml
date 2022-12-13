@@ -1,0 +1,30 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-role-create
+  namespace: tekton-pipelines 
+spec:
+  description: |
+    Creates Roles from CFN json stack.
+    This Task can be used to create IM Roles using the CFN json/yaml stack.
+  results:
+  - name: role-arn
+    description: Stores the role arn created by the task
+  params:
+  - name: stack-name
+    description: The name of the Role name you want to spin.
+  - name: role-cfn-url
+    description: The url of the CFN YAML/JSON to create IAM Roles 
+  - name: region
+    default: "us-west-2"
+  - name: role-name
+    description: The name of the role that needs to be created.
+  steps:
+  - name: create-role
+    image: alpine/k8s:1.22.6
+    script: |
+      echo "Approving KCM requests"
+      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+      curl -s $(params.role-cfn-url) -o ./amazon-role-eks
+      aws cloudformation deploy --stack-name $(params.stack-name) --region $(params.region) --template-file ./amazon-role-eks --parameter-overrides Name=$(params.role-name) --capabilities CAPABILITY_NAMED_IAM || true
+      aws iam get-role --role-name $(params.role-name) --query 'Role.[Arn]' --output text > $(results.role-arn.path)
