@@ -62,3 +62,4 @@ spec:
       kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
       # install csi drivers.
       kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=$(params.aws-ebs-csi-driver-version)"
+      kubectl scale --replicas 20 deploy coredns -n kube-system

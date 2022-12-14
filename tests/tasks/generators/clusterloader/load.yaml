@@ -12,7 +12,7 @@ spec:
     default: https://github.com/kubernetes/perf-tests.git
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
-    default: "release-1.23"
+    default: "master"
   - name: nodes-per-namespace
     description: "nodes per namespace to get created for load test "
     default: "100"
@@ -75,22 +75,19 @@ spec:
       MEDIUM_STATEFUL_SETS_PER_NAMESPACE: 0
       # we are not testing PVS at this point
       CL2_ENABLE_PVS: false
-      PROMETHEUS_SCRAPE_KUBE_PROXY: true
+      PROMETHEUS_SCRAPE_KUBE_PROXY: false
       PROMETHEUS_SCRAPE_APISERVER_ONLY: true
       ENABLE_SYSTEM_POD_METRICS: false
       NODE_MODE: master 
+      CL2_DISABLE_DAEMONSETS: true
+      CL2_ALLOWED_SLOW_API_CALLS: 1000000
+      CL2_PROMETHEUS_NODE_SELECTOR: "eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1"
       EOL
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
       
       # Enable Prometheus if the remote workspace id is provided
       if [ -n "$(params.amp-workspace-id)" ]; then
-      # TODO: Currently pathing the prometheus manifests for remote write. Move this to upsteam going forward.
-      echo "volumeBindingMode: WaitForFirstConsumer" >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
-      cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0ssd-storage-class.yaml
-      # TODO: Currently for v1.23 tests the node selector is hardcoded and can't be changed https://github.com/kubernetes/perf-tests/blob/release-1.23/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L15 via params. So for patching i am deleting the existing node selector and re-adding the updated node-selector later. Since this has been fixed in the current master https://github.com/kubernetes/perf-tests/blob/master/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml#L24 we can get rid of this going forward.
-      sed -i '/nodeSelector/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
-      sed -i '/kubernetes.io\/os: linux/d' $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
       cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
         containers:
           - name: aws-sigv4-proxy-sidecar
@@ -116,14 +113,18 @@ spec:
         externalLabels:
           cluster_name: $(params.cluster-name)
           s3_path: $S3_RESULT_PATH
-        nodeSelector:
-          kubernetes.io/os: linux
-          eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
+      cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0prometheus-operator-deployment.yaml
+            tolerations:
+              - key: monitoring
+                operator: Exists
+                effect: NoSchedule  
+      EOF
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0prometheus-operator-deployment.yaml
       fi
   - name: run-loadtest
-    image: 197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:latest
+    image: '197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:a15645'
     onError: continue
     script: |
       #!/bin/bash
@@ -132,7 +133,7 @@ spec:
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
       if [ -n "$(params.amp-workspace-id)" ]; then
-        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-storage-class-provisioner kubernetes.io/aws-ebs --prometheus-storage-class-volume-type gp2 --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
+        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2 --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
