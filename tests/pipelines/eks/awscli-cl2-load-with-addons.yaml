@@ -95,6 +95,17 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
+  - name: install-fluentbit-addon
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-mng-monitoring-nodes
+    taskRef:
+      kind: Task
+      name: eks-addon-fluentbit
   - name: create-mng-nodes
     params:
     - name: cluster-name
@@ -106,21 +117,10 @@ spec:
     - name: endpoint
       value: $(params.endpoint)
     runAfter:
-    - create-mng-monitoring-nodes
+    - install-fluentbit-addon
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
-  - name: install-fluentbit-addon
-    params:
-    - name: cluster-name
-      value: $(params.cluster-name)
-    - name: endpoint
-      value: $(params.endpoint)
-    runAfter:
-    - create-mng-nodes
-    taskRef:
-      kind: Task
-      name: eks-addon-fluentbit
   - name: create-cw-agent-addon
     params:
     - name: cluster-name
@@ -147,7 +147,6 @@ spec:
     - name: amp-workspace-id
       value: '$(params.amp-workspace-id)'
     runAfter:
-    - install-fluentbit-addon
     - create-cw-agent-addon
     taskRef:
       kind: Task
