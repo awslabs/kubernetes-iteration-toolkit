@@ -27,15 +27,21 @@ import (
 )
 
 func bootstrapCommand() *cobra.Command {
-	return &cobra.Command{
+	bootstrapCmd := &cobra.Command{
 		Use:   "bootstrap",
 		Short: "Bootstrap an environment for testing. Will reconnect if the environment already exists.",
 		Long:  ``,
 		Run:   bootstrap,
 	}
+	bootstrapCmd.Flags().StringP("instanceType", "i", "r6g.8xlarge", "Instance type for the substrate nodes.")
+	return bootstrapCmd
 }
 
 func bootstrap(cmd *cobra.Command, args []string) {
+	instanceType, err := cmd.Flags().GetString("instanceType")
+	if err != nil {
+		panic(err)
+	}
 	// ignore logs printed to stdout from underlying kubeadm packages
 	if !options.debug {
 		stdout := os.Stdout
@@ -56,7 +62,7 @@ func bootstrap(cmd *cobra.Command, args []string) {
 
 		Spec: v1alpha1.SubstrateSpec{
 			VPC:          &v1alpha1.VPCSpec{CIDR: []string{"10.0.0.0/16"}},
-			InstanceType: aws.String("r6g.8xlarge"),
+			InstanceType: aws.String(instanceType),
 			Subnets: []*v1alpha1.SubnetSpec{
 				{Zone: "us-west-2a", CIDR: "10.0.32.0/19"},
 				{Zone: "us-west-2b", CIDR: "10.0.64.0/19"},

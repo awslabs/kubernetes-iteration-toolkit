@@ -54,14 +54,13 @@ func newRootCmd(args []string) *cobra.Command {
 		Long: `kitctl help users provision Kubernetes clustes using kit-operator.
 		It also configures the cloud provider environment to get started easily`,
 	}
-	flags := cmd.PersistentFlags()
-	options.addFlags(flags)
-	if err := flags.Parse(args); err != nil {
-		panic(err)
-	}
+
 	// Add subcommands
 	cmd.AddCommand(bootstrapCommand())
 	cmd.AddCommand(deleteCommand())
+
+	flags := cmd.PersistentFlags()
+	options.addFlags(flags)
 	return cmd
 }
 
