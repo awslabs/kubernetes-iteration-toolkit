@@ -2,6 +2,7 @@ import { Construct } from 'constructs';
 import { aws_iam as iam, StackProps } from 'aws-cdk-lib';
 import { aws_eks as eks } from 'aws-cdk-lib';
 import * as request from 'sync-request';
+import * as fs from 'fs';
 
 export interface AWSEBSCSIDriverProps extends StackProps {
     cluster: eks.Cluster
@@ -56,18 +57,11 @@ export class AWSEBSCSIDriver extends Construct {
             }
         })
         chart.node.addDependency(ns)
-
-        
-        
     }
     private getIAMPolicy(version: string): any {
-        const metadataUrl = `https://raw.githubusercontent.com/kubernetes-sigs/aws-ebs-csi-driver/${version}/docs/example-iam-policy.json`;
+        // Update and run REPO_DIR/cache-iam-policies.sh to download and cache this policy
         return JSON.parse(
-          request.default('GET', metadataUrl, {
-            headers: {
-              'User-Agent': 'CDK' // GH API requires us to set UA
-            }
-          }).getBody().toString()
+            fs.readFileSync(`lib/addons/cached/aws-ebs-csi-driver-iam-policy-${version}.json`,'utf8')
         );
       }
 }

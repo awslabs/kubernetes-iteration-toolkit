@@ -84,7 +84,8 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		PriorityClassName:             "system-cluster-critical",
-		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
+		NodeSelector:                  nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd),
+		Affinity:                      affinity(controlPlane.Spec.ColocateAPIServerWithEtcd),
 		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
 			MaxSkew:           int32(1),
 			TopologyKey:       "topology.kubernetes.io/zone",
@@ -425,4 +426,26 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			},
 		}},
 	}
+}
+
+func affinity(colocateAPIServerWithEtcd bool) *v1.Affinity {
+	if colocateAPIServerWithEtcd {
+		return &v1.Affinity{PodAffinity: &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{object.AppNameLabelKey: "etcd"},
+				},
+				TopologyKey: "kubernetes.io/hostname",
+			}},
+		}}
+	}
+	return nil
+}
+
+func nodeSelector(clusterName string, colocateWithEtcd bool) map[string]string {
+	selector := APIServerLabels(clusterName)
+	if colocateWithEtcd {
+		selector[object.AppNameLabelKey] = object.ColocatedApiServerWithETCDLabelValue
+	}
+	return selector
 }

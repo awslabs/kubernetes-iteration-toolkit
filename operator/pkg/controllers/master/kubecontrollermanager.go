@@ -83,13 +83,14 @@ func kcmLabels(clustername string) map[string]string {
 
 func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	hostPathDirectory := v1.HostPathDirectory
 	return kcmPodSpecForVersion(controlPlane.Spec.KubernetesVersion, &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
 		PriorityClassName:             "system-node-critical",
 		Tolerations:                   []v1.Toleration{{Operator: v1.TolerationOpExists}},
-		NodeSelector:                  nodeSelector(controlPlane.ClusterName()),
+		NodeSelector:                  nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd),
 		Containers: []v1.Container{{
 			Name:    "controller-manager",
 			Image:   imageprovider.KubeControllerManager(controlPlane.Spec.KubernetesVersion),
@@ -122,6 +123,10 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				"--v=2",
 			},
 			VolumeMounts: []v1.VolumeMount{{
+				Name:      "hostpki",
+				MountPath: "/etc/pki",
+				ReadOnly:  true,
+			}, {
 				Name:      "ca-certs",
 				MountPath: "/etc/ssl/certs",
 				ReadOnly:  true,
@@ -162,6 +167,14 @@ func kcmPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 			},
 		}},
 		Volumes: []v1.Volume{{
+			Name: "hostpki",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/etc/pki",
+					Type: &hostPathDirectory,
+				},
+			},
+		}, {
 			Name: "ca-certs",
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{

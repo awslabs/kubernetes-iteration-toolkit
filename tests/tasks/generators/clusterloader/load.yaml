@@ -12,7 +12,7 @@ spec:
     default: https://github.com/kubernetes/perf-tests.git
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
-    default: "release-1.23"
+    default: "master"
   - name: nodes-per-namespace
     description: "nodes per namespace to get created for load test "
     default: "100"
@@ -35,8 +35,17 @@ spec:
     description: "aws eks enpoint to create clusters against"
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
+  - name: amp-workspace-id
+    description: The AMP workspace ID where remote write needs to happen.
+    default: ""
+  results:
+    - name: datapoint
+      description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
+    - name: s3_result
+      description: Stores the S3 result path after compute
   workspaces:
   - name: source
+    mountPath: /src/k8s.io/
   - name: results
   steps:
   - name: git-clone      
@@ -52,10 +61,13 @@ spec:
     image: alpine/k8s:1.22.6
     workingDir: $(workspaces.source.path)
     script: |
+      S3_RESULT_PATH=$(params.results-bucket)
+      echo $S3_RESULT_PATH > $(results.s3_result.path)
+      echo "S3 Path: $S3_RESULT_PATH" 
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
       CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
-      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 20
+      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 70
       PODS_PER_NODE: $(params.pods-per-node)
       CL2_USE_HOST_NETWORK_PODS: false
       # we are not testing statefulsets at this point
@@ -63,29 +75,84 @@ spec:
       MEDIUM_STATEFUL_SETS_PER_NAMESPACE: 0
       # we are not testing PVS at this point
       CL2_ENABLE_PVS: false
-      PROMETHEUS_SCRAPE_KUBE_PROXY: true
+      PROMETHEUS_SCRAPE_KUBE_PROXY: false
+      PROMETHEUS_SCRAPE_APISERVER_ONLY: true
       ENABLE_SYSTEM_POD_METRICS: false
       NODE_MODE: master 
+      CL2_DISABLE_DAEMONSETS: true
+      CL2_ALLOWED_SLOW_API_CALLS: 1000000
+      CL2_PROMETHEUS_NODE_SELECTOR: "eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1"
       EOL
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
+      
+      # Enable Prometheus if the remote workspace id is provided
+      if [ -n "$(params.amp-workspace-id)" ]; then
+      cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
+        containers:
+          - name: aws-sigv4-proxy-sidecar
+            image: public.ecr.aws/aws-observability/aws-sigv4-proxy:1.0
+            args:
+              - --name
+              - aps
+              - --region
+              - $(params.region)
+              - --host
+              - aps-workspaces.$(params.region).amazonaws.com
+              - --port
+              - :8005
+            ports:
+              - name: aws-sigv4-proxy
+                containerPort: 8005
+        remoteWrite:
+          - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
+            queueConfig:
+              capacity: 2500
+              maxSamplesPerSend: 1000
+              maxShards: 200
+        externalLabels:
+          cluster_name: $(params.cluster-name)
+          s3_path: $S3_RESULT_PATH
+      EOF
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
+      cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0prometheus-operator-deployment.yaml
+            tolerations:
+              - key: monitoring
+                operator: Exists
+                effect: NoSchedule  
+      EOF
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0prometheus-operator-deployment.yaml
+      fi
   - name: run-loadtest
-    image: public.ecr.aws/kit/clusterloader2:0213bea
+    image: '197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:a15645'
     onError: continue
     script: |
+      #!/bin/bash
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
+      if [ -n "$(params.amp-workspace-id)" ]; then
+        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2 --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
+      fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
-      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
+      exit_code=$?
+      if [ $exit_code -eq 0 ]; then
+      echo "1" | tee $(results.datapoint.path)
+      else
+      echo "0" | tee $(results.datapoint.path)
+      fi
+      exit $exit_code
     timeout: 30000s
   - name: upload-results
-    image: alpine/k8s:1.22.6
+    image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
+      S3_RESULT_PATH=$(cat $(results.s3_result.path))
+      echo "S3 Path: $S3_RESULT_PATH" 
       aws sts get-caller-identity
       # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
       ls -larth
-      aws s3 cp . s3://$(params.results-bucket)/  --recursive
+      aws s3 cp . s3://$S3_RESULT_PATH/  --recursive

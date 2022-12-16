@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/secrets"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,7 +34,7 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
-		NodeSelector:                  labels(controlPlane.ClusterName()),
+		NodeSelector:                  nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd),
 		TopologySpreadConstraints: []v1.TopologySpreadConstraint{{
 			MaxSkew:           int32(1),
 			TopologyKey:       "topology.kubernetes.io/zone",
@@ -79,7 +80,7 @@ func podSpecFor(controlPlane *v1alpha1.ControlPlane) *v1.PodSpec {
 				MountPath: "/etc/kubernetes/",
 			}},
 			Command: []string{
-				"./etc/kubernetes/bootstrap.sh",
+				"/etc/kubernetes/bootstrap.sh",
 			},
 			Args: []string{
 				"--cert-file=/etc/kubernetes/pki/etcd/server/server.crt",
@@ -224,4 +225,12 @@ func caServerName(controlPlane *v1alpha1.ControlPlane) string {
 }
 func caPeerName(controlPlane *v1alpha1.ControlPlane) string {
 	return fmt.Sprintf("%s-etcd-peer", controlPlane.ClusterName())
+}
+
+func nodeSelector(clusterName string, colocateWithAPIServer bool) map[string]string {
+	selector := labels(clusterName)
+	if colocateWithAPIServer {
+		selector[object.AppNameLabelKey] = object.ColocatedApiServerWithETCDLabelValue
+	}
+	return selector
 }

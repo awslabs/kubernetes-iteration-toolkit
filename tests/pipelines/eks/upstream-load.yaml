@@ -47,6 +47,9 @@ spec:
     default: "15"
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
+  - name: amp-workspace-id
+    description: The AMP workspace ID where remote write needs to happen.
+    default: ""
   tasks:
   - name: create-eks-cluster
     taskRef:
@@ -71,8 +74,17 @@ spec:
     workspaces:
       - name: config    
         workspace: config
+  - name: install-fluentbit-addon
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: eks-addon-fluentbit
   - name: generate
-    runAfter: [create-eks-cluster]
+    runAfter: [install-fluentbit-addon]
     taskRef:
       name: load
     params:
@@ -88,6 +100,8 @@ spec:
         value: '$(params.results-bucket)'
       - name: nodes
         value: '$(params.desired-nodes)'
+      - name: amp-workspace-id
+        value: '$(params.amp-workspace-id)'
     workspaces:
       - name: source
         workspace: source

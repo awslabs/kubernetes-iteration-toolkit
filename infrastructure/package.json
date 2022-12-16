@@ -1,8 +1,9 @@
 {
-  "name": "infra",
+  "name": "kit-infrastructure",
+  "license": "Apache-2",
   "version": "0.1.0",
   "bin": {
-    "infra": "bin/infra.js"
+    "infra": "bin/kit-infrastructure.ts"
   },
   "scripts": {
     "build": "tsc",

@@ -30,8 +30,9 @@ import (
 )
 
 var (
-	ControlPlaneLabelKey = v1alpha1.SchemeGroupVersion.Group + "/control-plane-name"
-	AppNameLabelKey      = v1alpha1.SchemeGroupVersion.Group + "/app"
+	ControlPlaneLabelKey                 = v1alpha1.SchemeGroupVersion.Group + "/control-plane-name"
+	AppNameLabelKey                      = v1alpha1.SchemeGroupVersion.Group + "/app"
+	ColocatedApiServerWithETCDLabelValue = "apiserver-etcd"
 )
 
 func WithOwner(owner, obj client.Object) client.Object {

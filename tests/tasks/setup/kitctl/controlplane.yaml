@@ -46,7 +46,7 @@ spec:
     description: Kubernetes version for the guest cluster 
   steps:
   - name: setup-control-plane
-    image: bitnami/kubectl
+    image: bitnami/kubectl:1.24.5 # curl was removed in more recent versions
     script: |
       #!/bin/bash
       echo "Approving KCM requests"
