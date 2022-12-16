@@ -45,6 +45,7 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 				for _, tag := range instance.Tags {
 					if aws.StringValue(tag.Key) == "aws:ec2launchtemplate:version" && aws.StringValue(tag.Value) == aws.StringValue(substrate.Status.Cluster.LaunchTemplateVersion) {
 						logging.FromContext(ctx).Infof("Found instance %s", aws.StringValue(instance.InstanceId))
+						substrate.Status.Infrastructure.MasterInstanceID = instance.InstanceId
 						return reconcile.Result{}, nil
 					}
 				}
