@@ -66,7 +66,7 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 		Namespace:       "karpenter",
 		Name:            "karpenter",
 		Repository:      "https://charts.karpenter.sh",
-		Version:         "0.9.0",
+		Version:         "0.16.1",
 		CreateNamespace: true,
 		Values: map[string]interface{}{
 			"clusterName":     substrate.Name,
