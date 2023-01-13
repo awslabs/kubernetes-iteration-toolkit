@@ -9,7 +9,7 @@ spec:
   params:
   - name: giturl
     description: "git url to clone the package"
-    default: https://github.com/kubernetes/perf-tests.git
+    default: https://github.com/hakuna-matatah/perf-tests.git
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
     default: "master"
@@ -58,7 +58,7 @@ spec:
       git checkout $(params.cl2-branch)
       git branch
   - name: prepare-loadtest
-    image: alpine/k8s:1.22.6
+    image: golang:1.19
     workingDir: $(workspaces.source.path)
     script: |
       S3_RESULT_PATH=$(params.results-bucket)
@@ -123,8 +123,11 @@ spec:
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0prometheus-operator-deployment.yaml
       fi
+      # Building clusterloader2 binary 
+      cd $(workspaces.source.path)/perf-tests/clusterloader2/
+      GOPROXY=direct GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
   - name: run-loadtest
-    image: '197575167141.dkr.ecr.us-west-2.amazonaws.com/clusterloader2:a15645'
+    image: alpine/k8s:1.22.6
     onError: continue
     script: |
       #!/bin/bash
@@ -137,7 +140,8 @@ spec:
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
-      ENABLE_EXEC_SERVICE=false /clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
+      cd $(workspaces.source.path)/perf-tests/clusterloader2/
+      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
       exit_code=$?
       if [ $exit_code -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
