@@ -15,6 +15,7 @@ spec:
   - name: slack-hook
   - name: slack-message
   - name: amp-workspace-id
+  - name: vpc-cfn-url
   - name: service-role-cfn-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_service_role.json"
   - name: node-role-cfn-url
@@ -42,6 +43,15 @@ spec:
     taskRef:
       kind: Task
       name: awscli-role-create
+  - name: awscli-vpc-create
+    params:
+      - name: stack-name
+        value: $(params.cluster-name)
+      - name: vpc-cfn-url
+        value: $(params.vpc-cfn-url)
+    taskRef:
+      kind: Task
+      name: awscli-vpc-create
   - name: create-cluster-node-role
     params:
     - name: stack-name
@@ -63,15 +73,15 @@ spec:
       value: $(params.cluster-name)-service-role
     - name: endpoint
       value: $(params.endpoint)
+    - name: vpc-stack-name
+      value: $(params.cluster-name)
     runAfter:
     - create-cluster-node-role
     - create-cluster-service-role
+    - awscli-vpc-create
     taskRef:
       kind: Task
-      name:  awscli-eks-cluster-create
-    workspaces:
-    - name: config
-      workspace: config
+      name: awscli-eks-cluster-create-with-vpc-stack
   - name: create-mng-monitoring-nodes
     params:
     - name: cluster-name
@@ -134,6 +144,8 @@ spec:
       name:  eks-addon-cwagent
   - name: generate
     params:
+    - name: cluster-name
+      value: $(params.cluster-name)
     - name: pods-per-node
       value: $(params.pods-per-node)
     - name: nodes-per-namespace
@@ -146,6 +158,8 @@ spec:
       value: $(params.desired-nodes)
     - name: amp-workspace-id
       value: '$(params.amp-workspace-id)'
+    - name: endpoint
+      value: $(params.endpoint)
     runAfter:
     - create-cw-agent-addon
     taskRef:
@@ -154,13 +168,11 @@ spec:
     workspaces:
     - name: source
       workspace: source
-    - name: config
-      workspace: config
     - name: results
       workspace: results
-  finally:    
+  finally:
   - name: teardown
-    params:   
+    params:
     - name: cluster-name
       value: $(params.cluster-name)
     - name: endpoint
@@ -177,6 +189,5 @@ spec:
       kind: Task
       name:  awscli-eks-cluster-teardown
   workspaces:
-  - name: config
   - name: source
   - name: results
