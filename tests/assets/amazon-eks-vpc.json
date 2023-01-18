@@ -664,6 +664,7 @@
         },
         "PublicSubnet01": {
             "Type": "AWS::EC2::Subnet",
+            "DependsOn": "VPC",
             "Metadata": {
                 "Comment": "Subnet 01"
             },
@@ -701,6 +702,7 @@
         },
         "PublicSubnet02": {
             "Type": "AWS::EC2::Subnet",
+            "DependsOn": "VPCCIDRBlock2",
             "Metadata": {
                 "Comment": "Subnet 02"
             },
@@ -738,6 +740,7 @@
         },
         "PublicSubnet03": {
             "Condition": "HasMoreThan2Azs",
+            "DependsOn": "VPCCIDRBlock3",
             "Type": "AWS::EC2::Subnet",
             "Metadata": {
                 "Comment": "Subnet 03"
@@ -776,6 +779,7 @@
         },
         "PublicSubnet04": {
             "Condition": "HasMoreThan2Azs",
+            "DependsOn": "VPCCIDRBlock4",
             "Type": "AWS::EC2::Subnet",
             "Metadata": {
                 "Comment": "Subnet 04"
@@ -814,6 +818,7 @@
         },
         "PrivateSubnet01": {
             "Type": "AWS::EC2::Subnet",
+            "DependsOn": "VPCCIDRBlock5",
             "Metadata": {
                 "Comment": "Private Subnet 01"
             },
@@ -850,6 +855,7 @@
         },
         "PrivateSubnet02": {
             "Type": "AWS::EC2::Subnet",
+            "DependsOn": "VPCCIDRBlock6",
             "Metadata": {
                 "Comment": "Private Subnet 02"
             },
@@ -886,6 +892,7 @@
         },
         "PrivateSubnet03": {
             "Condition": "HasMoreThan2Azs",
+            "DependsOn": "VPCCIDRBlock7",
             "Type": "AWS::EC2::Subnet",
             "Metadata": {
                 "Comment": "Private Subnet 03"
@@ -924,6 +931,7 @@
         "PrivateSubnet04": {
             "Condition": "HasMoreThan2Azs",
             "Type": "AWS::EC2::Subnet",
+            "DependsOn": "VPCCIDRBlock8",
             "Metadata": {
                 "Comment": "Private Subnet 04"
             },
@@ -961,6 +969,7 @@
         "PrivateSubnet05": {
             "Condition": "HasMoreThan2Azs",
             "Type": "AWS::EC2::Subnet",
+            "DependsOn": "VPCCIDRBlock9",
             "Metadata": {
                 "Comment": "Private Subnet 05"
             },
@@ -997,6 +1006,7 @@
         },
         "PrivateSubnet06": {
             "Condition": "HasMoreThan2Azs",
+            "DependsOn": "VPCCIDRBlock10",
             "Type": "AWS::EC2::Subnet",
             "Metadata": {
                 "Comment": "Private Subnet 06"
@@ -1034,6 +1044,7 @@
         },
         "PrivateSubnet07": {
             "Condition": "HasMoreThan2Azs",
+            "DependsOn": "VPCCIDRBlock11",
             "Type": "AWS::EC2::Subnet",
             "Metadata": {
                 "Comment": "Private Subnet 07"
@@ -1071,6 +1082,7 @@
         },
         "PrivateSubnet08": {
             "Condition": "HasMoreThan2Azs",
+            "DependsOn": "VPCCIDRBlock12",
             "Type": "AWS::EC2::Subnet",
             "Metadata": {
                 "Comment": "Private Subnet 08"
