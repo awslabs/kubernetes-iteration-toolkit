@@ -1,0 +1,34 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-delete-vpc
+  namespace: tekton-pipelines
+spec:
+  description: |
+    This Task can be used to delete CloudFormation stack containing VPC resources that was used for EKS clusters.
+  params:
+    - name: stack-name
+      description: The name of the VPC name you want to delete.
+    - name: region
+      default: "us-west-2"
+  steps:
+    - name: awscli-delete-vpc
+      image: alpine/k8s:1.22.6
+      script: |
+        #!/bin/bash
+        echo "Approving KCM requests"
+        kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
+        aws sts get-caller-identity 
+        # Check if the stack exists
+        aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.stack-name)
+        if [ $? -ne 0 ]; then
+        echo "Stack $(params.stack-name) not found ,Exiting..."
+        exit 1
+        else
+        echo "Deleting stack $(params.stack-name)..."
+        fi
+        #Deletes the CFN stack
+        aws cloudformation delete-stack --region $(params.region) --stack-name $(params.stack-name) 
+        # Wait for the stack to be deleted
+        aws cloudformation wait stack-delete-complete --region $(params.region) --stack-name $(params.stack-name)
+        echo "Stack deleted successfully!"
