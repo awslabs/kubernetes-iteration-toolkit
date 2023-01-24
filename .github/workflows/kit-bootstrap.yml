@@ -1,0 +1,55 @@
+name: This workflow automates the build, testing, and bootstrapping of a test environment on Kubernetes using KIT CLI
+on:
+  workflow_run:
+    workflows: [trigger-kit-CI]
+    types: [completed]
+permissions:
+  id-token: write
+  pull-requests: write
+  contents: read
+jobs:
+  kit:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/install-go-and-dependencies
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::953421922360:role/kit-Github-workflow
+          role-session-name: githubworkflowsession
+          aws-region: us-west-2
+      - name: Install kubectl
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -L -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -L -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/darwin/amd64/kubectl"  
+          fi
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+      - name: Builds the KIT CLI ,Provisions the Kit Environment and deletes it
+        run: |
+          cd ${HOME}/work/kubernetes-iteration-toolkit/kubernetes-iteration-toolkit/substrate/cmd/kitctl
+          go build -v .
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            os_type="linux"
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            os_type="darwin"
+          fi 
+          ./kitctl bootstrap kit-github-${os_type}-${{ github.run_id }}
+          export KUBECONFIG=${HOME}/.kit/env/kit-github-${os_type}-${{ github.run_id }}/etc/kubernetes/admin.conf
+          kubectl get pods -A
+          for i in {1..5}; do
+            ./kitctl delete kit-github-${os_type}-${{ github.run_id }}
+            #During the first attempt, "kitctl" was unable to delete some resources sporadically. To ensure that enough time is given for the resources to be deleted, a longer wait time of 220 seconds is added before attempting to delete the kit again.
+            #and for the remaining 4 iterations with a wait time of 60 seconds to ensure all resources are successfully deleted as we are left with few resources.
+            if [ $i -eq 1 ]; then
+              sleep 220
+            else
+              sleep 60
+            fi
+          done
+        working-directory: substrate

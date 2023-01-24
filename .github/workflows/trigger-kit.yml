@@ -1,0 +1,12 @@
+name: trigger-kit-CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+jobs:
+  depend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Message
+        run: echo "Triggers workflow kitctl-CI"

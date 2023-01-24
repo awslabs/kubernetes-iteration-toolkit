@@ -1,0 +1,163 @@
+#name: This workflow automates the build, testing, and bootstrapping of a test environment on Kubernetes using KIT CLI
+name:  sg-validation
+on:
+  push:
+    branches: [main]
+permissions:
+  id-token: write
+  pull-requests: write
+  contents: read
+jobs:
+  kitctl:
+    strategy:
+      matrix:
+        os: [ macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/install-go-and-dependencies
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::078365735624:role/github-Token-generate
+          role-session-name: githubworkflowsession
+          aws-region: us-west-2
+      - name: Install kubectl
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -L -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -L -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/darwin/amd64/kubectl"  
+          fi 
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+      - name: Builds the KIT CLI ,Provisions the Kit Environment,KIT guest cluster and deletes.
+        id: step1
+        run: |
+          allVersions=("1.21" )
+          cd ${HOME}/work/kubernetes-iteration-toolkit/kubernetes-iteration-toolkit/substrate/cmd/kitctl
+          go build  . 
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            os_type="linux"    
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            os_type="darwin"
+          fi 
+          ./kitctl bootstrap kit-github-${os_type}-${{ github.run_id }}-${{github.run_attempt}}
+          export KUBECONFIG=${HOME}/.kit/env/kit-github-${os_type}-${{ github.run_id }}-${{github.run_attempt}}/etc/kubernetes/admin.conf
+          kubecl get pods -A
+          for version in "${allVersions[@]}"; do
+            K8S_VERSION=$version
+            version=${version//./-}
+            GUEST_CLUSTER_NAME="guest-${os_type}-${version}-${{ github.run_id }}-${{github.run_attempt}}"
+            # K8S_VERSION="1.$i"
+            cat <<-EOF | kubectl apply -f -
+              apiVersion: kit.k8s.sh/v1alpha1
+              kind: ControlPlane
+              metadata:
+                name: ${GUEST_CLUSTER_NAME} # Desired Cluster name
+              spec:
+                kubernetesVersion: "${K8S_VERSION}"
+                etcd:
+                  replicas: 3
+                master:
+                  apiServer:
+                    replicas: 1  
+          EOF
+           for (( time=0; time<=600; time+=5 )); do
+              controlplane_object=$(kubectl get controlplane ${GUEST_CLUSTER_NAME} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+              if [[ "$controlplane_object" == "True" ]]; then
+                echo "Control plane objects are ready"
+                break;
+              else
+                kubectl logs deploy/kit-controller -n kit
+                kubectl get pods -A
+                echo "Control plane objects are not ready"
+
+              fi
+              if [[ "$time" -eq 590 ]]; then
+                echo "Timeout: Control plane objects are not ready after 20 minutes"
+                kubectl get pods -o wide
+                kubectl describe deployment
+                kubectl logs deploy/kit-controller -n kit
+                exit 1
+              fi
+              sleep 5
+            done
+            kubectl wait --for=condition=Ready pods  --all --timeout=5m  
+            GUESTKUBECONFIG=/tmp/kubeconfig
+            kubectl get secret ${GUEST_CLUSTER_NAME}-kube-admin-config -ojsonpath='{.data.config}' | base64 -d >$GUESTKUBECONFIG
+            cat <<-EOF | kubectl apply -f -
+              apiVersion: kit.k8s.sh/v1alpha1
+              kind: DataPlane
+              metadata:
+                name: ${GUEST_CLUSTER_NAME}-nodes
+              spec:
+                clusterName: ${GUEST_CLUSTER_NAME} # Associated Cluster name
+                nodeCount: 2
+          EOF
+            for (( time=0; time<=600; time+=5 )); do
+              dataplane_object=$(kubectl get dataplane ${GUEST_CLUSTER_NAME}-nodes  -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+              if [[ "$dataplane_object" == "True" ]]; then
+                echo "Dataplane objects are ready"
+                break;
+              else
+                echo "Dataplane objects are not ready"
+              fi
+              if [[ "$time" -eq 590 ]]; then
+                echo "Timeout: Dataplane objects are not ready after 10 minutes"
+                kubectl logs deploy/kit-controller -n kit 
+                exit 1
+              fi
+              sleep 5
+            done
+            kubectl --kubeconfig=$GUESTKUBECONFIG apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.10/config/master/aws-k8s-cni.yaml
+            kubectl --kubeconfig=$GUESTKUBECONFIG rollout status daemonset/aws-node -n kube-system
+            for (( time=0; time<=160; time+=5 )); do
+              ready_node=$(kubectl --kubeconfig=$GUESTKUBECONFIG get nodes 2>/dev/null | grep -w Ready | wc -l)
+              if [[ "$ready_node" -eq 2 ]]; then
+                echo "Dataplane nodes are ready"
+                break;
+              else
+                echo "Dataplane nodes are not ready"
+              fi
+              if [[ "$time" -eq 150 ]]; then
+                echo "Timeout: Dataplane nodes are not ready after 3 minutes"
+                exit 1
+              fi
+              sleep 5
+            done
+            kubectl --kubeconfig=$GUESTKUBECONFIG create deployment nginx-deployment --image=nginx
+            kubectl --kubeconfig=$GUESTKUBECONFIG rollout status deployment/nginx-deployment
+            kubectl --kubeconfig=$GUESTKUBECONFIG expose deployment nginx-deployment --name=nginx-service --port=80 --target-port=80 --type=ClusterIP
+            kubectl --kubeconfig=$GUESTKUBECONFIG certificate approve $(kubectl --kubeconfig=$GUESTKUBECONFIG get csr | grep Pending | awk '{print $1}')
+            kubectl --kubeconfig=$GUESTKUBECONFIG run -i --rm --restart=Never curly-pod  --image=curlimages/curl --command -- curl -s 'http://nginx-service:80'
+          done
+      - name:  Delete the kit environment 
+        if: always()
+        run: | 
+              #During the first attempt, "kitctl" was unable to delete some resources sporadically. To ensure that enough time is given for the resources to be deleted, a longer wait time of 220 seconds is added before attempting to delete the kit again.
+              #and for the remaining 3 iterations with a wait time of 60 seconds to ensure all resources are successfully deleted as we are left with few resources sometimes.
+              allVersions=("1-21")
+              cd ${HOME}/work/kubernetes-iteration-toolkit/kubernetes-iteration-toolkit/substrate/cmd/kitctl
+               if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+                os_type="linux"    
+              elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+                os_type="darwin"
+              fi 
+              export KUBECONFIG=${HOME}/.kit/env/kit-github-${os_type}-${{ github.run_id }}-${{github.run_attempt}}/etc/kubernetes/admin.conf
+              kubectl config current-context
+              for version in "${allVersions[@]}"; do
+                GUEST_CLUSTER_NAME="guest-${os_type}-${versions}-${{ github.run_id }}-${{github.run_attempt}}"
+                kubectl delete controlplane ${GUEST_CLUSTER_NAME}
+              done  
+              for i in {1..4}; do
+                ./kitctl delete kit-github-${os_type}-${{ github.run_id }}-${{github.run_attempt}}
+                if [ $i -eq 1 ]; then
+                  sleep 220
+                else
+                  sleep 60
+                fi
+              done
+              # dummy 1
+              # dummy 2
+        continue-on-error: true
+        working-directory: substrate
