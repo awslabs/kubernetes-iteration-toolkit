@@ -32,8 +32,8 @@ jobs:
     - name: configure aws credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
-          role-to-assume: arn:aws:iam::078365735624:role/github-Token-generate
-          role-session-name: samplerolesession
+          role-to-assume: arn:aws:iam::953421922360:role/kit-Github-workflow
+          role-session-name: githubworkflowsession
           aws-region: us-west-2
     - name: Builds the KIT CLI ,Provisions the Kit Environment and deletes it
       run: |
