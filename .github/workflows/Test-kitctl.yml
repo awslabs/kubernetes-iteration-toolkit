@@ -5,16 +5,13 @@ on:
   push:
     branches-ignore: [main]
   workflow_dispatch: {}
-jobs:
-   build-cli:
-    strategy:
-      matrix:
-        os: ["darwin", "linux"]
-        arch: ["amd64"]
-    runs-on: ubuntu-latest
-    permissions:
+permissions:
        id-token: write
        contents: read
+jobs:
+   build-cli:
+    name: kitctl-Test
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: actions/cache@v2
@@ -30,14 +27,13 @@ jobs:
       with:
         go-version: '1.17.1'
     - name: configure aws credentials
-      uses: aws-actions/configure-aws-credentials@master
+      uses: aws-actions/configure-aws-credentials@v1
       with:
           role-to-assume: arn:aws:iam::953421922360:role/kit-Github-workflow
           role-session-name: githubworkflowsession
           aws-region: us-west-2
     - name: Builds the KIT CLI ,Provisions the Kit Environment and deletes it
       run: |
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ./bin/kitctl ./cmd/kitctl/
         cd /home/runner/work/kubernetes-iteration-toolkit/kubernetes-iteration-toolkit/substrate/cmd/kitctl
         go build -v .
         RANDOM_SUFFIX=$(openssl rand -hex 5)
@@ -45,4 +41,3 @@ jobs:
         export KUBECONFIG=/home/runner/.kit/env/kit-github-${RANDOM_SUFFIX}/etc/kubernetes/admin.conf
         ./kitctl delete kit-github-${RANDOM_SUFFIX}
       working-directory: substrate
-  
