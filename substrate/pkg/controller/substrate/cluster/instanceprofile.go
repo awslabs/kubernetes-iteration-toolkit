@@ -292,6 +292,7 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 			"arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
 			"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
 			"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+			"arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess",
 		},
 	}, {
 		// Roles and policies attached to the nodes provisioned by Karpenter
@@ -323,6 +324,7 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 			"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
 			"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
 			"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+			"arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess",
 		},
 	}}
 }
