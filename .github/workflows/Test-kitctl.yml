@@ -31,7 +31,7 @@ jobs:
       with:
           role-to-assume: arn:aws:iam::953421922360:role/kit-Github-workflow
           role-session-name: githubworkflowsession
-          aws-region: us-west-2
+          aws-region: us-east-1
     - name: Builds the KIT CLI ,Provisions the Kit Environment and deletes it
       run: |
         cd /home/runner/work/kubernetes-iteration-toolkit/kubernetes-iteration-toolkit/substrate/cmd/kitctl
