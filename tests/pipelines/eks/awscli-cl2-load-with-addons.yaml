@@ -82,6 +82,9 @@ spec:
     taskRef:
       kind: Task
       name: awscli-eks-cluster-create-with-vpc-stack
+    workspaces:
+    - name: config    
+      workspace: config
   - name: create-mng-monitoring-nodes
     params:
     - name: cluster-name
@@ -105,17 +108,21 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
+    workspaces:
+    - name: config    
+      workspace: config
   - name: install-fluentbit-addon
     params:
     - name: cluster-name
       value: $(params.cluster-name)
-    - name: endpoint
-      value: $(params.endpoint)
     runAfter:
     - create-mng-monitoring-nodes
     taskRef:
       kind: Task
       name: eks-addon-fluentbit
+    workspaces:
+    - name: config    
+      workspace: config
   - name: create-mng-nodes
     params:
     - name: cluster-name
@@ -131,17 +138,21 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
+    workspaces:
+    - name: config    
+      workspace: config
   - name: create-cw-agent-addon
     params:
     - name: cluster-name
       value: $(params.cluster-name)
-    - name: endpoint
-      value: $(params.endpoint)
     runAfter:
     - create-mng-nodes
     taskRef:
       kind: Task
       name:  eks-addon-cwagent
+    workspaces:
+    - name: config    
+      workspace: config
   - name: generate
     params:
     - name: cluster-name
@@ -158,8 +169,6 @@ spec:
       value: $(params.desired-nodes)
     - name: amp-workspace-id
       value: '$(params.amp-workspace-id)'
-    - name: endpoint
-      value: $(params.endpoint)
     runAfter:
     - create-cw-agent-addon
     taskRef:
@@ -170,6 +179,8 @@ spec:
       workspace: source
     - name: results
       workspace: results
+    - name: config    
+      workspace: config
   finally:
   - name: teardown
     params:
@@ -191,3 +202,4 @@ spec:
   workspaces:
   - name: source
   - name: results
+  - name: config

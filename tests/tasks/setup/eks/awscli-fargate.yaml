@@ -29,13 +29,18 @@ spec:
   - name: host-cluster-node-role-name
     description: name of the hostcluster node role. This tightly coupled to code here  - https://github.com/awslabs/kubernetes-iteration-toolkit/blob/3ed1bbd47f7b8f111208e977acaa3edfa1834ca8/substrate/pkg/controller/substrate/cluster/addons/karpenter.go#L52 so if it's changed there, it should be changed here. This helps us to avoid creating a separate noderole for nodegroups/fargate.
   - name: fargate-subnets
-    description: only provide private subnets of your cluster VPC 
+    description: only provide private subnets of your cluster VPC
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
   steps:
   - name: create-fargate-profile
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
@@ -60,15 +65,18 @@ spec:
           echo "$(params.profile-name) is "CREATING" at $(date)"
           sleep 2
       done
-  - name: validate-nodes
-    image: alpine/k8s:1.22.6
+  - name: write-kubeconfig
+    image: alpine/k8s:1.23.7
     script: |
-      echo "validate fargate nodes"
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+  - name: validate-nodes
+    image: alpine/k8s:1.23.7
+    script: |
+      echo "validate fargate nodes"
       kubectl patch deployment coredns -n kube-system --type json -p='[{"op": "remove", "path": "/spec/template/metadata/annotations/eks.amazonaws.com~1compute-type"}]' || true
       kubectl version
       kubectl config current-context

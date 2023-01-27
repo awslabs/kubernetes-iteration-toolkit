@@ -36,12 +36,17 @@ spec:
   - name: nodegroup-prefix
     description: Prefix that needs to be appended to asg names.
     default: ""
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
   steps:
   - name: create-nodegroup
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       ENDPOINT_FLAG=""
       # Todo: remove this workaround for nodes less than 5k when our scaling system can scale up instantly
       if [ $(params.desired-nodes) -lt 5001  ] && [ $(params.desired-nodes) -gt 500 ]
@@ -60,7 +65,6 @@ spec:
       if [ -n "$(params.host-taints)" ]; then
         TAINTS_FLAG="--taints $(params.host-taints)"
       fi
-      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
 
       NG_SUBNETS=$(aws eks $ENDPOINT_FLAG --region $(params.region)  describe-cluster --name $(params.cluster-name) \
       --query cluster.resourcesVpcConfig.subnetIds --output text \

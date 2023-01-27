@@ -20,10 +20,8 @@ spec:
     description: name of the fargate profile that needs to be deleted
   steps:
   - name: delete-profile
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"

@@ -27,12 +27,17 @@ spec:
   - name: aws-ebs-csi-driver-version
     default: release-1.13
     description: The release version for aws ebs csi driver.
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
   steps:
   - name: create-eks
-    image: alpine/k8s:1.23.13
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
@@ -53,7 +58,17 @@ spec:
         aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
       fi
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+  - name: write-kubeconfig
+    image: alpine/k8s:1.23.7
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+  - name: install-addons-and-validate
+    image: alpine/k8s:1.23.7
+    script: |
       # enable PD on the cluster 
       kubectl api-versions 
       kubectl api-resources

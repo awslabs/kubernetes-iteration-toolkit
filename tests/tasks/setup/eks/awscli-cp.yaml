@@ -25,14 +25,15 @@ spec:
     description: servicerole name to be used for eks cluster to perform operations in customer account to setup cluster
   workspaces:
   - name: config
-    description: |
-      A workspace into which a kubeconfig file called `kubeconfig` will be written that will contain the information required to access the cluster. The `kubeconfig` will expect to use [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator/) to authenticate, so in order for it to be used it must be run in a container which contains both `kubectl` and `aws-iam-authenticator`.
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
   steps:
-  - name: write-kubeconfig
-    image: alpine/k8s:1.23.13
+  - name: create-cluster
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
@@ -51,8 +52,16 @@ spec:
       if [ "$CREATED_CLUSTER" == "" ]; then
         aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
       fi
-      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
-      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
-      cp  /root/.kube/config $(workspaces.config.path)/kubeconfig
+  - name: write-kubeconfig
+    image: alpine/k8s:1.23.7
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region) 
+  - name: update-cni-config
+    image: alpine/k8s:1.23.7
+    script: |
       # enable PD on the cluster 
       kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true

@@ -13,11 +13,9 @@ spec:
       default: "us-west-2"
   steps:
     - name: awscli-delete-vpc
-      image: alpine/k8s:1.22.6
+      image: alpine/k8s:1.23.7
       script: |
         #!/bin/bash
-        echo "Approving KCM requests"
-        kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
         aws sts get-caller-identity 
         # Check if the stack exists
         aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.stack-name)
