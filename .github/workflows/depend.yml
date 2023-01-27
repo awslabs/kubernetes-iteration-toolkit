@@ -1,0 +1,16 @@
+name: depend
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  id-token: write
+  pull-requests: write
+  contents: write
+jobs:
+  depend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/install-go-and-dependencies
