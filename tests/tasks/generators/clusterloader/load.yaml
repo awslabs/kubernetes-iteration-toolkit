@@ -30,9 +30,6 @@ spec:
   - name: region
     default: "us-west-2"
     description: The region where the cluster is in.
-  - name: endpoint
-    default: ""
-    description: "aws eks enpoint to create clusters against"
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
   - name: amp-workspace-id
@@ -47,6 +44,8 @@ spec:
   - name: source
     mountPath: /src/k8s.io/
   - name: results
+  - name: kubeconfig
+    description: kubeconfig of the guest cluster
   steps:
   - name: git-clone      
     image: alpine/git
@@ -125,23 +124,22 @@ spec:
       fi
       # Building clusterloader2 binary 
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
-      GOPROXY=direct GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
+      GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
   - name: run-loadtest
     image: alpine/k8s:1.22.6
     onError: continue
     script: |
       #!/bin/bash
-      ENDPOINT_FLAG=""
-      if [ -n "$(params.endpoint)" ]; then
-        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
-      fi
       if [ -n "$(params.amp-workspace-id)" ]; then
-        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2 --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
+        # CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2 --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
+        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2 --prometheus-storage-class-provisioner ebs.csi.aws.com --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
       fi
-      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+
+      export KUBECONFIG=$(workspaces.kubeconfig.path)/kubeconfig
+
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
-      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=/root/.kube/config --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
+      ENABLE_EXEC_SERVICE=false ./clusterloader --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
       exit_code=$?
       if [ $exit_code -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
