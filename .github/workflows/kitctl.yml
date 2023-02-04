@@ -1,0 +1,62 @@
+name: kit
+on:
+  push:
+    branches: [main,Fifthbranch]
+  workflow_dispatch: {}
+permissions:
+  id-token: write
+  pull-requests: write
+  contents: read
+jobs:
+  kit:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/install-go-and-dependencies
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_IDS }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEYS }}
+          aws-region: us-west-2   
+      - name: Install kubectl
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -L -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -L -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/darwin/amd64/kubectl"  
+          fi
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+      - name: Builds the KIT CLI ,Provisions the Kit Environment and deletes it
+        run: |
+          cd ${HOME}/work/kubernetes-iteration-toolkit/kubernetes-iteration-toolkit/substrate/cmd/kitctl
+          go build -v .
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+              ./kitctl bootstrap kit-github-linux-${{ github.run_id }}
+              sleep 100
+              export KUBECONFIG=${HOME}/.kit/env/kit-github-linux-${{ github.run_id }}/etc/kubernetes/admin.conf
+              for i in {1..5}; do
+                  ./kitctl delete kit-github-linux-${{ github.run_id }}
+                  if [ $i -eq 1 ]; then
+                     sleep 220
+                  else
+                    sleep 60
+                  fi
+               done
+           else
+              ./kitctl bootstrap kit-github-darwin-${{ github.run_id }}
+              sleep 100
+              export KUBECONFIG=${HOME}/.kit/env/kit-github-darwin-${{ github.run_id }}/etc/kubernetes/admin.conf
+              for i in {1..5}; do
+                  ./kitctl delete kit-github-darwin-${{ github.run_id }}
+                  if [ $i -eq 1  ]; then
+                      sleep 220
+                    else
+                      sleep 60
+                  fi
+              done  
+           fi
+        working-directory: substrate
