@@ -17,6 +17,7 @@ package controlplane
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
@@ -27,6 +28,7 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/controllers/master"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/kubeprovider"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/results"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -58,12 +60,29 @@ func (c *controlPlane) For() controllers.Object {
 
 // Reconcile will reconcile all the components running on the control plane
 func (c *controlPlane) Reconcile(ctx context.Context, object controllers.Object) (res *reconcile.Result, err error) {
+	cp, ok := object.(*v1alpha1.ControlPlane)
+	if !ok {
+		return nil, fmt.Errorf("parsing control plane object")
+	}
+	// if the cluster CP TTL has expired set deletion timestamp for the object
+	if cp.Spec.TTL != "" {
+		duration, err := time.ParseDuration(cp.Spec.TTL)
+		if err != nil {
+			return nil, fmt.Errorf("parsing TTL duration, %w", err)
+		}
+		deleteAfter := object.GetCreationTimestamp().Add(duration)
+		if time.Now().After(deleteAfter) {
+			t := metav1.Now()
+			object.SetDeletionTimestamp(&t)
+			return &reconcile.Result{Requeue: true}, nil
+		}
+	}
 	for _, resource := range []controlplane.Controller{
 		c.etcdController,
 		c.masterController,
 		c.addonsController,
 	} {
-		if err := resource.Reconcile(ctx, object.(*v1alpha1.ControlPlane)); err != nil {
+		if err := resource.Reconcile(ctx, cp); err != nil {
 			return nil, fmt.Errorf("control plane reconciling, %w", err)
 		}
 	}
