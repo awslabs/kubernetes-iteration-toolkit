@@ -24,10 +24,8 @@ spec:
   - name: node-role-stack-name
   steps:
   - name: delete-cluster
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
@@ -40,12 +38,12 @@ spec:
       done;
       aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
   - name: teardown-eks-role-stack
-    image: alpine/k8s:1.23.13
+    image: alpine/k8s:1.23.7
     script: |
       aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
       aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
   - name: send-slack-notification
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.7
     script: |
       if [ -n "$(params.slack-hook)" ]; then
         curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)

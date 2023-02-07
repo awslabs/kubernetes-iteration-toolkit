@@ -15,10 +15,8 @@ spec:
     description: The message you want to post.
   steps:
   - name: send-notification
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
       if [ -n "$(params.slack-hook)" ]; then
         curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)
       fi

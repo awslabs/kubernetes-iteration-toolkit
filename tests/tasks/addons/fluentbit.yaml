@@ -13,19 +13,17 @@ spec:
   - name: region
     default: "us-west-2"
     description: The region where the cluster is in.
-  - name: endpoint
-    default: ""
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
   steps:
   - name: create-fluentbit-addon
-    image: alpine/k8s:1.22.6
+    image: alpine/k8s:1.23.7
     script: |
-      echo "Approving KCM requests"
-      kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null || true
-      ENDPOINT_FLAG=""
-      if [ -n "$(params.endpoint)" ]; then
-        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
-      fi
-      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
       #kubectl commands are purely for knowing state of cluster before kicking off the test.
       kubectl version
       kubectl config current-context

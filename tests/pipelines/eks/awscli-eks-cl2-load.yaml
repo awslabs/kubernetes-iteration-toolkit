@@ -85,6 +85,9 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-create-with-vpc-stack
+    workspaces:
+    - name: config    
+      workspace: config
   - name: create-mng-monitoring-nodes
     params:
     - name: cluster-name
@@ -108,17 +111,21 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
+    workspaces:
+    - name: config    
+      workspace: config
   - name: install-fluentbit-addon
     params:
     - name: cluster-name
       value: $(params.cluster-name)
-    - name: endpoint
-      value: $(params.endpoint)
     runAfter:
     - create-mng-monitoring-nodes
     taskRef:
       kind: Task
       name: eks-addon-fluentbit
+    workspaces:
+    - name: config    
+      workspace: config
   - name: create-mng-nodes
     params:
     - name: cluster-name
@@ -134,6 +141,9 @@ spec:
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
+    workspaces:
+    - name: config    
+      workspace: config
   - name: generate
     params:
     - name: pods-per-node
@@ -148,8 +158,6 @@ spec:
       value: $(params.desired-nodes)
     - name: cluster-name
       value: $(params.cluster-name)
-    - name: endpoint
-      value: $(params.endpoint)
     - name: amp-workspace-id
       value: '$(params.amp-workspace-id)'
     runAfter:
@@ -161,7 +169,9 @@ spec:
     - name: source
       workspace: source
     - name: results
-      workspace: results  
+      workspace: results
+    - name: config    
+      workspace: config
   - name: cw-metrics
     params:
     - name: dimensions
@@ -196,3 +206,4 @@ spec:
   workspaces:
   - name: source
   - name: results
+  - name: config
