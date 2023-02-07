@@ -1,9 +1,73 @@
 # Kubernetes Iteration Toolkit Tests with Tekton
 
 ### Overview:
-Tekton is a powerful and flexible open-source framework for creating CI/CD systems, allowing developers to build, test, and deploy across cloud providers and on-premise systems.
+Tekton is a powerful and flexible open-source framework for creating CI/CD systems, allowing developers to build, test, and deploy across cloud providers and on-premise systems. This documents steps for setting up kit load test tasks and pipelines in tekton infrastructure.
+
+### Prerequisites
+* A kubernetes cluster with tekton infrastructure configured. [Ref](https://github.com/awslabs/kubernetes-iteration-toolkit/tree/main/infrastructure) for setting up KITInfra.
+* [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/)
 
 
+### Installing tekton pipelines
+```
+cd tests
+kubectl apply -n tekton-pipelines -f tasks -R
+kubectl apply -n tekton-pipelines -f pipelines -R
+```
+
+### Running a single pipelinerun
+```
+cat <<EOF | kubectl apply -f -
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+generateName: awscli-eks-load-sample
+spec:
+pipelineRef:
+    name: awscli-eks-cl2loadtest
+timeout: 9h0m0s
+workspaces:
+    - name: source
+    emptyDir: {}
+    - name: config
+    volumeClaimTemplate:
+        spec:
+        accessModes:
+            - ReadWriteOnce
+        storageClassName: gp2
+        resources:
+            requests:
+            storage: 1Gi
+    - name: results
+    emptyDir: {}
+params:
+    - name: cluster-name
+    value: "awscli-eks-load-100"
+    - name: desired-nodes
+    value: "100"
+    - name: pods-per-node
+    value: "10"
+    - name: nodes-per-namespace
+    value: "100"
+    - name: cl2-load-test-throughput
+    value: "20"
+    - name: results-bucket
+    value: kit-eks-scalability/kit-eks-5k/$(date +%s)
+    - name: slack-message
+    value: "You can monitor here - https://tekton.scalability.eks.aws.dev/#/namespaces/tekton-pipelines/pipelineruns ;5k node "
+    - name: slack-hook
+    value: <slack hook url. Pass empty if you don't have one>
+    - name: vpc-cfn-url
+    value: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/amazon-eks-vpc.json"
+podTemplate:
+    nodeSelector:
+    kubernetes.io/arch: amd64
+serviceAccountName: tekton-pipelines-executor
+EOF
+```
+
+### Scheduling recurrent test runs.
+For scheduling recurrent test runs a cron job is used to trigger the pipeline from the pipelinerun template. Reffer to the for a sample cron job and pipelinerun temaple. [example.yaml](pipelineruns%2Feks%2Fexample.yaml)
 
 ### Test Images
 
