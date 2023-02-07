@@ -149,14 +149,14 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 
 func kschHealthCheckPortForVersion(version string) int {
 	switch version {
-	case "1.23", "1.24":
+	case "1.23", "1.24", "1.25":
 		return 10259
 	}
 	return 10251
 }
 func kschHealthCheckSchemeForVersion(version string) v1.URIScheme {
 	switch version {
-	case "1.23", "1.24":
+	case "1.23", "1.24", "1.25":
 		return v1.URISchemeHTTPS
 	}
 	return v1.URISchemeHTTP

@@ -51,6 +51,7 @@ apply: ## Apply the controller into your ~/.kube/config cluster
 		$(HELM_OPTS) \
 		--set controller.image=ko://github.com/awslabs/kubernetes-iteration-toolkit/operator/cmd/controller \
 		--set webhook.image=ko://github.com/awslabs/kubernetes-iteration-toolkit/operator/cmd/webhook \
+		--set serviceAccount.create=true \
 		| KO_DOCKER_REPO=$(CONTAINER_IMAGE_REGISTRY)/kit $(WITH_GOFLAGS) ko apply --platform=linux/arm64,linux/amd64 --bare -f -
     
 delete: ## Delete the controller from your ~/.kube/config cluster
