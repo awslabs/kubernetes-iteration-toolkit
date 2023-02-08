@@ -112,6 +112,9 @@ export class KITInfrastructure extends Stack {
     });
 
     // Setup Tekton test permissions
+    const lt = new ec2.LaunchTemplate(this, 'tekton-tests-lt', {
+      requireImdsv2: true
+    })
 
     const ns = cluster.addManifest('tekton-tests-ns', {
       apiVersion: 'v1',
@@ -126,6 +129,7 @@ export class KITInfrastructure extends Stack {
         namespace: testNS
     })
     sa.node.addDependency(ns)
+    sa.node.addDependency(lt)
     sa.role.attachInlinePolicy(new iam.Policy(this, 'tekton-tests-policy', {
         statements: [
             new iam.PolicyStatement({
