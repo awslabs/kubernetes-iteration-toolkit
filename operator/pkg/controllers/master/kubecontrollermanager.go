@@ -271,7 +271,7 @@ var (
 
 func kcmPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
 	switch version {
-	case "1.22", "1.23", "1.24":
+	case "1.22", "1.23", "1.24", "1.25":
 		args := []string{}
 		for _, arg := range defaultSpec.Containers[0].Args {
 			if _, skip := disabledFlagsForKube122[strings.Split(arg, "=")[0]]; skip {
@@ -286,7 +286,7 @@ func kcmPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
 
 func kcmHealthCheckPortForVersion(version string) intstr.IntOrString {
 	switch version {
-	case "1.22", "1.23", "1.24":
+	case "1.22", "1.23", "1.24", "1.25":
 		return intstr.FromInt(10257)
 	}
 	return intstr.FromInt(10252)
@@ -294,7 +294,7 @@ func kcmHealthCheckPortForVersion(version string) intstr.IntOrString {
 
 func kcmHealthCheckSchemeForVersion(version string) v1.URIScheme {
 	switch version {
-	case "1.22", "1.23", "1.24":
+	case "1.22", "1.23", "1.24", "1.25":
 		return v1.URISchemeHTTPS
 	}
 	return v1.URISchemeHTTP
