@@ -1,6 +1,5 @@
-import { Construct } from 'constructs';
-import { aws_iam as iam,Duration, CfnResource, StackProps } from 'aws-cdk-lib';
-import { aws_eks as eks } from 'aws-cdk-lib';
+import { aws_eks as eks, aws_iam as iam, Duration, StackProps } from 'aws-cdk-lib'
+import { Construct } from 'constructs'
 
 export interface KarpenterProps extends StackProps {
     cluster: eks.Cluster
@@ -39,17 +38,17 @@ export class Karpenter extends Construct {
                         "ec2:TerminateInstances",
                         "ec2:DeleteLaunchTemplate",
                         // Read Operations
-                        "ec2:DescribeLaunchTemplates",
-                        "ec2:DescribeInstances",
-                        "ec2:DescribeSecurityGroups",
-                        "ec2:DescribeSubnets",
-                        "ec2:DescribeInstanceTypes",
-                        "ec2:DescribeInstanceTypeOfferings",
                         "ec2:DescribeAvailabilityZones",
-                        "ec2:DescribeSpotPriceHistory",
                         "ec2:DescribeImages",
-                        "ssm:GetParameter",
+                        "ec2:DescribeInstances",
+                        "ec2:DescribeInstanceTypeOfferings",
+                        "ec2:DescribeInstanceTypes",
+                        "ec2:DescribeLaunchTemplates",
+                        "ec2:DescribeSecurityGroups",
+                        "ec2:DescribeSpotPriceHistory",
+                        "ec2:DescribeSubnets",
                         "pricing:GetProducts",
+                        "ssm:GetParameter",
                     ],
                 }),
             ],
@@ -64,29 +63,25 @@ export class Karpenter extends Construct {
         const chart = props.cluster.addHelmChart('karpenter-chart', {
             chart: 'karpenter',
             release: 'karpenter',
-            version: 'v0.16.1',
-            repository: 'https://charts.karpenter.sh',
+            version: 'v0.21.1',
+            repository: 'oci://public.ecr.aws/karpenter/karpenter',
             namespace: props.namespace,
             createNamespace: false,
             timeout: Duration.minutes(10),
             wait: true,
             values: {
-                'clusterName': props.cluster.clusterName,
-                'clusterEndpoint': props.cluster.clusterEndpoint,
-                'aws': {
-                    'defaultInstanceProfile': nodeInstanceProfile.instanceProfileName,
+                'settings': {
+                    'aws': {
+                        'clusterName': props.cluster.clusterName,
+                        'clusterEndpoint': props.cluster.clusterEndpoint,
+                        'defaultInstanceProfile': nodeInstanceProfile.instanceProfileName,
+                    },
                 },
                 'serviceAccount': {
                     'create': false,
                     'name': sa.serviceAccountName,
                 },
-                tolerations: [
-                    {
-                        key: 'CriticalAddonsOnly',
-                        operator: 'Exists',
-                    },
-                ],
-            }
+            },
         })
         chart.node.addDependency(sa)
     }
