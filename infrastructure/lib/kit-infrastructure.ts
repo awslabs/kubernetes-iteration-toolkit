@@ -83,11 +83,24 @@ export class KITInfrastructure extends Stack {
       subnetType: ec2.SubnetType.PRIVATE_WITH_NAT,
     });
 
+    const lt = new ec2.CfnLaunchTemplate(this, 'tekton-tests-lt', {
+      launchTemplateData: {
+        metadataOptions: {
+          httpEndpoint: "enabled",
+          httpTokens: "required",
+        }
+      }
+    })
+
     const ng = cluster.addNodegroupCapacity('SystemPool', {
       subnets: privateSubnets,
       nodeRole: workerRole,
       minSize: 3,
       maxSize: 3,
+      launchTemplateSpec: {
+        id: lt.ref,
+        version: lt.attrLatestVersionNumber,
+      },
       instanceTypes: [
         new ec2.InstanceType('m5.large'),
         new ec2.InstanceType('m5a.large'),
@@ -111,11 +124,6 @@ export class KITInfrastructure extends Stack {
       ],
     });
 
-    // Setup Tekton test permissions
-    const lt = new ec2.LaunchTemplate(this, 'tekton-tests-lt', {
-      requireImdsv2: true
-    })
-
     const ns = cluster.addManifest('tekton-tests-ns', {
       apiVersion: 'v1',
       kind: 'Namespace',
@@ -129,7 +137,6 @@ export class KITInfrastructure extends Stack {
         namespace: testNS
     })
     sa.node.addDependency(ns)
-    sa.node.addDependency(lt)
     sa.role.attachInlinePolicy(new iam.Policy(this, 'tekton-tests-policy', {
         statements: [
             new iam.PolicyStatement({
