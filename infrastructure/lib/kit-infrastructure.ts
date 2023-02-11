@@ -124,7 +124,6 @@ export class KITInfrastructure extends Stack {
       ],
     });
 
-    // Setup Tekton test permissions
     const ns = cluster.addManifest('tekton-tests-ns', {
       apiVersion: 'v1',
       kind: 'Namespace',
