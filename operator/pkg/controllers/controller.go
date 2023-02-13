@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/errors"
@@ -81,7 +82,26 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 	existingFinalizers := resource.GetFinalizers()
 	existingFinalizerSet := sets.NewString(existingFinalizers...)
 	finalizerStr := sets.NewString(fmt.Sprintf(FinalizerForAWSResources, c.Name()))
-	if resource.GetDeletionTimestamp() == nil {
+	if resource.GetDeletionTimestamp() == nil && ttlExpiredForControlPlane(resource) {
+		// when ttl expires for the cluster, finalize all sub resources
+		if result, err = c.finalizeSubResources(ctx, resource, existingFinalizerSet.Difference(finalizerStr).UnsortedList()); err != nil {
+			return *results.Failed, fmt.Errorf("finalizing resource controller %w", err)
+		}
+		if result.Requeue || result.RequeueAfter > 0 {
+			return *result, nil
+		}
+		// delete the CP object since it doesn't get auto deleted.
+		if err := c.Delete(ctx, resource); err != nil {
+			return *results.Failed, fmt.Errorf("deleting CP object, %w", err)
+		}
+		// once the object is deleted we don't need to merge patch anymore
+		return reconcile.Result{}, nil
+	}
+	if resource.GetDeletionTimestamp() != nil {
+		if result, err = c.finalizeSubResources(ctx, resource, existingFinalizerSet.Difference(finalizerStr).UnsortedList()); err != nil {
+			return *results.Failed, fmt.Errorf("finalizing resource controller %v, %w", c.Controller.Name(), err)
+		}
+	} else {
 		// Add finalizer for this controller
 		resource.SetFinalizers(existingFinalizerSet.Union(finalizerStr).UnsortedList())
 		result, err = c.Controller.Reconcile(ctx, resource)
@@ -90,13 +110,6 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 			return *results.Failed, fmt.Errorf("reconciling resource, %w", err)
 		}
 		resource.StatusConditions().MarkTrue(v1alpha1.Active)
-	} else {
-		if result, err = c.Controller.Finalize(ctx, resource); err != nil {
-			return *results.Failed, fmt.Errorf("finalizing resource controller %v, %w", c.Controller.Name(), err)
-		}
-		// Remove finalizer for this controller
-		resource.SetFinalizers(existingFinalizerSet.Difference(finalizerStr).UnsortedList())
-		zap.S().Infof("[%s] Successfully deleted", resource.GetName())
 	}
 	// If the finalizers have changed merge patch the object
 	if !reflect.DeepEqual(existingFinalizers, resource.GetFinalizers()) {
@@ -105,4 +118,35 @@ func (c *GenericController) reconcile(ctx context.Context, resource Object, pers
 		}
 	}
 	return *result, nil
+}
+
+func (c *GenericController) finalizeSubResources(ctx context.Context, resource Object, finalizers []string) (*reconcile.Result, error) {
+	result, err := c.Controller.Finalize(ctx, resource)
+	if err != nil {
+		return result, fmt.Errorf("finalizing resource controller %v, %w", c.Controller.Name(), err)
+	}
+	// Remove finalizer for this controller
+	resource.SetFinalizers(finalizers)
+	zap.S().Infof("[%s] Successfully deleted resources", resource.GetName())
+	return result, nil
+}
+
+func ttlExpiredForControlPlane(resource Object) bool {
+	cp, ok := resource.(*v1alpha1.ControlPlane)
+	if !ok {
+		return false
+	}
+	if cp.Spec.TTL != "" {
+		duration, err := time.ParseDuration(cp.Spec.TTL)
+		if err != nil {
+			zap.S().Errorf("parsing TTL duration, %w", err)
+			return false
+		}
+		deleteAfter := resource.GetCreationTimestamp().Add(duration)
+		if time.Now().After(deleteAfter) {
+			zap.S().Infof("[%v] control plane TTL expired, deleting cluster resources", cp.ClusterName())
+			return true
+		}
+	}
+	return false
 }

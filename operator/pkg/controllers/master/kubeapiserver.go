@@ -17,6 +17,7 @@ package master
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
@@ -79,7 +80,7 @@ func APIServerLabels(clustername string) map[string]string {
 func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathDirectory := v1.HostPathDirectory
-	return v1.PodSpec{
+	return apiServerPodSpecForVersion(controlPlane.Spec.KubernetesVersion, &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
@@ -425,7 +426,7 @@ func apiServerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				},
 			},
 		}},
-	}
+	})
 }
 
 func affinity(colocateAPIServerWithEtcd bool) *v1.Affinity {
@@ -448,4 +449,23 @@ func nodeSelector(clusterName string, colocateWithEtcd bool) map[string]string {
 		selector[object.AppNameLabelKey] = object.ColocatedApiServerWithETCDLabelValue
 	}
 	return selector
+}
+
+var (
+	disabledFlagsForAPIServer = map[string]struct{}{"--feature-gates": {}}
+)
+
+func apiServerPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
+	switch version {
+	case "1.25":
+		args := []string{}
+		for _, arg := range defaultSpec.Containers[0].Args {
+			if _, skip := disabledFlagsForAPIServer[strings.Split(arg, "=")[0]]; skip {
+				continue
+			}
+			args = append(args, arg)
+		}
+		defaultSpec.Containers[0].Args = args
+	}
+	return *defaultSpec
 }
