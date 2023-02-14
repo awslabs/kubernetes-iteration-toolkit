@@ -111,6 +111,27 @@ The application is caching IAM policies of two components as static files in `li
 These IAM policies are pinned to a version and downloaded form Github. When the version of these components change
 in an upgrade, the cache needs to be updated by modifying the version values in `cache-iam-policies.sh` and executing file.
 
+### [Optional] Creating Amazon Managed Prometheus Workspace:
+```
+AMP_WORKSPACE_NAME=<workspace-name>
+AMP_WORKSPACE_ID=`aws amp create-workspace --alias $AMP_WORKSPACE_NAME --output text --query workspaceId`
+echo $AMP_WORKSPACE_ID # this amp workspace can be used to remote write cluster metrics from test tasks. Ref: https://github.com/awslabs/kubernetes-iteration-toolkit/blob/main/tests/pipelines/eks/awscli-cl2-load-with-addons.yaml#L17
+```
+
+### [Optional] Creating Amazon Managed Grafana Dashboard. [Ref](https://docs.aws.amazon.com/grafana/latest/userguide/AMP-adding-AWS-config.html)
+* Open the Amazon Managed Grafana console at https://console.aws.amazon.com/grafana/.
+* In the upper left corner of the page, choose the menu icon and then choose All workspaces.
+* Choose the name of the workspace. (use the workspace id and name you got from the previous command)
+* If you didn't choose to use service-managed permissions for this workspace when you created it, then change from using customer-managed permissions to use service-managed permissions to ensure that the proper IAM roles and policies are enabled for using the AWS data source configuration option in the Grafana workspace console. To do so, choose the edit icon by IAM role and then choose Service managed, Save changes. For more information, see Amazon Managed Grafana permissions and policies for AWS data sources (https://docs.aws.amazon.com/grafana/latest/userguide/AMG-manage-permissions.html).
+* Choose the Data sources tab. Then select the check box for Amazon Managed Service for Prometheus, and choose Actions, Enable service-managed policy.
+* Choose the Data sources tab again, and then choose Configure in Grafana in the Amazon Managed Service for Prometheus row.
+* Sign into the Grafana workspace console using IAM Identity Center if necessary.
+* In the left navigation bar in the Grafana workspace console, choose the AWS icon and then choose AWS services, Prometheus.
+* Select the Region that you want Amazon Managed Grafana to search to discover Amazon Managed Service for Prometheus workspaces, and then select the accounts and Amazon Managed Service for Prometheus workspaces that you want to add, and then choose Add data source.
+
+### Installing tekton tasks and pipelines
+Follow the steps from here: https://github.com/awslabs/kubernetes-iteration-toolkit/tree/main/tests
+
 ### Context Parameters:
 
 | Context Param       | Description                                                                                | Default                                                 |   |   |
