@@ -9634,6 +9634,8 @@ spec:
                           type: object
                       type: object
                   type: object
+                ttl:
+                  type: string
               type: object
             status:
               properties:
