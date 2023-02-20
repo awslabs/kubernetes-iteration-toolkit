@@ -150,7 +150,8 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 				Name: aws.String(instanceProfile),
 			},
 			MetadataOptions: &ec2.LaunchTemplateInstanceMetadataOptionsRequest{
-				HttpTokens: aws.String(ec2.LaunchTemplateHttpTokensStateRequired),
+				HttpTokens:              aws.String(ec2.LaunchTemplateHttpTokensStateRequired),
+				HttpPutResponseHopLimit: aws.Int64(2),
 			},
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
 			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
