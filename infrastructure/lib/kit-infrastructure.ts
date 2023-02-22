@@ -88,6 +88,7 @@ export class KITInfrastructure extends Stack {
         metadataOptions: {
           httpEndpoint: "enabled",
           httpTokens: "required",
+          httpPutResponseHopLimit: 2,
         }
       }
     })
