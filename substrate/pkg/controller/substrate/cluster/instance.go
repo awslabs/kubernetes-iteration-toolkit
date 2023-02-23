@@ -42,12 +42,10 @@ func (i *Instance) Create(ctx context.Context, substrate *v1alpha1.Substrate) (r
 	for _, reservation := range instancesOutput.Reservations {
 		for _, instance := range reservation.Instances {
 			if aws.StringValue(instance.State.Name) == ec2.InstanceStateNameRunning || aws.StringValue(instance.State.Name) == ec2.InstanceStateNamePending {
-				for _, tag := range instance.Tags {
-					if aws.StringValue(tag.Key) == "aws:ec2launchtemplate:version" && aws.StringValue(tag.Value) == aws.StringValue(substrate.Status.Cluster.LaunchTemplateVersion) {
-						logging.FromContext(ctx).Infof("Found instance %s", aws.StringValue(instance.InstanceId))
-						substrate.Status.Infrastructure.MasterInstanceID = instance.InstanceId
-						return reconcile.Result{}, nil
-					}
+				if tagsMatch(instance.Tags, substrate) {
+					logging.FromContext(ctx).Infof("Found instance %s", aws.StringValue(instance.InstanceId))
+					substrate.Status.Infrastructure.MasterInstanceID = instance.InstanceId
+					return reconcile.Result{}, nil
 				}
 			}
 		}
@@ -132,4 +130,16 @@ func (i *Instance) delete(ctx context.Context, substrate *v1alpha1.Substrate, pr
 	}
 	logging.FromContext(ctx).Infof("Deleted instances %v", aws.StringValueSlice(instances))
 	return nil
+}
+
+func tagsMatch(ec2Tags []*ec2.Tag, substrate *v1alpha1.Substrate) bool {
+	for _, tag := range ec2Tags {
+		if aws.StringValue(tag.Key) == "kit.aws/subtrate" && aws.StringValue(tag.Value) != substrate.Name {
+			return false
+		}
+		if aws.StringValue(tag.Key) == "aws:ec2launchtemplate:version" && aws.StringValue(tag.Value) != aws.StringValue(substrate.Status.Cluster.LaunchTemplateVersion) {
+			return false
+		}
+	}
+	return true
 }
