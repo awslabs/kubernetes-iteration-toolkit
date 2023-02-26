@@ -16,7 +16,7 @@ tools() {
     go install github.com/mitchellh/golicense@v0.2.0
     go install github.com/onsi/ginkgo/ginkgo@v1.16.5
     go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20220113220429-45b13b951f77
-    go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0
+    go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.11.3
 
     if ! echo "$PATH" | grep -q "${GOPATH:-undefined}/bin\|$HOME/go/bin"; then
         echo "Go workspace's \"bin\" directory is not in PATH. Run 'export PATH=\"\$PATH:\${GOPATH:-\$HOME/go}/bin\"'."
