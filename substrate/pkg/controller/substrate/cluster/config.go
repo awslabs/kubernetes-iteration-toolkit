@@ -18,6 +18,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -27,7 +33,6 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/components/iamauthenticator"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/discovery"
-	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -40,11 +45,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
-	"os"
-	"path"
-	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strings"
 )
 
 const (
@@ -265,9 +266,9 @@ func DefaultClusterConfig(substrate *v1alpha1.Substrate) *kubeadm.InitConfigurat
 	// in kubeadm validates existing coreDNS image version by parsing the image
 	// tags. It validates  in coreDNS library if the version is supported.
 	// Versions in coreDNS library are in the format `1.8.4` and it fails to
-	// validate. To get around this issue using the image from k8s.gcr.io which
+	// validate. To get around this issue using the image from registry.k8s.io which
 	// are tagged in format `v1.8.4`
-	defaultStaticConfig.ClusterConfiguration.DNS.ImageRepository = "k8s.gcr.io/coredns"
+	defaultStaticConfig.ClusterConfiguration.DNS.ImageRepository = "registry.k8s.io/coredns"
 	defaultStaticConfig.ClusterConfiguration.DNS.ImageTag = "v1.8.6"
 	// etcd specific config
 	defaultStaticConfig.Etcd.Local = &kubeadm.LocalEtcd{
