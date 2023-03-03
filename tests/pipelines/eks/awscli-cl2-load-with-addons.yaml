@@ -26,7 +26,7 @@ spec:
     - name: slack-hook
       value: $(params.slack-hook)
     - name: slack-message
-      value: $(params.slack-message)+"job kicked off"
+      value: "$(params.slack-message) job kicked off"
     taskRef:
       kind: Task
       name:  slack-notification
@@ -191,7 +191,7 @@ spec:
     - name: slack-hook
       value: $(params.slack-hook)
     - name: slack-message
-      value: $(params.slack-message)+"job completed"
+      value: "$(params.slack-message) job completed"
     - name: service-role-stack-name
       value: $(params.cluster-name)-service-role
     - name: node-role-stack-name
