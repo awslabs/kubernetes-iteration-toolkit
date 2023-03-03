@@ -65,7 +65,7 @@ type Etcd struct {
 type MasterSpec struct {
 	// Provide a KMS key ID to enable the encryption provider
 	KMSKeyID *string `json:"kmsKeyId,omitempty"`
-	// The EncryptionProvider spec is respected only if the encryption provider is enabled.
+	// The EncryptionProvider spec is used only if KMSKeyID is provided.
 	EncryptionProvider *Component `json:"encryptionProvider,omitempty"`
 
 	Scheduler         *Component `json:"scheduler,omitempty"`
