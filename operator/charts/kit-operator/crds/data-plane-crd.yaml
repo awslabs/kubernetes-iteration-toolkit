@@ -58,6 +58,10 @@ spec:
                 description: ClusterName is used to connect the worker nodes to a
                   control plane clusterName.
                 type: string
+              dnsClusterIP:
+                description: DNSClusterIP helps configure the DNS IP for the cluster
+                  used by pods to resolve endpoints
+                type: string
               instanceProfileName:
                 description: InstanceProfileName if provided is assigned to the kube
                   nodes created If not provided, use the name for the current kit
