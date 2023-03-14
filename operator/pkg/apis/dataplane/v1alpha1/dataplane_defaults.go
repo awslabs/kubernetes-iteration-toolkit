@@ -18,6 +18,11 @@ import (
 	"context"
 )
 
+const (
+	// TODO https://github.com/awslabs/kubernetes-iteration-toolkit/issues/61
+	defaultDNSClusterIP = "10.100.0.10"
+)
+
 func (c *DataPlane) SetDefaults(ctx context.Context) {
 	c.Spec.SetDefaults(ctx)
 }
@@ -29,5 +34,8 @@ func (s *DataPlaneSpec) SetDefaults(ctx context.Context) {
 	}
 	if len(s.InstanceTypes) == 0 {
 		s.InstanceTypes = []string{"t2.xlarge", "t3.xlarge", "t3a.xlarge"}
+	}
+	if s.DNSClusterIP == "" {
+		s.DNSClusterIP = defaultDNSClusterIP
 	}
 }

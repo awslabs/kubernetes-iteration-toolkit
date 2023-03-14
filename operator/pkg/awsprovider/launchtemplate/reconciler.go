@@ -40,8 +40,6 @@ import (
 
 const (
 	TagKeyNameForAWSResources = "kit.k8s.sh/cluster-name"
-	// TODO https://github.com/awslabs/kubernetes-iteration-toolkit/issues/61
-	dnsClusterIP = "10.100.0.10"
 )
 
 type Controller struct {
@@ -156,7 +154,8 @@ func (c *Controller) createLaunchTemplate(ctx context.Context, dataplane *v1alph
 			Monitoring:       &ec2.LaunchTemplatesMonitoringRequest{Enabled: ptr.Bool(true)},
 			SecurityGroupIds: []*string{ptr.String(securityGroupID)},
 			UserData: ptr.String(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(userData,
-				dataplane.Spec.ClusterName, dnsClusterIP, base64.StdEncoding.EncodeToString(clusterCA), apiServerEndpoint)))),
+				dataplane.Spec.ClusterName, dataplane.Spec.DNSClusterIP,
+				base64.StdEncoding.EncodeToString(clusterCA), apiServerEndpoint)))),
 		},
 		LaunchTemplateName: ptr.String(TemplateName(dataplane.Spec.ClusterName)),
 		TagSpecifications:  generateEC2Tags("launch-template", dataplane.Spec.ClusterName),

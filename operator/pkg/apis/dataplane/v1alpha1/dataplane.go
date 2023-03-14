@@ -81,4 +81,7 @@ type DataPlaneSpec struct {
 	// If not provided, get it from the current k8s cluster
 	// +optional
 	ClusterCA []byte `json:"clusterCA,omitempty"`
+	// DNSClusterIP helps configure the DNS IP for the cluster used by pods to resolve endpoints
+	// +optional
+	DNSClusterIP string `json:"dnsClusterIP,omitempty"`
 }
