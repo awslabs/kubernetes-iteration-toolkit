@@ -40,7 +40,7 @@ func (l *LaunchTemplate) Create(ctx context.Context, substrate *v1alpha1.Substra
 	if substrate.Status.Infrastructure.SecurityGroupID == nil {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/eks/optimized-ami/1.21/amazon-linux-2-arm64/recommended/image_id")})
+	parameterOutput, err := l.SSM.GetParameterWithContext(ctx, &ssm.GetParameterInput{Name: aws.String("/aws/service/eks/optimized-ami/1.24/amazon-linux-2-arm64/recommended/image_id")})
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("getting ssm parameter, %w", err)
 	}

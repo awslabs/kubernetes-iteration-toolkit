@@ -57,7 +57,7 @@ const (
 	kubeletSystemdPath     = "/etc/systemd/system"
 	kubeletConfigPath      = "/var/lib/kubelet/"
 	authenticatorConfigDir = "/etc/aws-iam-authenticator"
-	kubernetesVersionTag   = "v1.21.2-eks-1-21-4"
+	kubernetesVersionTag   = "v1.24.10-eks-1-24-12"
 	imageRepository        = "public.ecr.aws/eks-distro/kubernetes"
 	etcdVersionTag         = "v3.4.16-eks-1-21-7"
 	etcdImageRepository    = "public.ecr.aws/eks-distro/etcd-io"
@@ -250,7 +250,7 @@ After=docker.service iptables-restore.service
 Requires=docker.service
 
 [Service]
-ExecStart=/usr/bin/kubelet --cluster-dns=10.96.0.10 --cluster-domain=cluster.local --hostname-override=%s --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.18.9-eks-1-18-1  --provider-id=aws:///%s/%s --node-labels=kit.aws/substrate=control-plane
+ExecStart=/usr/bin/kubelet --cluster-dns=10.96.0.10 --cluster-domain=cluster.local --hostname-override=%s --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.24.10-eks-1-24-12  --provider-id=aws:///%s/%s --node-labels=kit.aws/substrate=control-plane
 Restart=always`, substrate.Name, aws.StringValue(instancesOutput.Reservations[0].Instances[0].Placement.AvailabilityZone), aws.StringValue(substrate.Status.Infrastructure.MasterInstanceID))), 0644); err != nil {
 		return fmt.Errorf("writing kubelet configuration, %w", err)
 	}
