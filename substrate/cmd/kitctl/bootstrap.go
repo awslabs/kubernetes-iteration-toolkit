@@ -15,13 +15,13 @@ limitations under the License.
 package main
 
 import (
-	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/controller/substrate"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/logging"
 )
@@ -38,22 +38,18 @@ func bootstrapCommand() *cobra.Command {
 }
 
 func bootstrap(cmd *cobra.Command, args []string) {
+	ctx := cmd.Context()
+	if debug {
+		dev, err := zap.NewDevelopment()
+		if err != nil {
+			panic(err)
+		}
+		ctx = logging.WithLogger(ctx, dev.Sugar())
+	}
 	instanceType, err := cmd.Flags().GetString("instanceType")
 	if err != nil {
 		panic(err)
 	}
-	// ignore logs printed to stdout from underlying kubeadm packages
-	if !options.debug {
-		stdout := os.Stdout
-		stderr := os.Stderr
-		os.Stdout, _ = os.Open(os.DevNull)
-		os.Stderr, _ = os.Open(os.DevNull)
-		defer func() {
-			os.Stdout = stdout
-			os.Stderr = stderr
-		}()
-	}
-	ctx := cmd.Context()
 	start := time.Now()
 	name := parseName(ctx, args)
 	logging.FromContext(ctx).Infof("Bootstrapping %q", name)

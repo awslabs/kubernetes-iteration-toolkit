@@ -34,7 +34,7 @@ func (l *AWSLoadBalancer) Create(ctx context.Context, substrate *v1alpha1.Substr
 	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
+	result, err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:  "kube-system",
 		Name:       "aws-load-balancer-controller",
 		Repository: "https://aws.github.io/eks-charts",
@@ -43,8 +43,12 @@ func (l *AWSLoadBalancer) Create(ctx context.Context, substrate *v1alpha1.Substr
 			"clusterName":  substrate.Name,
 			"replicaCount": "1",
 		},
-	}); err != nil {
+	})
+	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
+	}
+	if result.Requeue {
+		return result, nil
 	}
 	if _, err := l.EC2.CreateTagsWithContext(ctx, &ec2.CreateTagsInput{
 		Resources: aws.StringSlice(substrate.Status.Infrastructure.PublicSubnetIDs),

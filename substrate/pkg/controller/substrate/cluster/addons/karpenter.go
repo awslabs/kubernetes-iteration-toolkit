@@ -62,7 +62,7 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
+	result, err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:       "karpenter",
 		Name:            "karpenter",
 		Repository:      "https://charts.karpenter.sh",
@@ -83,8 +83,12 @@ func (k *Karpenter) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 				"defaultInstanceProfile": discovery.Name(substrate, cluster.TenantControlPlaneNodeRole),
 			},
 		},
-	}); err != nil {
+	})
+	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
+	}
+	if result.Requeue {
+		return result, nil
 	}
 	client, err := kubectl.NewClient(*substrate.Status.Cluster.KubeConfig)
 	if err != nil {

@@ -16,7 +16,6 @@ package addons
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/helm"
@@ -30,7 +29,7 @@ func (l *KITOperator) Create(ctx context.Context, substrate *v1alpha1.Substrate)
 	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
+	return helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:       "kit",
 		Name:            "kit-operator",
 		Repository:      "https://awslabs.github.io/kubernetes-iteration-toolkit",
@@ -39,10 +38,7 @@ func (l *KITOperator) Create(ctx context.Context, substrate *v1alpha1.Substrate)
 			"controller": map[string]interface{}{"nodeSelector": map[string]interface{}{"kit.aws/substrate": "control-plane"}},
 			"webhook":    map[string]interface{}{"nodeSelector": map[string]interface{}{"kit.aws/substrate": "control-plane"}},
 		},
-	}); err != nil {
-		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
-	}
-	return reconcile.Result{}, nil
+	})
 }
 
 func (l *KITOperator) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {

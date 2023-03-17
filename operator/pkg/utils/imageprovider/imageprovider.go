@@ -69,7 +69,7 @@ func CoreDNS() string {
 }
 
 func AWSIamAuthenticator() string {
-	return repositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.10-eks-1-23-9"
+	return repositoryName + "kubernetes-sigs/aws-iam-authenticator:v0.5.13-eks-1-24-latest"
 }
 
 func AWSEncryptionProvider() string {

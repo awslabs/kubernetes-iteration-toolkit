@@ -251,7 +251,10 @@ Requires=docker.service
 
 [Service]
 ExecStart=/usr/bin/kubelet --cluster-dns=10.96.0.10 --cluster-domain=cluster.local --hostname-override=%s --pod-manifest-path=/etc/kubernetes/manifests --kubeconfig=/etc/kubernetes/kubelet.conf  --cgroup-driver=systemd  --container-runtime=docker --network-plugin=cni --pod-infra-container-image=public.ecr.aws/eks-distro/kubernetes/pause:v1.24.10-eks-1-24-12  --provider-id=aws:///%s/%s --node-labels=kit.aws/substrate=control-plane
-Restart=always`, substrate.Name, aws.StringValue(instancesOutput.Reservations[0].Instances[0].Placement.AvailabilityZone), aws.StringValue(substrate.Status.Infrastructure.MasterInstanceID))), 0644); err != nil {
+Restart=always
+
+[Install]
+WantedBy=multi-user.target`, substrate.Name, aws.StringValue(instancesOutput.Reservations[0].Instances[0].Placement.AvailabilityZone), aws.StringValue(substrate.Status.Infrastructure.MasterInstanceID))), 0644); err != nil {
 		return fmt.Errorf("writing kubelet configuration, %w", err)
 	}
 	return nil
