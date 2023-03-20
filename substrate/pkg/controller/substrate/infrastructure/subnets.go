@@ -29,6 +29,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	TagKeySubnetInternalELB = "kubernetes.io/role/internal-elb"
+	TagKeySubnetPublicELB   = "kubernetes.io/role/elb"
+)
+
 type Subnets struct {
 	EC2 *ec2.EC2
 }
@@ -97,11 +102,20 @@ func (s *Subnets) ensureSubnet(ctx context.Context, substrate *v1alpha1.Substrat
 		return describeSubnetsOutput.Subnets[0], nil
 	}
 	// tag required by ELB controller to discover these subnets to configure ELB
+	tags := discovery.Tags(substrate, name)
+	if subnetSpec.Public {
+		tags = append(tags, &ec2.Tag{Key: aws.String(TagKeySubnetPublicELB), Value: aws.String("1")})
+	} else {
+		tags = append(tags, &ec2.Tag{Key: aws.String(TagKeySubnetInternalELB), Value: aws.String("1")})
+	}
 	createSubnetsOutput, err := s.EC2.CreateSubnetWithContext(ctx, &ec2.CreateSubnetInput{
-		AvailabilityZone:  aws.String(subnetSpec.Zone),
-		CidrBlock:         aws.String(subnetSpec.CIDR),
-		VpcId:             substrate.Status.Infrastructure.VPCID,
-		TagSpecifications: []*ec2.TagSpecification{{ResourceType: aws.String(ec2.ResourceTypeSubnet), Tags: discovery.Tags(substrate, name)}},
+		AvailabilityZone: aws.String(subnetSpec.Zone),
+		CidrBlock:        aws.String(subnetSpec.CIDR),
+		VpcId:            substrate.Status.Infrastructure.VPCID,
+		TagSpecifications: []*ec2.TagSpecification{{
+			ResourceType: aws.String(ec2.ResourceTypeSubnet),
+			Tags:         tags,
+		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating subnet, %w", err)
