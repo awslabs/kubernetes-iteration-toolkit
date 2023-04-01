@@ -325,6 +325,7 @@ func desiredRolesFor(substrate *v1alpha1.Substrate) []role {
 			"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
 			"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
 			"arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess",
+			"arn:aws:iam::aws:policy/AmazonS3FullAccess",
 		},
 	}}
 }

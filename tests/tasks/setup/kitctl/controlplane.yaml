@@ -129,5 +129,7 @@ spec:
       done
       echo "Installing CNI"
       kubectl --kubeconfig=/tmp/kubeconfig apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.10/config/master/aws-k8s-cni.yaml
+      echo "Installing CSI"
+      kubectl --kubeconfig=/tmp/kubeconfig apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.13"
       echo "Approving KCM requests"
       kubectl certificate approve $(kubectl get csr | grep "Pending" | awk '{print $1}')  2>/dev/null  || true

@@ -1,0 +1,119 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: create-test-cluster
+  namespace: tekton-pipelines
+spec:
+  description: |
+    This pipeline creates a cluster for testing new addons, webhooks, or controllers.
+  params:
+  - name: cluster-name
+  - name: endpoint
+  - name: desired-nodes
+  - name: vpc-cfn-url
+  - name: kubernetes-version
+    default: "1.25"
+  - name: service-role-cfn-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_service_role.json"
+  - name: node-role-cfn-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_role.json"
+  tasks:
+  - name: awscli-vpc-create
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)
+    - name: vpc-cfn-url
+      value: "$(params.vpc-cfn-url)"
+    taskRef:
+      kind: Task
+      name:  awscli-vpc-create
+  - name: create-cluster-service-role
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)-service-role
+    - name: role-cfn-url
+      value: $(params.service-role-cfn-url)
+    - name: role-name
+      value: "$(params.cluster-name)-service-role"
+    taskRef:
+      kind: Task
+      name: awscli-role-create
+  - name: create-cluster-node-role
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)-node-role
+    - name: role-cfn-url
+      value: $(params.node-role-cfn-url)
+    - name: role-name
+      value: "$(params.cluster-name)-node-role"
+    taskRef:
+      kind: Task
+      name: awscli-role-create
+  - name: create-eks-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: service-role-name
+      value: "$(params.cluster-name)-service-role"
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: vpc-stack-name
+      value: $(params.cluster-name)
+    - name: kubernetes-version
+      value: "$(params.kubernetes-version)"
+    runAfter:
+    - create-cluster-node-role
+    - create-cluster-service-role
+    - awscli-vpc-create
+    taskRef:
+      kind: Task
+      name:  awscli-eks-cluster-create-with-vpc-stack
+    workspaces:
+    - name: config    
+      workspace: config
+  - name: create-mng-monitoring-nodes
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: host-cluster-node-role-name
+      value: "$(params.cluster-name)-node-role"
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: desired-nodes
+      value: "1"
+    - name: max-nodes
+      value: "1"
+    - name: host-instance-types
+      value: "m5.4xlarge"
+    - name: host-taints
+      value: "key=monitoring,value=true,effect=NO_SCHEDULE"
+    - name: nodegroup-prefix
+      value: "monitoring-"
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name:  awscli-eks-nodegroup-create
+    workspaces:
+    - name: config    
+      workspace: config
+  - name: create-mng-nodes
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: desired-nodes
+      value: $(params.desired-nodes)
+    - name: host-cluster-node-role-name
+      value: "$(params.cluster-name)-node-role"
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-mng-monitoring-nodes
+    taskRef:
+      kind: Task
+      name:  awscli-eks-nodegroup-create
+    workspaces:
+    - name: config    
+      workspace: config
+  workspaces:
+  - name: config

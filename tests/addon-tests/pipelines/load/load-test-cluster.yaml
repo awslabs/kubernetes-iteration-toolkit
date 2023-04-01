@@ -1,0 +1,86 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: load-test-cluster
+  namespace: tekton-pipelines
+spec:
+  description: |
+    This pipeline sends slack notifcation before it spins up an EKS cluster with in it's own VPC 
+    and runs cl2 loadtest and upload results to s3 and tearsdown the cluster and sends slack notification.
+  params:
+  - name: cluster-name
+  - name: endpoint
+  - name: desired-nodes
+  - name: pods-per-node
+  - name: nodes-per-namespace
+  - name: cl2-load-test-throughput
+  - name: results-bucket
+  - name: vpc-cfn-url
+  - name: kubernetes-version
+    default: "1.25"
+  - name: amp-workspace-id
+  tasks:
+  - name: create-eks-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: service-role-name
+      value: "$(params.cluster-name)-service-role"
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: vpc-stack-name
+      value: $(params.cluster-name)
+    - name: kubernetes-version
+      value: "$(params.kubernetes-version)"
+    taskRef:
+      kind: Task
+      name:  awscli-eks-cluster-create-with-vpc-stack
+    workspaces:
+    - name: config    
+      workspace: config
+  - name: generate
+    params:
+    - name: pods-per-node
+      value: $(params.pods-per-node)
+    - name: nodes-per-namespace
+      value: $(params.nodes-per-namespace)
+    - name: cl2-load-test-throughput
+      value: $(params.cl2-load-test-throughput)
+    - name: results-bucket
+      value: $(params.results-bucket)
+    - name: nodes
+      value: $(params.desired-nodes)
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: amp-workspace-id
+      value: '$(params.amp-workspace-id)'
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: load
+    workspaces:
+    - name: source
+      workspace: source
+    - name: results
+      workspace: results
+    - name: config    
+      workspace: config
+  finally:    
+  - name: teardown
+    params:   
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: service-role-stack-name
+      value: $(params.cluster-name)-service-role
+    - name: node-role-stack-name
+      value: $(params.cluster-name)-node-role
+    taskRef:
+      kind: Task
+      name:  addon-test-cluster-teardown
+  workspaces:
+  - name: source
+  - name: results
+  - name: config
