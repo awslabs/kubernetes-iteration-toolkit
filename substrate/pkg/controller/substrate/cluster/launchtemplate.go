@@ -104,6 +104,7 @@ while [ true ]; do
 		echo "Successfully synced from S3 \$dir"
 		echo "Restarting Kubelet service"
 		systemctl daemon-reload
+		systemctl enable kubelet
 		systemctl restart kubelet
     fi
  done

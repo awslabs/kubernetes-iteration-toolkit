@@ -16,7 +16,6 @@ package addons
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/helm"
@@ -29,15 +28,12 @@ func (a *AWSVPCCNI) Create(ctx context.Context, substrate *v1alpha1.Substrate) (
 	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
+	return helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:  "kube-system",
 		Name:       "aws-vpc-cni",
 		Repository: "https://aws.github.io/eks-charts",
 		Version:    "1.1.16",
-	}); err != nil {
-		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
-	}
-	return reconcile.Result{}, nil
+	})
 }
 
 func (a *AWSVPCCNI) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {

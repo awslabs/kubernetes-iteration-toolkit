@@ -16,7 +16,6 @@ package addons
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/helm"
@@ -29,7 +28,7 @@ func (p *PrometheusStack) Create(ctx context.Context, substrate *v1alpha1.Substr
 	if !substrate.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
-	if err := helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
+	return helm.NewClient(*substrate.Status.Cluster.KubeConfig).Apply(ctx, &helm.Chart{
 		Namespace:       "monitoring",
 		Name:            "kube-prometheus-stack",
 		Repository:      "https://github.com/prometheus-community/helm-charts/releases/download/kube-prometheus-stack-34.0.0/",
@@ -48,10 +47,7 @@ func (p *PrometheusStack) Create(ctx context.Context, substrate *v1alpha1.Substr
 			"prometheusOperator":    map[string]interface{}{"serviceMonitor": map[string]interface{}{"selfMonitor": false}, "nodeSelector": map[string]interface{}{"kit.aws/substrate": "control-plane"}},
 			"grafana":               map[string]interface{}{"nodeSelector": map[string]interface{}{"kit.aws/substrate": "control-plane"}},
 		},
-	}); err != nil {
-		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
-	}
-	return reconcile.Result{}, nil
+	})
 }
 
 func (p *PrometheusStack) Delete(_ context.Context, _ *v1alpha1.Substrate) (reconcile.Result, error) {

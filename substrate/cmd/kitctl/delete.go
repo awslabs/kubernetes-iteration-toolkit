@@ -35,6 +35,9 @@ func deleteCommand() *cobra.Command {
 
 func delete(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
+	if debug {
+		ctx = logging.WithLogger(ctx, developmentZapLogger().Sugar())
+	}
 	start := time.Now()
 	name := parseName(ctx, args)
 	logging.FromContext(ctx).Infof("Deleting %q", name)

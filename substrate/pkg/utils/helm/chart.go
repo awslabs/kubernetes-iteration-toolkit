@@ -16,7 +16,10 @@ package helm
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
+	"syscall"
 	"time"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -27,6 +30,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"knative.dev/pkg/logging"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func NewClient(kubeConfig string) *Client {
@@ -49,7 +53,18 @@ type Chart struct {
 	Values          map[string]interface{}
 }
 
-func (c *Client) Apply(ctx context.Context, chart *Chart) (err error) {
+func (c *Client) Apply(ctx context.Context, chart *Chart) (reconcile.Result, error) {
+	if err := c.apply(ctx, chart); err != nil {
+		if IsErrorConnectionRefused(err) || IsNetIOTimeOut(err) {
+			logging.FromContext(ctx).Infof("connection refused from API server, helm chart for %s requeued", chart.Name)
+			return reconcile.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+		}
+		return reconcile.Result{}, fmt.Errorf("applying chart, %w", err)
+	}
+	return reconcile.Result{}, nil
+}
+
+func (c *Client) apply(ctx context.Context, chart *Chart) (err error) {
 	// Get the chart from the repository
 	chartPath := fmt.Sprintf("%s/%s-%s.tgz", chart.Repository, chart.Name, chart.Version)
 	if chart.Version == "" {
@@ -71,6 +86,19 @@ func (c *Client) Apply(ctx context.Context, chart *Chart) (err error) {
 	client := &genericclioptions.ConfigFlags{KubeConfig: &c.kubeConfig, Namespace: &chart.Namespace}
 	if err := actionConfig.Init(client, chart.Namespace, "", func(_ string, _ ...interface{}) {}); err != nil {
 		return fmt.Errorf("init helm action config, %w", err)
+	}
+	// delete any pending charts, we get into this situation when we have helm applied but instance reboots.
+	// error from helm upgrade -  another operation (install/upgrade/rollback) is in progress
+	lastRelease, err := actionConfig.Releases.Last(chart.Name)
+	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
+		return fmt.Errorf("getting last release info for %s, %w", chart.Name, err)
+	}
+	if !errors.Is(err, driver.ErrReleaseNotFound) && lastRelease.Info.Status.IsPending() {
+		logging.FromContext(ctx).Infof("helm chart %s is currently pending, uninstalling", chart.Name)
+		deleteClient := action.NewUninstall(actionConfig)
+		if _, err := deleteClient.Run(chart.Name); err != nil {
+			return fmt.Errorf("getting last release info for %s, %w", chart.Name, err)
+		}
 	}
 	// check history for the releaseName, if release is not found install else upgrade
 	histClient := action.NewHistory(actionConfig)
@@ -97,4 +125,13 @@ func (c *Client) Apply(ctx context.Context, chart *Chart) (err error) {
 	}
 	logging.FromContext(ctx).Infof("Upgraded chart %s/%s", chart.Repository, chart.Name)
 	return nil
+}
+
+func IsErrorConnectionRefused(err error) bool {
+	return errors.Is(err, syscall.ECONNREFUSED)
+}
+
+func IsNetIOTimeOut(err error) bool {
+	netErr := net.Error(nil)
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
