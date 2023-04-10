@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"os/user"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"knative.dev/pkg/logging"
 )
@@ -34,4 +36,27 @@ func parseName(ctx context.Context, args []string) string {
 	u, err := user.Current()
 	runtime.Must(err)
 	return fmt.Sprintf("kitctl-%s", u.Username)
+}
+
+func productionZapLogger() *zap.Logger {
+	config := zap.NewProductionConfig()
+	config.Encoding = "console"
+	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("Jan 02 15:04:05.000000000")
+	config.EncoderConfig.StacktraceKey = "" // to hide stacktrace info
+	logger, err := config.Build()
+	if err != nil {
+		panic(err)
+	}
+	return logger
+}
+
+func developmentZapLogger() *zap.Logger {
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("Jan 02 15:04:05.000000000")
+	config.EncoderConfig.StacktraceKey = "" // to hide stacktrace info
+	logger, err := config.Build()
+	if err != nil {
+		panic(err)
+	}
+	return logger
 }

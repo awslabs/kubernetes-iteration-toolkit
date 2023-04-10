@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"knative.dev/pkg/logging"
 )
@@ -29,11 +28,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	rand.Seed(time.Now().UnixNano())
-	logger, err := zap.NewProduction()
-	if err != nil {
-		panic(err)
-	}
-	runtime.Must(rootCmd.ExecuteContext(logging.WithLogger(ctx, logger.Sugar())))
+	runtime.Must(rootCmd.ExecuteContext(logging.WithLogger(ctx, productionZapLogger().Sugar())))
 }
 
 var (

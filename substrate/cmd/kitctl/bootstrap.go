@@ -21,7 +21,6 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/controller/substrate"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/logging"
 )
@@ -40,11 +39,7 @@ func bootstrapCommand() *cobra.Command {
 func bootstrap(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	if debug {
-		dev, err := zap.NewDevelopment()
-		if err != nil {
-			panic(err)
-		}
-		ctx = logging.WithLogger(ctx, dev.Sugar())
+		ctx = logging.WithLogger(ctx, developmentZapLogger().Sugar())
 	}
 	instanceType, err := cmd.Flags().GetString("instanceType")
 	if err != nil {

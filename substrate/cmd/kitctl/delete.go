@@ -20,7 +20,6 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/controller/substrate"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/logging"
 )
@@ -37,11 +36,7 @@ func deleteCommand() *cobra.Command {
 func delete(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	if debug {
-		dev, err := zap.NewDevelopment()
-		if err != nil {
-			panic(err)
-		}
-		ctx = logging.WithLogger(ctx, dev.Sugar())
+		ctx = logging.WithLogger(ctx, developmentZapLogger().Sugar())
 	}
 	start := time.Now()
 	name := parseName(ctx, args)
