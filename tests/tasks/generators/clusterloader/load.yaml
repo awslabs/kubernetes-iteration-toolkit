@@ -128,7 +128,7 @@ spec:
       fi
       # Building clusterloader2 binary 
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
-      GOPROXY=direct GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
+      GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
   - name: run-loadtest
     image: alpine/k8s:1.23.7
     onError: continue
