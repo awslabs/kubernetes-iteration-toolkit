@@ -184,6 +184,19 @@ spec:
       workspace: results
     - name: config    
       workspace: config
+  - name: cw-metrics
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate.results.datapoint)
+    - name: namespace
+      value: $(params.kubernetes-version)
+    runAfter:
+      - generate
+    taskRef:
+      kind: Task
+      name: cloudwatch
   finally:
   - name: teardown
     params:
