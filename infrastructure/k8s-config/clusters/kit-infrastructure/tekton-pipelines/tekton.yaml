@@ -19,6 +19,7 @@ spec:
     # include releases
     !/pipeline/previous/v0.33.2/release.yaml
     !/triggers/previous/v0.19.0/release.yaml
+    !/triggers/previous/v0.19.1/intercetors.yaml
     !/dashboard/previous/v0.24.1/tekton-dashboard-release.yaml
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
@@ -119,6 +120,36 @@ spec:
         kind: Deployment
         metadata:
           name: tekton-triggers-webhook
+          namespace: tekton-pipelines
+        spec:
+          template:
+            spec:
+              tolerations:
+                - key: CriticalAddonsOnly
+                  operator: Exists
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: tekton-interceptors
+  namespace: tekton-pipelines
+spec:
+  interval: 2m0s
+  path: ./triggers/previous/v0.19.1
+  prune: true
+  sourceRef:
+    kind: Bucket
+    name: tekton
+  patches:
+    - target:
+        kind: Deployment
+        name: tekton-triggers-core-interceptors
+        namespace: tekton-pipelines
+      patch: |-
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: tekton-triggers-core-interceptors
           namespace: tekton-pipelines
         spec:
           template:
