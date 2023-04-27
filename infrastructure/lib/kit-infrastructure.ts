@@ -9,6 +9,7 @@ import { FluxV2 } from './addons/fluxv2'
 import { Karpenter } from './addons/karpenter'
 import { KIT } from './addons/kit'
 import { KubectlLayer } from 'aws-cdk-lib/lambda-layer-kubectl'
+import { PerfDash } from './addons/perfdash'
 
 export class KITInfrastructure extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -21,7 +22,7 @@ export class KITInfrastructure extends Stack {
     const installEBSCSIDriverAddon = this.getContextOrDefault("AWSEBSCSIDriverAddon", "true")
     const installKarpenterAddon = this.getContextOrDefault('KarpenterAddon', "true")
     const installKitAddon = this.getContextOrDefault("KITAddon", "true")
-    const repoAddonPaths = this.node.tryGetContext('FluxRepoAddonPaths')
+    const installPerfDashAddon = this.getContextOrDefault("PerfDashAddon", "false")
 
     const testRepoName = this.node.tryGetContext('TestFluxRepoName')
     const testRepoUrl = this.node.tryGetContext('TestFluxRepoURL')
@@ -207,19 +208,19 @@ export class KITInfrastructure extends Stack {
       namespace: 'aws-fluent-bit',
     }).node.addDependency(cluster);
 
-    new FluxV2(this, 'Flux', {
+    const fluxv2 = new FluxV2(this, 'Flux', {
       cluster: cluster,
       namespace: 'flux-system',
       repoUrl: repoUrl,
       repoBranch: repoBranch,
       repoPath: repoPath,
-      repoAddonPaths: repoAddonPaths,
       testRepoName: testRepoName,
       testRepoUrl: testRepoUrl,
       testRepoBranch: testRepoBranch,
       testRepoPath: testRepoPath,
       testNamespace: testNS,
-    }).node.addDependency(cluster);
+    });
+    fluxv2.node.addDependency(cluster);
 
     new AWSLoadBalancerController(this, 'AWSLoadBalancerController', {
       cluster: cluster,
@@ -241,6 +242,16 @@ export class KITInfrastructure extends Stack {
         namespace: 'karpenter',
         nodeRoleName: workerRole.roleName,
       }).node.addDependency(cluster);
+    }
+
+    if(installPerfDashAddon == "true") {
+      const perfdash = new PerfDash(this, 'PerfDash', {
+        cluster: cluster,
+        namespace: 'perfdash',
+      });
+      perfdash.node.addDependency(cluster);
+      // perfdash depends on a GitRepository definition in fluxv2.
+      perfdash.node.addDependency(fluxv2);
     }
   }
 

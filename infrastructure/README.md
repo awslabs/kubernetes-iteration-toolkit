@@ -17,6 +17,7 @@ KIT Infrastructure creates a base K8s cluster with below add-ons by default but 
 - Karpenter (optional)
 - Flux v2
 - Kubernetes Iteration Toolkit (KIT) Operator (optional)
+- Perf Dash (optional)
 
 Flux is setup, by deafult, to monitor the KIT git repo path `./infrastructure/k8s-config/clusters/kit-infrastructure`, which includes other add-ons that do not require AWS credentials such as tekton, prometheus, grafana, the metrics-server and [perf dash].
 
@@ -24,10 +25,9 @@ Flux is setup, by deafult, to monitor the KIT git repo path `./infrastructure/k8
 
 Perf dash is an optional addon and disabled by default.
 
-To bring it up, there are a few places you need to ensure they are wired correctly.
+To make the perf dash addon work, a configmap needs to be created by the user manually with configuration for the perf dash.
+The following configmap is a sample configmap. You can modify some fields (e.g. PERFDASH_LOG_BUCKET and jobs.yaml) as needed.
 
-- A k8s service account named `perfdash-log-fetcher` is expected and has the permissions to fetch the logs from the s3 bucket.
-- A ConfigMap containing the target S3 bucket name that hosts the log and the jobs config for perf dash must be created so that it can be mounted as volume in the Deployment. An example configmap can be:
 ```
 apiVersion: v1
 kind: ConfigMap
@@ -39,21 +39,27 @@ metadata:
     app.kubernetes.io/component: config
     app.kubernetes.io/part-of: perfdash
 data:
-  PERFDASH_LOG_BUCKET: my-bucket-name
+  # CHANGE the following as needed.
+  PERFDASH_LOG_BUCKET: my-s3-bucket-name
+  AWS_DEFAULT_REGION: us-west-2
+  AWS_REGION: us-west-2
+  AWS_ROLE_ARN: arn:aws:iam::123456789012:role/KITInfrastructure-ClusterperfdashsaRoleXXXXXXXX-XXXXXXXXXXXX
   jobs.yaml: |
     periodics:
       - name: "kit-eks-1k"
         tags:
           - "perfDashPrefix: 1K test"
           - "perfDashJobType: performance"
+          - "perfDashArtifactsDir: "
       - name: "kit-eks-2k"
         tags:
         - "perfDashPrefix: 2k test"
         - "perfDashJobType: performance"
+        - "perfDashArtifactsDir: "
 ```
 - The logs for different runs in the bucket should have the layout like the following:
 ```
-my-s3-bucket
+my-s3-bucket-name
 ├── kit-eks-1k # note: this should match the name in perf dash config.
 │   ├── 123
 │   │   └── cl2-logs
@@ -99,7 +105,7 @@ cdk deploy KITInfrastructure --no-rollback \
   -c AWSEBSCSIDriverAddon=false \
   -c KarpenterAddon=false \
   -c KITAddon=false \
-  -c FluxRepoAddonPaths="./infrastructure/k8s-config/clusters/addons/"
+  -c PerfDashAddon=true
 ```
 
 ### Dependent IAM policies:
@@ -139,7 +145,6 @@ Follow the steps from here: https://github.com/awslabs/kubernetes-iteration-tool
 | FluxRepoURL         | Flux Source git repo URL to synchronize KIT infrastructure like Tekton                     | https://github.com/awslabs/kubernetes-iteration-toolkit |   |   |
 | FluxRepoBranch      | Flux Source git repo branch to synchronize KIT infrastructure                              | main                                                    |   |   |
 | FluxRepoPath        | Flux Source git repo path to Kubernetes resources                                          | ./infrastructure/k8s-config/clusters/kit-infrastructure |   |   |
-| FluxRepoAddonPaths      | Flux Source git repo paths (separted by comma) to Kubernetes addons.                       |                                                         |   |   |
 | TestFluxRepoName    | Flux Source git repo name to synchronize application tests like Tekton Tasks and Pipelines |                                                         |   |   |
 | TestFluxRepoURL     | Flux Source git repo URL to synchronize application tests                                  |                                                         |   |   |
 | TestFluxRepoBranch  | Flux Source git repo branch to synchronize application tests                               |                                                         |   |   |
