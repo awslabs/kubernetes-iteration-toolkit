@@ -29,6 +29,9 @@ spec:
     operator: In
     values:
       - amd64
+  - key: "karpenter.k8s.aws/instance-cpu"
+    operator: In
+    values: ["16", "32", "48", "64"]
   limits: 
     resources: 
       cpu: 8000

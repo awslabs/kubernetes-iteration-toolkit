@@ -26,6 +26,9 @@ spec:
       - amd64
   - key: kit.k8s.sh/app
     operator: Exists
+  - key: "karpenter.k8s.aws/instance-cpu"
+    operator: In
+    values: ["16", "32", "48", "64"]
   - key: kit.k8s.sh/control-plane-name
     operator: Exists
   limits: 
