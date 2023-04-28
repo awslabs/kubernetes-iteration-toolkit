@@ -76,6 +76,9 @@ export class Karpenter extends Construct {
                         'clusterEndpoint': props.cluster.clusterEndpoint,
                         'defaultInstanceProfile': nodeInstanceProfile.instanceProfileName,
                     },
+                    'featureGates': {
+                        "driftEnabled": true,
+                    },
                 },
                 'serviceAccount': {
                     'create': false,
