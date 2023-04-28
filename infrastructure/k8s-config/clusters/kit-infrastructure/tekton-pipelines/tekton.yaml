@@ -17,9 +17,9 @@ spec:
     # exclude all
     /*
     # include releases
-    !/pipeline/previous/v0.33.2/release.yaml
-    !/triggers/previous/v0.19.0/release.yaml
-    !/triggers/previous/v0.19.1/intercetors.yaml
+    !/pipeline/previous/v0.47.0/release.yaml
+    !/triggers/previous/v0.23.1/release.yaml
+    !/triggers/previous/v0.23.1/intercetors.yaml
     !/dashboard/previous/v0.24.1/tekton-dashboard-release.yaml
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
@@ -29,7 +29,7 @@ metadata:
   namespace: tekton-pipelines
 spec:
   interval: 2m0s
-  path: ./pipeline/previous/v0.33.2
+  path: ./pipeline/previous/v0.47.0
   prune: true
   sourceRef:
     kind: Bucket
@@ -89,7 +89,7 @@ metadata:
   namespace: tekton-pipelines
 spec:
   interval: 2m0s
-  path: ./triggers/previous/v0.19.0
+  path: ./triggers/previous/v0.23.1
   prune: true
   sourceRef:
     kind: Bucket
@@ -135,7 +135,7 @@ metadata:
   namespace: tekton-pipelines
 spec:
   interval: 2m0s
-  path: ./triggers/previous/v0.19.1
+  path: ./triggers/previous/v0.23.1
   prune: true
   sourceRef:
     kind: Bucket

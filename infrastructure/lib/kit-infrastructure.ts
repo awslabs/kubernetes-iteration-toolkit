@@ -45,7 +45,7 @@ export class KITInfrastructure extends Stack {
       clusterName: id,
       vpc: vpc,
       role: clusterRole,
-      version: eks.KubernetesVersion.V1_21,
+      version: eks.KubernetesVersion.V1_26,
       defaultCapacity: 0,
     });
 
@@ -68,6 +68,7 @@ export class KITInfrastructure extends Stack {
 
     const sg = new SecurityGroup(this, "NodeSecurityGroup", {
       description: "Worker Node Security Group",
+      allowAllIpv6Outbound: true,
       vpc: vpc,
     });
     cluster.clusterSecurityGroup.addIngressRule(sg, ec2.Port.allTraffic())
