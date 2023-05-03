@@ -1,3 +1,5 @@
+[![kitctl](https://github.com/awslabs/kubernetes-iteration-toolkit/actions/workflows/kitctl-test.yml/badge.svg)](https://github.com/awslabs/kubernetes-iteration-toolkit/actions/workflows/kitctl-test.yml) **`kitctl`** test coverage when new modifications are committed to this repository
+
 # What is Kubernetes Iteration Toolkit?
 
 ## What is KIT?
