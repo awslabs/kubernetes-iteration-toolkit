@@ -1,4 +1,4 @@
-name: This workflow automates the build, testing, and bootstrapping of a test environment on Kubernetes using KIT CLI
+name: kit-e2e-test
 on:
   push:
     branches: [main]
@@ -192,7 +192,6 @@ jobs:
             if [ $status -eq 0 ]; then
               echo "Command executed successfully for $i iteration."
               COMMAND_COMPLETED=true
-              break
             elif [ $status -eq 124 ]; then
               echo "Command timed out. Retrying in $RETRY_DELAY seconds."
             elif [ $status -eq 143 ]; then

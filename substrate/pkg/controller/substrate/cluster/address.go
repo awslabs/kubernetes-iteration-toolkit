@@ -16,12 +16,10 @@ package cluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/apis/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/substrate/pkg/utils/discovery"
@@ -89,13 +87,15 @@ func (a *Address) Delete(ctx context.Context, substrate *v1alpha1.Substrate) (re
 	for _, address := range addressesOutput.Addresses {
 		if address.AssociationId != nil {
 			if _, err := a.EC2.DisassociateAddressWithContext(ctx, &ec2.DisassociateAddressInput{AssociationId: address.AssociationId}); err != nil {
-				// Until NAT GW is not yet deleted we can't disassociate, check for error and retry
-				if err != nil && strings.Contains(err.Error(), "AuthFailure: You do not have permission to access the specified resource") {
-					if aerr := awserr.Error(nil); errors.As(err, &aerr) {
-						return reconcile.Result{Requeue: true}, nil
-					}
+				if strings.Contains(err.Error(), "InvalidAssociationID.NotFound") {
+					// Association ID does not exist, continue with the next address
+					continue
+					// Until NAT GW is not yet deleted we can't disassociate, check for error and retry
+				} else if strings.Contains(err.Error(), "AuthFailure: You do not have permission to access the specified resource") {
+					return reconcile.Result{Requeue: true}, nil
+				} else {
+					return reconcile.Result{}, fmt.Errorf("disassociating elastic IP, %w", err)
 				}
-				return reconcile.Result{}, fmt.Errorf("disassociating elastic IP, %w", err)
 			}
 		}
 		if _, err := a.EC2.ReleaseAddressWithContext(ctx, &ec2.ReleaseAddressInput{AllocationId: address.AllocationId}); err != nil {
