@@ -24,34 +24,37 @@ export class Karpenter extends Construct {
             namespace: props.namespace
         })
         sa.node.addDependency(ns)
-        sa.role.attachInlinePolicy(new iam.Policy(this, 'karpenter-controller-policy', {
+        const karpenterControllerPolicy = new iam.PolicyDocument({
             statements: [
-                new iam.PolicyStatement({
-                    resources: ['*'],
-                    actions: [
-                        // Write Operations
-                        "ec2:CreateLaunchTemplate",
-                        "ec2:CreateFleet",
-                        "ec2:RunInstances",
-                        "ec2:CreateTags",
-                        "iam:PassRole",
-                        "ec2:TerminateInstances",
-                        "ec2:DeleteLaunchTemplate",
-                        // Read Operations
-                        "ec2:DescribeAvailabilityZones",
-                        "ec2:DescribeImages",
-                        "ec2:DescribeInstances",
-                        "ec2:DescribeInstanceTypeOfferings",
-                        "ec2:DescribeInstanceTypes",
-                        "ec2:DescribeLaunchTemplates",
-                        "ec2:DescribeSecurityGroups",
-                        "ec2:DescribeSpotPriceHistory",
-                        "ec2:DescribeSubnets",
-                        "pricing:GetProducts",
-                        "ssm:GetParameter",
-                    ],
-                }),
+              new iam.PolicyStatement({
+                resources: ['*'],
+                actions: [
+                    // Write Operations
+                    "ec2:CreateLaunchTemplate",
+                    "ec2:CreateFleet",
+                    "ec2:RunInstances",
+                    "ec2:CreateTags",
+                    "iam:PassRole",
+                    "ec2:TerminateInstances",
+                    "ec2:DeleteLaunchTemplate",
+                    // Read Operations
+                    "ec2:DescribeAvailabilityZones",
+                    "ec2:DescribeImages",
+                    "ec2:DescribeInstances",
+                    "ec2:DescribeInstanceTypeOfferings",
+                    "ec2:DescribeInstanceTypes",
+                    "ec2:DescribeLaunchTemplates",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeSpotPriceHistory",
+                    "ec2:DescribeSubnets",
+                    "pricing:GetProducts",
+                    "ssm:GetParameter",
+                ],
+              }),
             ],
+          });
+        sa.role.attachInlinePolicy(new iam.Policy(this, 'karpenter-controller-policy', {
+            document: karpenterControllerPolicy,
         }));
 
         const nodeInstanceProfile = new iam.CfnInstanceProfile(this, 'karpenter-instance-profile', {
