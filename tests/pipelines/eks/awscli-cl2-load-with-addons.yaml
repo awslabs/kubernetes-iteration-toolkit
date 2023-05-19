@@ -199,6 +199,7 @@ spec:
       name: cloudwatch
   finally:
   - name: teardown
+    retries: 10 # To deal with throttling during deletion
     params:
     - name: cluster-name
       value: $(params.cluster-name)
