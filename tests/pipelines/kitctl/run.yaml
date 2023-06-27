@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
   name: pipeline-template
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   params:
   - name: name

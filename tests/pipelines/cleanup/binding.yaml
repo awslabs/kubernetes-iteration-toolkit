@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerBinding
 metadata:
   name: cleanup-details
-  namespace: tekton-pipelines 
+  namespace: scalability 
 spec:
   params:
   - name: keep

@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: slack-notification
-  namespace: tekton-pipelines  
+  namespace: scalability 
 spec:
   description: |
     sends slack notification for a given slack hook

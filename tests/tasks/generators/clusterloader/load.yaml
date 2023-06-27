@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: load
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   description: "clusterloader2 task to run various types of cl2 tests on a given cluster."
   params:
