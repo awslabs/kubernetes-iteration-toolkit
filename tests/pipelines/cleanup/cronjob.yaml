@@ -1,8 +1,8 @@
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: cleanup-trigger
-  namespace: tekton-pipelines 
+  namespace: scalability 
 spec:
   schedule: "0 * * * *"
   jobTemplate:

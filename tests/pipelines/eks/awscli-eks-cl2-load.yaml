@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: awscli-eks-cl2loadtest
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   description: |
     This pipeline sends slack notifcation before it spins up an EKS cluster with in it's own VPC 

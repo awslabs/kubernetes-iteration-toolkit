@@ -72,11 +72,11 @@ To schedule recurrent test runs, you can leverage cron-job to trigger a pipeline
 ```
 cat <<EOF | kubectl apply -f -
 ---
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: awscli-eks-load-5k-example
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   schedule: "13 15 * * *"
   jobTemplate:
@@ -93,7 +93,7 @@ apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerBinding
 metadata:
   name: awscli-eks-load-5k
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   params:
     - name: servicerole
@@ -103,7 +103,7 @@ apiVersion: triggers.tekton.dev/v1alpha1
 kind: EventListener
 metadata:
   name: awscli-eks-load-5k
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   serviceAccountName: tekton-triggers
   triggers:
@@ -117,7 +117,7 @@ apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
   name: awscli-eks-load-5k
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1

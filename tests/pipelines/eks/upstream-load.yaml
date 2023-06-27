@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: loadtest
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   workspaces:
     - name: config

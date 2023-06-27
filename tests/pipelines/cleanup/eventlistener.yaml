@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
   name: tekton-cd
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   serviceAccountName: tekton-cleaner
   triggers:

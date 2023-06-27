@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: awscli-eks-cl2loadtest-with-addons
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   params:
   - name: cluster-name

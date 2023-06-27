@@ -7,6 +7,7 @@ import { AWSFluentBit } from './addons/fluent-bit-for-aws'
 import { FluxV2 } from './addons/fluxv2'
 import { Karpenter } from './addons/karpenter'
 import { KIT } from './addons/kit'
+import { KubectlLayer } from 'aws-cdk-lib/lambda-layer-kubectl'
 
 export class KITInfrastructure extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -45,6 +46,7 @@ export class KITInfrastructure extends Stack {
       clusterName: id,
       vpc: vpc,
       role: clusterRole,
+      kubectlLayer: new KubectlLayer(this, 'kubectl'),
       version: eks.KubernetesVersion.V1_26,
       defaultCapacity: 0,
     });

@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: awscli-eks-fargate-create
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   description: |
     Create an EKS  fargate pods for a given cluster and label selectors.

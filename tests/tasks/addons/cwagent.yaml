@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: eks-addon-cwagent
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   description: |
     This Task can be used to create a EKS CW Agent Deamonset on EKS cluster

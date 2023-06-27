@@ -2,7 +2,7 @@ apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
   name: cleanup-runs
-  namespace: tekton-pipelines 
+  namespace: scalability
 spec:
   params:
   - name: namespace
