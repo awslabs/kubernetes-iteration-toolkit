@@ -39,9 +39,9 @@ spec:
               name: workspace
             env:
               - name: SINK_URL
-                value: "http://el-tekton-cd.tekton-pipelines.svc.cluster.local:8080"
+                value: "http://el-tekton-cd.scalability.svc.cluster.local:8080"
               - name: NAMESPACE
-                value: "tekton-pipelines"
+                value: "scalability"
               - name: CLEANUP_KEEP
                 value: "50"
           restartPolicy: Never

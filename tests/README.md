@@ -11,8 +11,8 @@ Tekton is a powerful and flexible open-source framework for creating CI/CD syste
 ### Installing tekton pipelines
 ```
 cd tests
-kubectl apply -n tekton-pipelines -f tasks -R
-kubectl apply -n tekton-pipelines -f pipelines -R
+kubectl apply -n scalability -f tasks -R
+kubectl apply -n scalability -f pipelines -R
 ```
 
 ### Running a single pipelinerun
@@ -86,7 +86,7 @@ spec:
           containers:
             - name: curl
               image: curlimages/curl
-              args: ["curl", "-X", "POST", "--data", "{}", "el-awscli-eks-load-5k.tekton-pipelines.svc.cluster.local:8080"]
+              args: ["curl", "-X", "POST", "--data", "{}", "el-awscli-eks-load-5k.scalability.svc.cluster.local:8080"]
           restartPolicy: Never
 ---
 apiVersion: triggers.tekton.dev/v1alpha1

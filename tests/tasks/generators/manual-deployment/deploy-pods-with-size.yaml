@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: deploy-pods-with-size
-  namespace: tekton-pipelines
+  namespace: scalability
   annotations:
     tekton.dev/pipelines.minVersion: "0.17.0"
     tekton.dev/categories: Kubernetes
@@ -67,4 +67,3 @@ spec:
       kubectl --kubeconfig=/tmp/kubeconfig apply -f /tmp/deploy.yaml
       echo "Get pods"
       kubectl --kubeconfig=/tmp/kubeconfig get pod -A
-
