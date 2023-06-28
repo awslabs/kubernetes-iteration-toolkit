@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: eks-addon-fluentbit
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   description: |
     This task installs the FluentBit addon on an EKS cluster.

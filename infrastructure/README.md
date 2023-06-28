@@ -94,7 +94,7 @@ As an example, below are the parmeters used if you want to selectively enable so
 ```shell
 cdk bootstrap
 cdk deploy KITInfrastructure --no-rollback \
-  -c TestNamespace="tekton-pipelines" \
+  -c TestNamespace="scalability" \
   -c TestServiceAccount="tekton-pipelines-executor" \
   -c AWSEBSCSIDriverAddon=false \
   -c KarpenterAddon=false \

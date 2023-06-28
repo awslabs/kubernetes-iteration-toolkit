@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: awscli-delete-vpc
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   description: |
     This Task can be used to delete CloudFormation stack containing VPC resources that was used for EKS clusters.

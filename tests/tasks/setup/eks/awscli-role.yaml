@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: awscli-role-create
-  namespace: tekton-pipelines 
+  namespace: scalability
 spec:
   description: |
     Creates Roles from CFN json stack.

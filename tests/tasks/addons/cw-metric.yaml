@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name:  cloudwatch
-  namespace: tekton-pipelines
+  namespace: scalability
 spec:
   description: "Cloudwatch task publishes the provided metric data points to Amazon CloudWatch. More details can be found in the aws cli reference doc: https://awscli.amazonaws.com/v2/documentation/api/2.1.29/reference/cloudwatch/put-metric-data.html"
   params:
