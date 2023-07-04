@@ -1,3 +1,4 @@
+import * as cdk from 'aws-cdk-lib';
 import { aws_ec2 as ec2, aws_eks as eks, aws_iam as iam, Stack, StackProps, STACK_RESOURCE_LIMIT_CONTEXT, Tags } from 'aws-cdk-lib'
 import { SecurityGroup } from 'aws-cdk-lib/aws-ec2'
 import { Construct } from 'constructs'
@@ -34,7 +35,10 @@ export class KITInfrastructure extends Stack {
 
     // The IAM role that will be used by EKS
     const clusterRole = new iam.Role(this, 'ClusterRole', {
-      assumedBy: new iam.ServicePrincipal('eks.amazonaws.com'),
+      assumedBy: new iam.CompositePrincipal(
+        new iam.ArnPrincipal(`arn:aws:iam::${cdk.Aws.ACCOUNT_ID}:root`),
+        new iam.ServicePrincipal('eks.amazonaws.com')
+      ),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEKSClusterPolicy'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEKSVPCResourceController')
@@ -45,7 +49,9 @@ export class KITInfrastructure extends Stack {
     const cluster = new eks.Cluster(this, 'Cluster', {
       clusterName: id,
       vpc: vpc,
+      mastersRole: clusterRole,
       role: clusterRole,
+      outputMastersRoleArn: true,
       kubectlLayer: new KubectlLayer(this, 'kubectl'),
       version: eks.KubernetesVersion.V1_26,
       defaultCapacity: 0,
