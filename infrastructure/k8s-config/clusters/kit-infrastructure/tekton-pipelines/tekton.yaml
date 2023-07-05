@@ -17,7 +17,7 @@ spec:
     # exclude all
     /*
     # include releases
-    !/pipeline/previous/v0.47.0/release.yaml
+    !/pipeline/previous/v0.47.1/release.yaml
     !/triggers/previous/v0.23.1/release.yaml
     !/triggers/previous/v0.23.1/interceptors.yaml
     !/dashboard/previous/v0.24.1/tekton-dashboard-release.yaml
