@@ -15,7 +15,7 @@ require (
 	k8s.io/apimachinery v0.24.3
 	k8s.io/cli-runtime v0.24.2
 	k8s.io/client-go v0.24.2
-	k8s.io/kubernetes v1.24.14
+	k8s.io/kubernetes v1.24.15
 	knative.dev/pkg v0.0.0-20220318185521-e6e3cf03d765
 	sigs.k8s.io/controller-runtime v0.11.1
 )
