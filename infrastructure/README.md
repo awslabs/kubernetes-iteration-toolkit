@@ -43,7 +43,6 @@ data:
   PERFDASH_LOG_BUCKET: my-s3-bucket-name
   AWS_DEFAULT_REGION: us-west-2
   AWS_REGION: us-west-2
-  AWS_ROLE_ARN: arn:aws:iam::123456789012:role/KITInfrastructure-ClusterperfdashsaRoleXXXXXXXX-XXXXXXXXXXXX
   jobs.yaml: |
     periodics:
       - name: "kit-eks-1k"

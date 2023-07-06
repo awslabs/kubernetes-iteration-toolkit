@@ -28,11 +28,6 @@ spec:
               configMapKeyRef:
                 name: perfdash-config
                 key: PERFDASH_LOG_BUCKET
-          - name: AWS_ROLE_ARN
-            valueFrom:
-              configMapKeyRef:
-                name: perfdash-config
-                key: AWS_ROLE_ARN
           - name: AWS_DEFAULT_REGION
             valueFrom:
               configMapKeyRef:

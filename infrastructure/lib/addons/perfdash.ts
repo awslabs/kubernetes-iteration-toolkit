@@ -49,14 +49,36 @@ export class PerfDash extends Construct {
       },
       spec: {
         interval: '5m0s',
-        path: "./infrastructure/k8s-config/clusters/addons/perfdash",
+        path: "./infrastructure/k8s-config/clusters/kit-infrastructure/perfdash",
         prune: true,
         sourceRef: {
           kind: 'GitRepository',
           name: 'flux-system',
           namespace: 'flux-system'
         },
-        validation: 'client'
+        validation: 'client',
+        patches: [
+          {
+            target: {
+              kind: "Deployment",
+              name: "perfdash",
+              namespace: "perfdash",
+            },
+            patch: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: perfdash
+  namespace: perfdash
+spec:
+  template:
+    spec:
+      containers:
+      - name: perfdash
+        env:
+        - name: AWS_ROLE_ARN
+          value: `+sa.role.roleArn
+          },
+        ]
       }
     });
     perfdashKustomizationManifest.node.addDependency(ns);
