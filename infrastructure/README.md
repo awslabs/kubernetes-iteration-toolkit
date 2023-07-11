@@ -144,6 +144,7 @@ Follow the steps from here: https://github.com/awslabs/kubernetes-iteration-tool
 | FluxRepoURL         | Flux Source git repo URL to synchronize KIT infrastructure like Tekton                     | https://github.com/awslabs/kubernetes-iteration-toolkit |   |   |
 | FluxRepoBranch      | Flux Source git repo branch to synchronize KIT infrastructure                              | main                                                    |   |   |
 | FluxRepoPath        | Flux Source git repo path to Kubernetes resources                                          | ./infrastructure/k8s-config/clusters/kit-infrastructure |   |   |
+| FluxRepoAddonPaths  | Flux Source git repo paths (separted by comma) to Kubernetes addons.                       |                                                         |   |   |
 | TestFluxRepoName    | Flux Source git repo name to synchronize application tests like Tekton Tasks and Pipelines |                                                         |   |   |
 | TestFluxRepoURL     | Flux Source git repo URL to synchronize application tests                                  |                                                         |   |   |
 | TestFluxRepoBranch  | Flux Source git repo branch to synchronize application tests                               |                                                         |   |   |

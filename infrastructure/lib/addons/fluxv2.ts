@@ -10,6 +10,7 @@ export interface FluxV2Props extends StackProps {
   repoUrl: string;
   repoBranch: string;
   repoPath: string;
+  repoAddonPaths?: string;
   testRepoName: string;
   testRepoUrl?: string;
   testRepoBranch?: string;
@@ -126,6 +127,34 @@ export class FluxV2 extends Construct {
     }
   });
   kustomizationManifest.node.addDependency(chart);
+
+  if (props.repoAddonPaths) {
+    for (var repoAddonPath of props.repoAddonPaths.split(",")) {
+      // Use last segment in the path and replace any non alphanumeric characters with '-' .
+      const addonName = repoAddonPath.substring(repoAddonPath.lastIndexOf('/') + 1).replace(/\W/g, '-')
+      const addonKustomizationManifest = props.cluster.addManifest('AddonKustomizationSelf', {
+        apiVersion: 'kustomize.toolkit.fluxcd.io/v1beta1',
+        kind: 'Kustomization',
+        metadata: {
+          // Flux seems to be using apply which doesn't allow generateName field,
+          // so we append a suffix here.
+          name: 'flux-addon-' + addonName,
+          namespace: props.namespace,
+        },
+        spec: {
+          interval: '2m0s',
+          path: repoAddonPath,
+          prune: true,
+          sourceRef: {
+            kind: 'GitRepository',
+            name: 'flux-system'
+          },
+          validation: 'client'
+        }
+      });
+      addonKustomizationManifest.node.addDependency(chart);
+    }
+  }
 
   if (props.testRepoUrl) {
     const testGitRepoManifest = props.cluster.addManifest('TestGitRepoSelf', {

@@ -23,6 +23,7 @@ export class KITInfrastructure extends Stack {
     const installKarpenterAddon = this.getContextOrDefault('KarpenterAddon', "true")
     const installKitAddon = this.getContextOrDefault("KITAddon", "true")
     const installPerfDashAddon = this.getContextOrDefault("PerfDashAddon", "false")
+    const repoAddonPaths = this.node.tryGetContext('FluxRepoAddonPaths')
 
     const testRepoName = this.node.tryGetContext('TestFluxRepoName')
     const testRepoUrl = this.node.tryGetContext('TestFluxRepoURL')
@@ -214,6 +215,7 @@ export class KITInfrastructure extends Stack {
       repoUrl: repoUrl,
       repoBranch: repoBranch,
       repoPath: repoPath,
+      repoAddonPaths: repoAddonPaths,
       testRepoName: testRepoName,
       testRepoUrl: testRepoUrl,
       testRepoBranch: testRepoBranch,

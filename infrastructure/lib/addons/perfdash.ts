@@ -49,7 +49,7 @@ export class PerfDash extends Construct {
       },
       spec: {
         interval: '5m0s',
-        path: "./infrastructure/k8s-config/clusters/kit-infrastructure/perfdash",
+        path: "./infrastructure/k8s-config/clusters/addons/perfdash",
         prune: true,
         sourceRef: {
           kind: 'GitRepository',
