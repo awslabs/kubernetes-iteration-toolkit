@@ -67,6 +67,7 @@ spec:
       kind: Task
       name: awscli-role-create
   - name: create-eks-cluster
+    retries: 3
     params:
     - name: cluster-name
       value: $(params.cluster-name)
