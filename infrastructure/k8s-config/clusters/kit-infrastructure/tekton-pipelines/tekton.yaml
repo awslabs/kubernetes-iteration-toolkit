@@ -29,7 +29,7 @@ metadata:
   namespace: tekton-pipelines
 spec:
   interval: 2m0s
-  path: ./pipeline/previous/v0.47.0
+  path: ./pipeline/previous/v0.47.1
   prune: true
   sourceRef:
     kind: Bucket
