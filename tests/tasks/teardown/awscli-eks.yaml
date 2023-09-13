@@ -48,3 +48,21 @@ spec:
       if [ -n "$(params.slack-hook)" ]; then
         curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)
       fi
+  - name: awscli-delete-vpc
+    image: alpine/k8s:1.23.7
+    script: |
+      #!/bin/bash
+      aws sts get-caller-identity 
+      # Check if the stack exists
+      aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.cluster-name)
+      if [ $? -ne 0 ]; then
+        echo "Stack $(params.cluster-name) not found. Exiting..."
+        exit 1
+      else
+        echo "Deleting stack $(params.cluster-name)..."
+      fi
+      #Deletes the CFN stack
+      aws cloudformation delete-stack --region $(params.region) --stack-name $(params.cluster-name) 
+      # Wait for the stack to be deleted
+      aws cloudformation wait stack-delete-complete --region $(params.region) --stack-name $(params.cluster-name)
+      echo "Stack deleted successfully!"
