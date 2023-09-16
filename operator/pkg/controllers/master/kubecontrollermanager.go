@@ -269,6 +269,14 @@ var (
 	disabledFlagsForKube122 = map[string]struct{}{"--horizontal-pod-autoscaler-use-rest-clients": {}}
 )
 
+var (
+	disabledFlagsForKube126 = map[string]struct{}{"--horizontal-pod-autoscaler-use-rest-clients": {}, "--logtostderr": {}}
+)
+
+var (
+	disabledFlagsForKube127 = map[string]struct{}{"--horizontal-pod-autoscaler-use-rest-clients": {}, "--logtostderr": {}, "--cloud-provider": {}}
+)
+
 func kcmPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
 	switch version {
 	case "1.22", "1.23", "1.24", "1.25":
@@ -280,13 +288,31 @@ func kcmPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
 			args = append(args, arg)
 		}
 		defaultSpec.Containers[0].Args = args
+	case "1.26":
+		args := []string{}
+		for _, arg := range defaultSpec.Containers[0].Args {
+			if _, skip := disabledFlagsForKube126[strings.Split(arg, "=")[0]]; skip {
+				continue
+			}
+			args = append(args, arg)
+		}
+		defaultSpec.Containers[0].Args = args
+	case "1.27":
+		args := []string{}
+		for _, arg := range defaultSpec.Containers[0].Args {
+			if _, skip := disabledFlagsForKube127[strings.Split(arg, "=")[0]]; skip {
+				continue
+			}
+			args = append(args, arg)
+		}
+		defaultSpec.Containers[0].Args = args
 	}
 	return *defaultSpec
 }
 
 func kcmHealthCheckPortForVersion(version string) intstr.IntOrString {
 	switch version {
-	case "1.22", "1.23", "1.24", "1.25":
+	case "1.22", "1.23", "1.24", "1.25", "1.26", "1.27":
 		return intstr.FromInt(10257)
 	}
 	return intstr.FromInt(10252)
@@ -294,7 +320,7 @@ func kcmHealthCheckPortForVersion(version string) intstr.IntOrString {
 
 func kcmHealthCheckSchemeForVersion(version string) v1.URIScheme {
 	switch version {
-	case "1.22", "1.23", "1.24", "1.25":
+	case "1.22", "1.23", "1.24", "1.25", "1.26", "1.27":
 		return v1.URISchemeHTTPS
 	}
 	return v1.URISchemeHTTP

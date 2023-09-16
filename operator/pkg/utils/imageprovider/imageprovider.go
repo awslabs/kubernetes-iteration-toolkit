@@ -23,6 +23,8 @@ var (
 		"1.23": kubeVersion123Tag,
 		"1.24": kubeVersion124Tag,
 		"1.25": kubeVersion125Tag,
+		"1.26": kubeVersion126Tag,
+		"1.27": kubeVersion127Tag,
 	}
 )
 
@@ -40,6 +42,8 @@ const (
 	kubeVersion123Tag = "v1.23.13-eks-1-23-9"
 	kubeVersion124Tag = "v1.24.8-eks-1-24-5"
 	kubeVersion125Tag = "v1.25.5-eks-1-25-3"
+	kubeVersion126Tag = "v1.26.7-eks-1-26-17"
+	kubeVersion127Tag = "v1.27.4-eks-1-27-10"
 	repositoryName    = "public.ecr.aws/eks-distro/"
 	busyBoxImage      = "public.ecr.aws/docker/library/busybox:stable"
 )
