@@ -462,23 +462,21 @@ var (
 func apiServerPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
 	switch version {
 	case "1.25":
-		args := []string{}
-		for _, arg := range defaultSpec.Containers[0].Args {
-			if _, skip := disabledFlagsForAPIServer[strings.Split(arg, "=")[0]]; skip {
-				continue
-			}
-			args = append(args, arg)
-		}
-		defaultSpec.Containers[0].Args = args
+		disableFlags(defaultSpec, disabledFlagsForAPIServer)
 	case "1.26", "1.27":
-		args := []string{}
-		for _, arg := range defaultSpec.Containers[0].Args {
-			if _, skip := disabledFlagsForApi126[strings.Split(arg, "=")[0]]; skip {
-				continue
-			}
-			args = append(args, arg)
-		}
-		defaultSpec.Containers[0].Args = args
+		disableFlags(defaultSpec, disabledFlagsForApi126)
 	}
 	return *defaultSpec
+}
+
+//Method to disable flags from default specs for a k8s version
+func disableFlags(defaultSpec *interface{}, disabledFlags map[string]struct{}) {
+	args := []string{}
+	for _, arg := range defaultSpec.Containers[0].Args {
+		if _, skip := disabledFlags[strings.Split(arg, "=")[0]]; skip {
+			continue
+		}
+		args = append(args, arg)
+	}
+	defaultSpec.Containers[0].Args = args
 }

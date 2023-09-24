@@ -17,8 +17,6 @@ package master
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
@@ -156,14 +154,7 @@ var (
 func kschPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
 	switch version {
 	case "1.26", "1.27":
-		args := []string{}
-		for _, arg := range defaultSpec.Containers[0].Args {
-			if _, skip := disabledFlagsForKsh126[strings.Split(arg, "=")[0]]; skip {
-				continue
-			}
-			args = append(args, arg)
-		}
-		defaultSpec.Containers[0].Args = args
+		disableFlags(defaultSpec, disabledFlagsForKsh126)
 	}
 	return *defaultSpec
 }
