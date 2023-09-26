@@ -467,7 +467,7 @@ func apiServerPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodS
 }
 
 //Method to disable flags from default specs for a k8s version
-func disableFlags(defaultSpec interface{}, disabledFlags map[string]struct{}) {
+func disableFlags(defaultSpec *v1.PodSpec, disabledFlags map[string]struct{}) {
 	args := []string{}
 	for _, arg := range defaultSpec.Containers[0].Args {
 		if _, skip := disabledFlags[strings.Split(arg, "=")[0]]; skip {
