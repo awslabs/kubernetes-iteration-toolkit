@@ -452,20 +452,28 @@ func nodeSelector(clusterName string, colocateWithEtcd bool) map[string]string {
 }
 
 var (
-	disabledFlagsForAPIServer = map[string]struct{}{"--feature-gates": {}}
+	disabledFlagsForAPI125 = map[string]struct{}{"--feature-gates": {}}
+	disabledFlagsForApi126 = map[string]struct{}{"--feature-gates": {}, "--logtostderr": {}}
 )
 
 func apiServerPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
 	switch version {
 	case "1.25":
-		args := []string{}
-		for _, arg := range defaultSpec.Containers[0].Args {
-			if _, skip := disabledFlagsForAPIServer[strings.Split(arg, "=")[0]]; skip {
-				continue
-			}
-			args = append(args, arg)
-		}
-		defaultSpec.Containers[0].Args = args
+		disableFlags(defaultSpec, disabledFlagsForAPI125)
+	case "1.26", "1.27":
+		disableFlags(defaultSpec, disabledFlagsForApi126)
 	}
 	return *defaultSpec
+}
+
+//Method to disable flags from default specs for a k8s version
+func disableFlags(defaultSpec *v1.PodSpec, disabledFlags map[string]struct{}) {
+	args := []string{}
+	for _, arg := range defaultSpec.Containers[0].Args {
+		if _, skip := disabledFlags[strings.Split(arg, "=")[0]]; skip {
+			continue
+		}
+		args = append(args, arg)
+	}
+	defaultSpec.Containers[0].Args = args
 }

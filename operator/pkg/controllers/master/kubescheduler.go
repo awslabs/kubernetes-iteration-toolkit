@@ -17,7 +17,6 @@ package master
 import (
 	"context"
 	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/apis/controlplane/v1alpha1"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
@@ -70,7 +69,7 @@ func schedulerLabels(clusterName string) map[string]string {
 
 func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
-	return v1.PodSpec{
+	return kschPodSpecForVersion(controlPlane.Spec.KubernetesVersion, &v1.PodSpec{
 		TerminationGracePeriodSeconds: aws.Int64(1),
 		HostNetwork:                   true,
 		DNSPolicy:                     v1.DNSClusterFirstWithHostNet,
@@ -144,19 +143,32 @@ func schedulerPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
 				},
 			},
 		}},
+	})
+}
+
+var (
+	disabledFlagsForKsh126 = map[string]struct{}{"--logtostderr": {}}
+)
+
+//Specific flags to be disabled for a particular version
+func kschPodSpecForVersion(version string, defaultSpec *v1.PodSpec) v1.PodSpec {
+	switch version {
+	case "1.26", "1.27":
+		disableFlags(defaultSpec, disabledFlagsForKsh126)
 	}
+	return *defaultSpec
 }
 
 func kschHealthCheckPortForVersion(version string) int {
 	switch version {
-	case "1.23", "1.24", "1.25":
+	case "1.23", "1.24", "1.25", "1.26", "1.27":
 		return 10259
 	}
 	return 10251
 }
 func kschHealthCheckSchemeForVersion(version string) v1.URIScheme {
 	switch version {
-	case "1.23", "1.24", "1.25":
+	case "1.23", "1.24", "1.25", "1.26", "1.27":
 		return v1.URISchemeHTTPS
 	}
 	return v1.URISchemeHTTP
