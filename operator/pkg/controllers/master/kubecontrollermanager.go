@@ -265,13 +265,7 @@ data:
 
 var (
 	disabledFlagsForKube122 = map[string]struct{}{"--horizontal-pod-autoscaler-use-rest-clients": {}}
-)
-
-var (
 	disabledFlagsForKube126 = map[string]struct{}{"--horizontal-pod-autoscaler-use-rest-clients": {}, "--logtostderr": {}}
-)
-
-var (
 	disabledFlagsForKube127 = map[string]struct{}{"--horizontal-pod-autoscaler-use-rest-clients": {}, "--logtostderr": {}, "--cloud-provider": {}}
 )
 
