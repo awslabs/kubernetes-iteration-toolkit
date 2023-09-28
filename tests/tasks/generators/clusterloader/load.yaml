@@ -135,7 +135,7 @@ spec:
     script: |
       #!/bin/bash
       if [ -n "$(params.amp-workspace-id)" ]; then
-        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2 --prometheus-manifest-path=$(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/"
+        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2"
       fi
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
