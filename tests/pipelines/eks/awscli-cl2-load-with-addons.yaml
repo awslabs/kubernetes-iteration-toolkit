@@ -97,6 +97,8 @@ spec:
       value: $(params.cluster-name)-node-role
     - name: endpoint
       value: $(params.endpoint)
+    - name: kubernetes-version
+      value: $(params.kubernetes-version)
     - name: desired-nodes
       value: "1"
     - name: max-nodes
@@ -137,6 +139,8 @@ spec:
       value: $(params.cluster-name)-node-role
     - name: endpoint
       value: $(params.endpoint)
+    - name: kubernetes-version
+      value: $(params.kubernetes-version)
     runAfter:
     - install-fluentbit-addon
     taskRef:

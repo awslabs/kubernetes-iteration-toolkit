@@ -14,6 +14,9 @@ spec:
   - name: region
     default: "us-west-2"
     description: The region where the cluster is in.
+  - name: kubernetes-version
+    default: "1.21"
+    description: The EKS version to install.
   - name: desired-nodes
     default: "10"
     description: The desired number of nodes in the cluster.
@@ -75,9 +78,60 @@ spec:
       asgs=$((nodes/max_nodes))
       echo "asgs: $asgs"
       node_group=$(params.nodegroup-prefix)$(params.cluster-name)-nodes
+      
+      create_and_validate_launchTemplate_resource()
+      {
+        launch_template_name=$node_group-launchTemplate
+        iam_instance_profile=$NODE_ROLE_ARN
+        imageId=/aws/service/eks/optimized-ami/$(params.kubernetes-version)/amazon-linux-2/recommended/image_id
+        
+        cat sed "s/\$LAUNCH_TEMPLATE_NAME/$launch_template_name/g; \
+        s/\$NODE_INSTANCE_PROFILE/$iam_instance_profile/g; \
+        s/\$IMAGE_ID/$imageId/g;" > "$(workspaces.config.path)/cfnConfig.yaml" <<EOL
+        AWSTemplateFormatVersion: '2010-09-09'
+        Description: Create an EKS Node Group Launch Template
+        Resources:
+          NodeGroupLaunchTemplate:
+            Type: AWS::EC2::LaunchTemplate
+            Properties:
+              LaunchTemplateName: $LAUNCH_TEMPLATE_NAME
+              LaunchTemplateData:
+                InstanceType: t3.medium
+                BlockDeviceMappings:
+                  - DeviceName: /dev/xvda
+                    Ebs:
+                      VolumeSize: 20
+                      VolumeType: gp2
+                IamInstanceProfile:
+                  Arn: $NODE_INSTANCE_PROFILE
+                ImageId: $IMAGE_ID
+                UserData: !Base64
+                  "Fn::Sub": |
+                    #!/bin/bash
+                    yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+                MetadataOptions:
+                  HttpPutResponseHopLimit : 2
+                  HttpEndpoint: enabled
+                  HttpTokens: !If
+                    - IMDSv1Disabled
+                    - required
+                    - optional
+        EOL
+                
+        STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`$node_group-stack`].StackStatus' --output text --region $(params.region))
+        if [[ "$STACK_STATUS" == "" ]]; then
+            aws cloudformation create-stack \
+                --stack-name $node_group-stack \
+                --template-file $(workspaces.config.path)/cfnConfig.yaml \
+                --region $(params.region)
+        fi
+        aws cloudformation wait stack-create-complete --stack-name $node_group-stack --region $(params.region)
+      }
+      
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
+        launch_template_name=$node_group-launchTemplate
         CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$node_group_name'`]' --output text)
         EC2_INSTANCES=$3
         if [ "$CREATED_NODEGROUP" == "" ]; then
@@ -86,6 +140,7 @@ spec:
           --cluster-name $(params.cluster-name) \
           --nodegroup-name $node_group_name \
           --node-role $NODE_ROLE_ARN \
+          --launch-template (aws ec2 describe-launch-templates --launch-template-names $launch_template_name)
           --region $(params.region) \
           --instance-types $EC2_INSTANCES \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
