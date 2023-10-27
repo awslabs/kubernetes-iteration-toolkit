@@ -16,6 +16,7 @@ spec:
   - name: slack-message
   - name: amp-workspace-id
   - name: vpc-cfn-url
+  - name: ng-cfn-url
   - name: kubernetes-version
   - name: service-role-cfn-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_service_role.json"
@@ -99,6 +100,8 @@ spec:
       value: $(params.endpoint)
     - name: kubernetes-version
       value: $(params.kubernetes-version)
+    - name: ng-cfn-url
+      value: $(params.ng-cfn-url)
     - name: desired-nodes
       value: "1"
     - name: max-nodes
@@ -141,6 +144,8 @@ spec:
       value: $(params.endpoint)
     - name: kubernetes-version
       value: $(params.kubernetes-version)
+    - name: ng-cfn-url
+      value: $(params.ng-cfn-url)
     runAfter:
     - install-fluentbit-addon
     taskRef:

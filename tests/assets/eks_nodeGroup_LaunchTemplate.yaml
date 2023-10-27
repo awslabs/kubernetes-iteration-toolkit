@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create an EKS Node Group Launch Template
+Resources:
+  NodeGroupLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Ref LaunchTemplateName
+      LaunchTemplateData:
+        InstanceType: t3.medium
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 20
+              VolumeType: gp2
+        IamInstanceProfile:
+          Arn: arn:aws:iam::953421922360:instance-profile/sushima-CodeDeployDemo-EC2-Instance-Profile
+        UserData: !Base64
+          "Fn::Sub": |
+            #!/bin/bash
+            yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+        MetadataOptions:
+          HttpPutResponseHopLimit : 2
+          HttpEndpoint: enabled
+          HttpTokens: required
+
+Outputs:
+  NodeGroupLaunchTemplateName:
+    Description: Name of the Node Group Launch Template
+    Value: !Ref NodeGroupLaunchTemplate

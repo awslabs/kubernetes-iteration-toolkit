@@ -15,7 +15,7 @@ spec:
     default: "us-west-2"
     description: The region where the cluster is in.
   - name: kubernetes-version
-    default: "1.21"
+    default: "1.28"
     description: The EKS version to install.
   - name: desired-nodes
     default: "10"
@@ -33,6 +33,8 @@ spec:
   - name: host-instance-types
     description: Instance types for managed nodes.
     default: "c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"
+  - name: ng-cfn-url
+    description: The url of the CFN YAML/JSON to create CFN stack dor NG launch template
   - name: host-taints
     description: Taints to be added to managed nodes
     default: ""
@@ -78,56 +80,23 @@ spec:
       asgs=$((nodes/max_nodes))
       echo "asgs: $asgs"
       node_group=$(params.nodegroup-prefix)$(params.cluster-name)-nodes
+      launch_template_name=$node_group-launchTemplate
       
-      create_and_validate_launchTemplate_resource()
-      {
-        launch_template_name=$node_group-launchTemplate
-        iam_instance_profile=$NODE_ROLE_ARN
-        imageId=/aws/service/eks/optimized-ami/$(params.kubernetes-version)/amazon-linux-2/recommended/image_id
-        
-        cat sed "s/\$LAUNCH_TEMPLATE_NAME/$launch_template_name/g; \
-        s/\$NODE_INSTANCE_PROFILE/$iam_instance_profile/g; \
-        s/\$IMAGE_ID/$imageId/g;" > "$(workspaces.config.path)/cfnConfig.yaml" <<EOL
-        AWSTemplateFormatVersion: '2010-09-09'
-        Description: Create an EKS Node Group Launch Template
-        Resources:
-          NodeGroupLaunchTemplate:
-            Type: AWS::EC2::LaunchTemplate
-            Properties:
-              LaunchTemplateName: $LAUNCH_TEMPLATE_NAME
-              LaunchTemplateData:
-                InstanceType: t3.medium
-                BlockDeviceMappings:
-                  - DeviceName: /dev/xvda
-                    Ebs:
-                      VolumeSize: 20
-                      VolumeType: gp2
-                IamInstanceProfile:
-                  Arn: $NODE_INSTANCE_PROFILE
-                ImageId: $IMAGE_ID
-                UserData: !Base64
-                  "Fn::Sub": |
-                    #!/bin/bash
-                    yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
-                MetadataOptions:
-                  HttpPutResponseHopLimit : 2
-                  HttpEndpoint: enabled
-                  HttpTokens: !If
-                    - true
-                    - required
-                    - optional
-        EOL
-                
-        STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`$node_group-stack`].StackStatus' --output text --region $(params.region))
-        if [[ "$STACK_STATUS" == "" ]]; then
-            aws cloudformation create-stack \
-                --stack-name $node_group-stack \
-                --template-file $(workspaces.config.path)/cfnConfig.yaml \
-                --region $(params.region)
-        fi
-        aws cloudformation wait stack-create-complete --stack-name $node_group-stack --region $(params.region)
-      }
+      curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
       
+      STACK_NAME=$node_group-stack
+      STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text  --region $(params.region))
+      
+      if [[ "$STACK_STATUS" == "" ]]; then
+          aws cloudformation create-stack \
+              --stack-name $STACK_NAME \
+              --template-body ./amazon-ng-cfn \
+              --region $(params.region)
+      fi
+      
+      aws cloudformation wait stack-create-complete --stack-name $node_group-stack --region $(params.region)
+      echo "CREATED_CFN_STACK=$STACK_NAME"
+    
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
