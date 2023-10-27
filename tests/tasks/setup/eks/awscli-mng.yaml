@@ -83,6 +83,7 @@ spec:
       launch_template_name=$node_group-launchTemplate
       
       curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
+      sed -i "s/!Ref LaunchTemplateName/$LaunchTemplateName/g" ./amazon-ng-cfn
       
       STACK_NAME=$node_group-stack
       STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text  --region $(params.region))
