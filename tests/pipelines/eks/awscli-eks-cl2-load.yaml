@@ -105,7 +105,7 @@ spec:
       - create-eks-cluster
     taskRef:
       kind: Task
-      name: awscli-eks-cfn-launch-template-create
+      name: awscli-eks-cfn-launch-template
     workspaces:
       - name: config
         workspace: config

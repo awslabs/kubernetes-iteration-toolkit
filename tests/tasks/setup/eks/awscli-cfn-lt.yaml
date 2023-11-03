@@ -2,17 +2,17 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: awscli-eks-cfn-launch-template-create
+  name: awscli-eks-cfn-launch-template
   namespace: scalability
 spec:
   description: |
     Create an EKS CFN stack to output a launch template.
-    This Task can be used to create an EKS CFN stack that outputs a launch template with prod ami for a given cluster to ensure PVRE reporting of instances.
+    This Task can be used to create an EKS CFN stack that outputs a launch template.
   params:
     - name: cluster-name
-      description: The name of the EKS cluster you want to spin managed nodegroups for.
+      description: EKS cluster you want to create CFN stack for.
     - name: stack-name
-      description: The name of the VPC name you want to spin.
+      description: Stack name you want to spin.
     - name: region
       default: "us-west-2"
       description: The region where the cluster is in.
