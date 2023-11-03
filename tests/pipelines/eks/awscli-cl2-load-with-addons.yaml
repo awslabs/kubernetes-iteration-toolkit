@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: awscli-eks-cl2loadtest-with-addons
+  name: sushima-awscli-eks-cl2loadtest-with-addons
   namespace: scalability
 spec:
   params:
@@ -90,6 +90,26 @@ spec:
     workspaces:
     - name: config    
       workspace: config
+  - name: create-launch-template
+    params:
+      - name: cluster-name
+        value: $(params.cluster-name)
+      - name: stack-name
+        value: $(params.cluster-name)-launch-template
+      - name: kubernetes-version
+        value: "$(params.kubernetes-version)"
+      - name: ng-cfn-url
+        value: "$(params.ng-cfn-url)"
+      - name: endpoint
+        value: $(params.endpoint)
+    runAfter:
+      - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-eks-cfn-launch-template-create
+    workspaces:
+      - name: config
+        workspace: config
   - name: create-mng-monitoring-nodes
     params:
     - name: cluster-name
@@ -223,6 +243,8 @@ spec:
       value: $(params.cluster-name)-service-role
     - name: node-role-stack-name
       value: $(params.cluster-name)-node-role
+    - name: launch-template-stack-name
+      value: $(params.cluster-name)-launch-template
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-teardown

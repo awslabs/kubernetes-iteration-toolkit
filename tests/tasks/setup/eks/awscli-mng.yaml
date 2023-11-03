@@ -14,9 +14,6 @@ spec:
   - name: region
     default: "us-west-2"
     description: The region where the cluster is in.
-  - name: kubernetes-version
-    default: "1.28"
-    description: The EKS version to install.
   - name: desired-nodes
     default: "10"
     description: The desired number of nodes in the cluster.
@@ -33,8 +30,6 @@ spec:
   - name: host-instance-types
     description: Instance types for managed nodes.
     default: "c5.large m5.large r5.large t3.large t3a.large c5a.large m5a.large r5a.large"
-  - name: ng-cfn-url
-    description: The url of the CFN YAML/JSON to create CFN stack dor NG launch template
   - name: host-taints
     description: Taints to be added to managed nodes
     default: ""
@@ -80,28 +75,11 @@ spec:
       asgs=$((nodes/max_nodes))
       echo "asgs: $asgs"
       node_group=$(params.nodegroup-prefix)$(params.cluster-name)-nodes
-      launch_template_name=$node_group-launchTemplate
-      
-      curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
-      sed -i "s/!Ref LaunchTemplateName/$LaunchTemplateName/g" ./amazon-ng-cfn
-      
-      STACK_NAME=$node_group-stack
-      STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text  --region $(params.region))
-      
-      if [[ "$STACK_STATUS" == "" ]]; then
-          aws cloudformation create-stack \
-              --stack-name $STACK_NAME \
-              --template-body ./amazon-ng-cfn \
-              --region $(params.region)
-      fi
-      
-      aws cloudformation wait stack-create-complete --stack-name $node_group-stack --region $(params.region)
-      echo "CREATED_CFN_STACK=$STACK_NAME"
     
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
-        launch_template_name=$node_group-launchTemplate
+        launch_template_name=$(params.cluster-name)-launchTemplate
         CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$node_group_name'`]' --output text)
         EC2_INSTANCES=$3
         if [ "$CREATED_NODEGROUP" == "" ]; then
@@ -110,7 +88,7 @@ spec:
           --cluster-name $(params.cluster-name) \
           --nodegroup-name $node_group_name \
           --node-role $NODE_ROLE_ARN \
-          --launch-template (aws ec2 describe-launch-templates --launch-template-names $launch_template_name)
+          --launch-template name=$launch_template_name\
           --region $(params.region) \
           --instance-types $EC2_INSTANCES \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
