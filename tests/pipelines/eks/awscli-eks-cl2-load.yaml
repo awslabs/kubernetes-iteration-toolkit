@@ -117,10 +117,6 @@ spec:
       value: "$(params.cluster-name)-node-role"
     - name: endpoint
       value: $(params.endpoint)
-    - name: kubernetes-version
-      value: "$(params.kubernetes-version)"
-    - name: ng-cfn-url
-      value: "$(params.ng-cfn-url)"
     - name: desired-nodes
       value: "1"
     - name: max-nodes
