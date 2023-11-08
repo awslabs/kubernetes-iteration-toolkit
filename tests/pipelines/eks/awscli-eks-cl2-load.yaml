@@ -18,6 +18,7 @@ spec:
   - name: slack-hook
   - name: slack-message
   - name: vpc-cfn-url
+  - name: ng-cfn-url
   - name: kubernetes-version
     default: "1.23"
   - name: amp-workspace-id
@@ -88,6 +89,26 @@ spec:
     workspaces:
     - name: config    
       workspace: config
+  - name: create-cfn-launch-template
+    params:
+      - name: cluster-name
+        value: $(params.cluster-name)
+      - name: stack-name
+        value: $(params.cluster-name)-launch-template
+      - name: kubernetes-version
+        value: "$(params.kubernetes-version)"
+      - name: ng-cfn-url
+        value: "$(params.ng-cfn-url)"
+      - name: endpoint
+        value: $(params.endpoint)
+    runAfter:
+      - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-eks-cfn-launch-template
+    workspaces:
+      - name: config
+        workspace: config
   - name: create-mng-monitoring-nodes
     params:
     - name: cluster-name
@@ -107,7 +128,7 @@ spec:
     - name: nodegroup-prefix
       value: "monitoring-"
     runAfter:
-    - create-eks-cluster
+    - create-cfn-launch-template
     taskRef:
       kind: Task
       name:  awscli-eks-nodegroup-create
@@ -201,6 +222,8 @@ spec:
       value: $(params.cluster-name)-service-role
     - name: node-role-stack-name
       value: $(params.cluster-name)-node-role
+    - name: launch-template-stack-name
+      value: $(params.cluster-name)-launch-template
     taskRef:
       kind: Task
       name:  awscli-eks-cluster-teardown
