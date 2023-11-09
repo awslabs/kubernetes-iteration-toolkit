@@ -16,7 +16,9 @@ spec:
   - name: slack-message
   - name: amp-workspace-id
   - name: vpc-cfn-url
+    value: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/amazon-eks-vpc.json"
   - name: ng-cfn-url
+    value: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_nodeGroup_launch_template.json"
   - name: kubernetes-version
   - name: service-role-cfn-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_service_role.json"
