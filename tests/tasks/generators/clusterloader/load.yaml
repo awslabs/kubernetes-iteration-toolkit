@@ -70,15 +70,18 @@ spec:
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
       CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
+      CL2_DELETE_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
       CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 70
       PODS_PER_NODE: $(params.pods-per-node)
+      CL2_RATE_LIMIT_POD_CREATION: false
       CL2_USE_HOST_NETWORK_PODS: false
       # we are not testing statefulsets at this point
       SMALL_STATEFUL_SETS_PER_NAMESPACE: 0
       MEDIUM_STATEFUL_SETS_PER_NAMESPACE: 0
       # we are not testing PVS at this point
       CL2_ENABLE_PVS: false
-      PROMETHEUS_SCRAPE_KUBE_PROXY: false
+      PROMETHEUS_SCRAPE_KUBE_PROXY: true
+      PROMETHEUS_KUBE_PROXY_SELECTOR_KEY: k8s-app
       PROMETHEUS_SCRAPE_APISERVER_ONLY: true
       ENABLE_SYSTEM_POD_METRICS: false
       NODE_MODE: master 

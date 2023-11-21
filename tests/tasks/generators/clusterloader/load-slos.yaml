@@ -70,6 +70,7 @@ spec:
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       NODES_PER_NAMESPACE: $(params.nodes-per-namespace)
       CL2_LOAD_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
+      CL2_DELETE_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
       CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 90
       PODS_PER_NODE: $(params.pods-per-node)
       CL2_USE_HOST_NETWORK_PODS: false
@@ -81,6 +82,7 @@ spec:
       ENABLE_SYSTEM_POD_METRICS: false
       NODE_MODE: master 
       CL2_DISABLE_DAEMONSETS: true
+      CL2_RATE_LIMIT_POD_CREATION: false
       # Enable prometheus flags
       ENABLE_PROMETHEUS_SERVER: true
       PROMETHEUS_PVC_STORAGE_CLASS: gp2
@@ -88,10 +90,11 @@ spec:
       PROMETHEUS_SCRAPE_APISERVER_ONLY: true
       PROMETHEUS_SCRAPE_KUBELETS: true
       PROMETHEUS_SCRAPE_KUBE_STATE_METRICS: true
+      PROMETHEUS_KUBE_PROXY_SELECTOR_KEY: k8s-app
       # enable SLOs related CL2 vars
-      CL2_NETWORK_LATENCY_THRESHOLD: true
+      CL2_NETWORK_LATENCY_THRESHOLD: 1s
       CL2_ENABLE_VIOLATIONS_FOR_NETWORK_PROGRAMMING_LATENCIES: true
-      CL2_NETWORK_PROGRAMMING_LATENCY_THRESHOLD: 20s
+      CL2_NETWORK_PROGRAMMING_LATENCY_THRESHOLD: 30s
       CL2_ENABLE_DNSTESTS: true
       CL2_USE_ADVANCED_DNSTEST: true
       CL2_ENABLE_API_AVAILABILITY_MEASUREMENT: true
