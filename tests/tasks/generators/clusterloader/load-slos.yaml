@@ -141,6 +141,15 @@ spec:
                 effect: NoSchedule  
       EOF
       cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0prometheus-operator-deployment.yaml
+      # schedule kube-state-pod onto the same node as prometheus
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/exporters/kube-state-metrics/deployment.yaml
+      cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/exporters/kube-state-metrics/deployment.yaml
+            tolerations:
+              - key: monitoring
+                operator: Exists
+                effect: NoSchedule  
+      EOF
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/exporters/kube-state-metrics/deployment.yaml
       fi
       # Building clusterloader2 binary 
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
