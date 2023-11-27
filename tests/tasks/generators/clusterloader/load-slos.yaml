@@ -83,14 +83,6 @@ spec:
       NODE_MODE: master 
       CL2_DISABLE_DAEMONSETS: true
       CL2_RATE_LIMIT_POD_CREATION: false
-      # Enable prometheus flags
-      ENABLE_PROMETHEUS_SERVER: true
-      PROMETHEUS_PVC_STORAGE_CLASS: gp2
-      PROMETHEUS_SCRAPE_KUBE_PROXY: true
-      PROMETHEUS_SCRAPE_APISERVER_ONLY: true
-      PROMETHEUS_SCRAPE_KUBELETS: true
-      PROMETHEUS_SCRAPE_KUBE_STATE_METRICS: true
-      PROMETHEUS_KUBE_PROXY_SELECTOR_KEY: k8s-app
       # enable SLOs related CL2 vars
       CL2_NETWORK_LATENCY_THRESHOLD: 1s
       CL2_ENABLE_VIOLATIONS_FOR_NETWORK_PROGRAMMING_LATENCIES: true
@@ -160,11 +152,18 @@ spec:
     script: |
       #!/bin/bash
       if [ -n "$(params.amp-workspace-id)" ]; then
-        CL2_PROMETHEUS_FLAGS="--enable-prometheus-server=true --prometheus-pvc-storage-class gp2"
+        # Enable prometheus flags
+        export ENABLE_PROMETHEUS_SERVER=true
+        export PROMETHEUS_PVC_STORAGE_CLASS=gp2
+        export PROMETHEUS_SCRAPE_KUBE_PROXY=true
+        export PROMETHEUS_SCRAPE_APISERVER_ONLY=true
+        export PROMETHEUS_SCRAPE_KUBELETS=true
+        export PROMETHEUS_SCRAPE_KUBE_STATE_METRICS=true
+        export PROMETHEUS_KUBE_PROXY_SELECTOR_KEY=k8s-app
       fi
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
-      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2 $CL2_PROMETHEUS_FLAGS
+      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
       exit_code=$?
       if [ $exit_code -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
