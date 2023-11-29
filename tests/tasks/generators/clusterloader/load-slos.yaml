@@ -160,6 +160,7 @@ spec:
         export PROMETHEUS_SCRAPE_KUBELETS=true
         export PROMETHEUS_SCRAPE_KUBE_STATE_METRICS=true
         export PROMETHEUS_KUBE_PROXY_SELECTOR_KEY=k8s-app
+        export PROMETHEUS_MEMORY_REQUEST=16Gi
       fi
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
