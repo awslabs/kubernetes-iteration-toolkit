@@ -93,6 +93,7 @@ spec:
       CL2_API_AVAILABILITY_PERCENTAGE_THRESHOLD: 99.5
       CL2_ALLOWED_SLOW_API_CALLS: 1
       CL2_PROMETHEUS_NODE_SELECTOR: "eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1"
+      CL2_PROMETHEUS_MEMORY_SCALE_FACTOR: 4
       EOL
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
@@ -157,7 +158,6 @@ spec:
         export PROMETHEUS_PVC_STORAGE_CLASS=gp2
         export PROMETHEUS_SCRAPE_KUBE_PROXY=true
         export PROMETHEUS_SCRAPE_APISERVER_ONLY=true
-        export PROMETHEUS_SCRAPE_KUBELETS=true
         export PROMETHEUS_SCRAPE_KUBE_STATE_METRICS=true
         export PROMETHEUS_KUBE_PROXY_SELECTOR_KEY=k8s-app
         export PROMETHEUS_MEMORY_REQUEST=16Gi
