@@ -22,7 +22,6 @@ spec:
     default: "Job is completed"
   - name: service-role-stack-name
   - name: node-role-stack-name
-  - name: launch-template-stack-name
   steps:
   - name: delete-cluster
     image: alpine/k8s:1.23.7
@@ -43,7 +42,6 @@ spec:
     script: |
       aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
       aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
-      aws cloudformation delete-stack --stack-name $(params.launch-template-stack-name)
   - name: send-slack-notification
     image: alpine/k8s:1.23.7
     script: |
