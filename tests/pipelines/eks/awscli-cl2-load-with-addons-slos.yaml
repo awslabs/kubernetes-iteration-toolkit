@@ -19,8 +19,6 @@ spec:
       value: $(params.cluster-name)-service-role
     - name: node-role-stack-name
       value: $(params.cluster-name)-node-role
-    - name: launch-template-stack-name
-      value: $(params.cluster-name)-launch-template
     retries: 10
     taskRef:
       kind: Task
@@ -129,26 +127,6 @@ spec:
     workspaces:
     - name: config
       workspace: config
-  - name: create-launch-template
-    params:
-      - name: cluster-name
-        value: $(params.cluster-name)
-      - name: stack-name
-        value: $(params.cluster-name)-launch-template
-      - name: kubernetes-version
-        value: "$(params.kubernetes-version)"
-      - name: ng-cfn-url
-        value: "$(params.ng-cfn-url)"
-      - name: endpoint
-        value: $(params.endpoint)
-    runAfter:
-      - create-eks-cluster
-    taskRef:
-      kind: Task
-      name: awscli-eks-cfn-launch-template
-    workspaces:
-      - name: config
-        workspace: config
   - name: create-mng-monitoring-nodes
     params:
     - name: cluster-name
@@ -168,7 +146,7 @@ spec:
     - name: nodegroup-prefix
       value: monitoring-
     runAfter:
-    - create-launch-template
+    - create-eks-cluster
     taskRef:
       kind: Task
       name: awscli-eks-nodegroup-create
