@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create an EKS Node Group Launch Template
+
+Parameters:
+    LaunchTemplateName:
+        Type: String
+        Description: Name of the Launch Template
+
+    ClusterName:
+        Type: String
+        Description: Name of the Cluster
+
+    ImageId:
+        Type: String
+        Description: Latest AMI for a given kubernetes version
+
+    ClusterCA:
+        Type: String
+        Description: Base64-encoded cluster CA certificate
+
+    APIServerEndpoint:
+        Type: String
+        Description: API server endpoint URL
+
+    DNSClusterIPRange:
+        Type: String
+        Description: DNS cluster IP range
+
+Resources:
+    NodeGroupLaunchTemplate:
+        Type: AWS::EC2::LaunchTemplate
+        Properties:
+            LaunchTemplateName: !Ref LaunchTemplateName
+            LaunchTemplateData:
+                ImageId: !Ref ImageId
+                BlockDeviceMappings:
+                    - DeviceName: /dev/xvda
+                      Ebs:
+                          VolumeSize: 20
+                          VolumeType: gp2
+                UserData: !Base64
+                    "Fn::Sub": |
+                        MIME-Version: 1.0
+                        Content-Type: multipart/mixed; boundary="==MYBOUNDARY=="
+                        
+                        --==MYBOUNDARY==
+                        Content-Type: text/x-shellscript; charset="us-ascii"
+                        
+                        #!/bin/bash 
+                        set -ex
+                        
+                        /etc/eks/bootstrap.sh ${ClusterName} \
+                          --b64-cluster-ca ${ClusterCA} \
+                          --apiserver-endpoint ${APIServerEndpoint} \
+                          --dns-cluster-ip ${DNSClusterIPRange} \
+                          --container-runtime containerd 
+                        
+                        --==MYBOUNDARY==--
+                MetadataOptions:
+                    HttpPutResponseHopLimit: 2
+                    HttpEndpoint: enabled
+                    HttpTokens: required
+
+Outputs:
+    NodeGroupLaunchTemplateName:
+        Description: Name of the Node Group Launch Template
+        Value: !Ref NodeGroupLaunchTemplate
