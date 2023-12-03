@@ -138,6 +138,7 @@ spec:
         export ENABLE_PROMETHEUS_SERVER=true
         export PROMETHEUS_PVC_STORAGE_CLASS=gp2
         export PROMETHEUS_SCRAPE_KUBE_PROXY=false
+        export PROMETHEUS_KUBE_PROXY_SELECTOR_KEY=k8s-app
         export PROMETHEUS_SCRAPE_APISERVER_ONLY=true
       fi
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config.yaml
