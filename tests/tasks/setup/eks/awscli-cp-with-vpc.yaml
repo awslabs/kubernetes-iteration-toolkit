@@ -85,5 +85,4 @@ spec:
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
       aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version v1.0.0-eksbuild.1
-      # confirm that EKS Pod Identity Agent pods are running
-      kubectl get pods -n kube-system | grep 'eks-pod-identity-agent' 
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
