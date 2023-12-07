@@ -79,10 +79,11 @@ spec:
       kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=$(params.aws-ebs-csi-driver-version)"
       # TODO: Calculate replicas based on the cluster size going forward.
       kubectl scale --replicas 1000 deploy coredns -n kube-system
+      #ToDo - remove these comments after experimentation
       # Install EKS Pod Identity Agent 
-      ENDPOINT_FLAG=""
-      if [ -n "$(params.endpoint)" ]; then
-        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
-      fi
-      aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version v1.0.0-eksbuild.1
-      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      # ENDPOINT_FLAG=""
+      # if [ -n "$(params.endpoint)" ]; then
+      #   ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      # fi
+      # aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version v1.0.0-eksbuild.1
+      # aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 

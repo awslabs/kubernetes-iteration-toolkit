@@ -153,18 +153,6 @@ spec:
     workspaces:
     - name: config
       workspace: config
-  - name: install-fluentbit-addon
-    params:
-    - name: cluster-name
-      value: $(params.cluster-name)
-    runAfter:
-    - create-mng-monitoring-nodes
-    taskRef:
-      kind: Task
-      name: eks-addon-fluentbit
-    workspaces:
-    - name: config
-      workspace: config
   - name: create-mng-nodes
     params:
     - name: cluster-name
@@ -176,22 +164,10 @@ spec:
     - name: endpoint
       value: $(params.endpoint)
     runAfter:
-    - install-fluentbit-addon
+    - create-mng-monitoring-nodes
     taskRef:
       kind: Task
       name: awscli-eks-nodegroup-create
-    workspaces:
-    - name: config
-      workspace: config
-  - name: create-cw-agent-addon
-    params:
-    - name: cluster-name
-      value: $(params.cluster-name)
-    runAfter:
-    - create-mng-nodes
-    taskRef:
-      kind: Task
-      name: eks-addon-cwagent
     workspaces:
     - name: config
       workspace: config
@@ -212,7 +188,7 @@ spec:
     - name: amp-workspace-id
       value: $(params.amp-workspace-id)
     runAfter:
-    - create-cw-agent-addon
+    - create-mng-nodes
     taskRef:
       kind: Task
       name: load-slos
