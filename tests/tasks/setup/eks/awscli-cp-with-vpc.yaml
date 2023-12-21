@@ -57,7 +57,8 @@ spec:
       if [ "$CREATED_CLUSTER" == "" ]; then
         aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
       fi
-      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
+      sleep 300 
   - name: write-kubeconfig
     image: alpine/k8s:1.23.7
     script: |
