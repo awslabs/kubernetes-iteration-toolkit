@@ -1,0 +1,61 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-cfn-launch-template
+  namespace: scalability
+spec:
+  description: |
+    Create an EKS CFN stack to output a launch template.
+    This Task can be used to create an EKS CFN stack that outputs a launch template.
+  params:
+    - name: cluster-name
+      description: EKS cluster you want to create CFN stack for.
+    - name: stack-name
+      description: Stack name you want to spin.
+    - name: region
+      default: "us-west-2"
+      description: The region where the cluster is in.
+    - name: kubernetes-version
+      default: "1.28"
+      description: The EKS version to install.
+    - name: ng-cfn-url
+      description: The url of the CFN YAML/JSON to create CFN stack for NG launch template
+    - name: endpoint
+      default: ""
+  workspaces:
+    - name: config
+      mountPath: /config/
+  stepTemplate:
+    env:
+      - name: KUBECONFIG
+        value: /config/kubeconfig
+  steps:
+    - name: create-launch-template
+      image: alpine/k8s:1.23.7
+      script: |
+        set -x
+        ENDPOINT_FLAG=""
+        if [ -n "$(params.endpoint)" ]; then
+          ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+        fi
+        
+        curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
+        
+        launch_template_name=$(params.cluster-name)-launchTemplate
+        STACK_NAME=$(params.stack-name)
+        STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
+
+        if [[ "$STACK_STATUS" == "" ]]; then
+            aws cloudformation create-stack \
+                --stack-name $STACK_NAME \
+                --template-body file://$(pwd)/amazon-ng-cfn \
+                --parameters ParameterKey=LaunchTemplateName,ParameterValue=$launch_template_name\
+                    ParameterKey=ClusterName,ParameterValue=$(params.cluster-name)\
+                --region $(params.region)
+        
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $(params.region)
+            echo "CREATED_CFN_STACK=$STACK_NAME"
+        else
+            echo "$STACK_NAME Already exists"
+        fi
