@@ -69,15 +69,17 @@ spec:
       NG_SUBNETS=$(aws eks $ENDPOINT_FLAG --region $(params.region)  describe-cluster --name $(params.cluster-name) \
       --query cluster.resourcesVpcConfig.subnetIds --output text \
       )
-
+      
       max_nodes=$(params.max-nodes)
       nodes=$(params.desired-nodes)
       asgs=$((nodes/max_nodes))
       echo "asgs: $asgs"
       node_group=$(params.nodegroup-prefix)$(params.cluster-name)-nodes
+    
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
+        launch_template_name=$(params.cluster-name)-launchTemplate
         CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$node_group_name'`]' --output text)
         EC2_INSTANCES=$3
         if [ "$CREATED_NODEGROUP" == "" ]; then
@@ -86,6 +88,7 @@ spec:
           --cluster-name $(params.cluster-name) \
           --nodegroup-name $node_group_name \
           --node-role $NODE_ROLE_ARN \
+          --launch-template name=$launch_template_name\
           --region $(params.region) \
           --instance-types $EC2_INSTANCES \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
