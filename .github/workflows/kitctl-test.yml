@@ -31,7 +31,7 @@ jobs:
           sudo mv kubectl /usr/local/bin/
       - name: Build kitctl, provision Kit Environment and KIT guest cluster.
         run: |
-          allVersions=("1-21" "1-22" "1-23" "1-24" "1-25")
+          allVersions=("1-21" "1-22" "1-23" "1-24" "1-25" "1-26" "1-27" "1-28" "1-29")
           cd ${HOME}/work/kubernetes-iteration-toolkit/kubernetes-iteration-toolkit/substrate/cmd/kitctl
           go build  .
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
@@ -126,7 +126,7 @@ jobs:
       - name:  Delete the Guest Control plane and Dataplane
         if: always()
         run: |
-          allVersions=("1-21" "1-22" "1-23" "1-24" "1-25")
+          allVersions=("1-21" "1-22" "1-23" "1-24" "1-25" "1-26" "1-27" "1-28" "1-29")
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
             os_type="linux"    
           elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
