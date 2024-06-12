@@ -23,6 +23,7 @@ import (
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/functional"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/imageprovider"
 	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/object"
+	"github.com/awslabs/kubernetes-iteration-toolkit/operator/pkg/utils/patch"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +49,13 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 	if controlPlane.Spec.Master.KMSKeyID == nil {
 		return nil
 	}
-	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	encryptionProviderPodSpec := encryptionProviderPodSpecFor(controlPlane)
+	if controlPlane.Spec.Master.EncryptionProvider != nil {
+		encryptionProviderPodSpec, err = patch.PodSpec(&encryptionProviderPodSpec, controlPlane.Spec.Master.EncryptionProvider.Spec)
+		if err != nil {
+			return fmt.Errorf("patch encryption provider pod spec, %w", err)
+		}
+	}
 	return c.kubeClient.EnsurePatch(ctx, &appsv1.DaemonSet{},
 		object.WithOwner(controlPlane, &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
@@ -61,47 +68,7 @@ func (c *Controller) reconcileEncryptionProvider(ctx context.Context, controlPla
 				Selector:       &metav1.LabelSelector{MatchLabels: providerLabels(controlPlane.ClusterName())},
 				Template: v1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{Labels: providerLabels(controlPlane.ClusterName())},
-					Spec: v1.PodSpec{
-						PriorityClassName: "system-node-critical",
-						Tolerations:       []v1.Toleration{{Operator: v1.TolerationOpExists}},
-						NodeSelector:      nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd),
-						Containers: []v1.Container{{
-							Name:    "aws-encryption-provider",
-							Image:   imageprovider.AWSEncryptionProvider(),
-							Command: []string{"/aws-encryption-provider"},
-							Args: []string{
-								"--key=" + aws.StringValue(controlPlane.Spec.Master.KMSKeyID),
-								"--listen=/var/run/kmsplugin/socket.sock",
-							},
-							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
-							LivenessProbe: &v1.Probe{
-								ProbeHandler: v1.ProbeHandler{
-									HTTPGet: &v1.HTTPGetAction{
-										Scheme: v1.URISchemeHTTP,
-										Path:   "/healthz",
-										Port:   intstr.FromInt(8080),
-									},
-								},
-								InitialDelaySeconds: 10,
-								PeriodSeconds:       5,
-								TimeoutSeconds:      5,
-								FailureThreshold:    5,
-							},
-							VolumeMounts: []v1.VolumeMount{{
-								Name:      "var-run-kmsplugin",
-								MountPath: "/var/run/kmsplugin",
-							}},
-						}},
-						Volumes: []v1.Volume{{
-							Name: "var-run-kmsplugin",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: "/var/run/kmsplugin",
-									Type: &hostPathDirectoryOrCreate,
-								},
-							},
-						}},
-					},
+					Spec:       encryptionProviderPodSpec,
 				},
 			},
 		}),
@@ -114,6 +81,51 @@ func EncryptionProviderConfigName(clusterName string) string {
 
 func providerLabels(clustername string) map[string]string {
 	return functional.UnionStringMaps(labelsFor(clustername), map[string]string{"component": "aws-encryption-provider"})
+}
+
+func encryptionProviderPodSpecFor(controlPlane *v1alpha1.ControlPlane) v1.PodSpec {
+	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	return v1.PodSpec{
+		PriorityClassName: "system-node-critical",
+		Tolerations:       []v1.Toleration{{Operator: v1.TolerationOpExists}},
+		NodeSelector:      nodeSelector(controlPlane.ClusterName(), controlPlane.Spec.ColocateAPIServerWithEtcd),
+		Containers: []v1.Container{{
+			Name:    "aws-encryption-provider",
+			Image:   imageprovider.AWSEncryptionProvider(),
+			Command: []string{"/aws-encryption-provider"},
+			Args: []string{
+				"--key=" + aws.StringValue(controlPlane.Spec.Master.KMSKeyID),
+				"--listen=/var/run/kmsplugin/socket.sock",
+			},
+			Ports: []v1.ContainerPort{{ContainerPort: 8080}},
+			LivenessProbe: &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: v1.URISchemeHTTP,
+						Path:   "/healthz",
+						Port:   intstr.FromInt(8080),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       5,
+				TimeoutSeconds:      5,
+				FailureThreshold:    5,
+			},
+			VolumeMounts: []v1.VolumeMount{{
+				Name:      "var-run-kmsplugin",
+				MountPath: "/var/run/kmsplugin",
+			}},
+		}},
+		Volumes: []v1.Volume{{
+			Name: "var-run-kmsplugin",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/var/run/kmsplugin",
+					Type: &hostPathDirectoryOrCreate,
+				},
+			},
+		}},
+	}
 }
 
 var (
