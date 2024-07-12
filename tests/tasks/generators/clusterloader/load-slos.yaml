@@ -61,7 +61,7 @@ spec:
       git checkout $(params.cl2-branch)
       git branch
   - name: prepare-loadtest
-    image: golang:1.19
+    image: golang:1.22
     workingDir: $(workspaces.source.path)
     script: |
       S3_RESULT_PATH=$(params.results-bucket)
@@ -145,7 +145,7 @@ spec:
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
       GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
   - name: run-loadtest
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.30.2
     onError: continue
     script: |
       #!/bin/bash
