@@ -91,6 +91,7 @@ spec:
       CL2_ALLOWED_SLOW_API_CALLS: 1
       CL2_PROMETHEUS_NODE_SELECTOR: "eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1"
       CL2_PROMETHEUS_MEMORY_SCALE_FACTOR: 4
+      CL2_ENABLE_CLUSTER_OOMS_TRACKER: false
       EOL
       cat $(workspaces.source.path)/overrides.yaml
       cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
