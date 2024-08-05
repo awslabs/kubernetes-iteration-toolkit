@@ -47,5 +47,5 @@ spec:
           ready_node=$(kubectl --kubeconfig=/tmp/kubeconfig get nodes 2>/dev/null | grep -w Ready | wc -l)
           if [[ "$ready_node" -eq $(params.node-count) ]]; then break; fi
           sleep 5
-      done 
+      done
       kubectl --kubeconfig=/tmp/kubeconfig get nodes

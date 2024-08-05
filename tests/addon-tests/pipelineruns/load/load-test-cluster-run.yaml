@@ -1,0 +1,48 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: load-test-cluster-run
+  namespace: tekton-pipelines
+spec:
+  workspaces:
+    - name: source
+      emptyDir: {}
+    - name: results
+      emptyDir: {}
+    - name: config
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          storageClassName: kit-gp2
+          resources:
+            requests:
+              storage: 1Gi
+  params:
+  - name: cluster-name
+    value: addon-test-cluster-3
+  - name: endpoint
+    value: ""
+  - name: desired-nodes
+    value: "50"
+  - name: vpc-cfn-url
+    value: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/amazon-eks-vpc.json"
+  - name: pods-per-node
+    value: "10"
+  - name: nodes-per-namespace
+    value: "10"
+  - name: cl2-load-test-throughput
+    value: "20"
+  - name: results-bucket
+    value: ""
+  - name: amp-workspace-id
+    value: ""
+  - name: kubernetes-version
+    value: "1.25"
+  podTemplate:
+    nodeSelector:
+      kubernetes.io/arch: amd64
+  serviceAccountName: tekton-pipelines-executor
+  pipelineRef:
+    name: load-test-cluster
+  timeout: "0"
