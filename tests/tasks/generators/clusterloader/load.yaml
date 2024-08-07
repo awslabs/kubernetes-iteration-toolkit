@@ -61,7 +61,7 @@ spec:
       git checkout $(params.cl2-branch)
       git branch
   - name: prepare-loadtest
-    image: golang:1.19
+    image: golang:1.22
     workingDir: $(workspaces.source.path)
     script: |
       S3_RESULT_PATH=$(params.results-bucket)
@@ -73,6 +73,7 @@ spec:
       CL2_DELETE_TEST_THROUGHPUT: $(params.cl2-load-test-throughput)
       CL2_SCHEDULER_THROUGHPUT_THRESHOLD: 70
       PODS_PER_NODE: $(params.pods-per-node)
+      CL2_ENABLE_CLUSTER_OOMS_TRACKER: false
       CL2_RATE_LIMIT_POD_CREATION: false
       CL2_USE_HOST_NETWORK_PODS: false
       # we are not testing PVS at this point
@@ -127,7 +128,7 @@ spec:
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
       GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
   - name: run-loadtest
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.30.2
     onError: continue
     script: |
       #!/bin/bash
