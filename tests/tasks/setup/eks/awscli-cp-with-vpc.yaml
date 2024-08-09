@@ -81,8 +81,10 @@ spec:
       kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=$(params.aws-ebs-csi-driver-version)"
       # TODO: Calculate replicas based on the cluster size going forward.
       # Patching the coredns not to get scheduled on the monitoring node.
+      # Set revisionHistoryLimit to 0 to avoid keeping older replicasets.
       kubectl patch deployment coredns --patch '{
         "spec": {
+          "revisionHistoryLimit": 0,
           "template": {
             "spec": {
               "affinity": {
