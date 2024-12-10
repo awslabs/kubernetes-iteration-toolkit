@@ -42,16 +42,14 @@ spec:
         
         curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
 
-        SSH_KEY_NAME=scaletest-$(params.region)-nodegroups-ssh-key
-        if [[ "$(aws ec2 --region $(params.region) describe-key-pairs --key-names $SSH_KEY_NAME --query 'KeyPairs[?KeyName==`'$SSH_KEY_NAME'`].KeyName' --output text)" -eq 0 ]]; 
-        then 
-            echo "KeyPair not found"; 
-            rm -f $HOME/.ssh/$SSH_KEY_NAME.pem
-            aws ec2 create-key-pair --region $(params.region) --key-name $SSH_KEY_NAME --query 'KeyMaterial' --output text > $HOME/.ssh/$SSH_KEY_NAME.pem
-            chmod 400 $HOME/.ssh/$SSH_KEY_NAME.pem
-            ssh-add -k $HOME/.ssh/$SSH_KEY_NAME.pem
-        else 
-            echo "KeyPair already exists"; 
+        SSH_KEY_NAME=scaletest-nodegroups-ssh-key
+        if [[ "$(aws ec2 --region "$(params.region)" describe-key-pairs --key-names "$SSH_KEY_NAME" --query 'KeyPairs[0].KeyName' --output text)" == "$SSH_KEY_NAME" ]]; then
+            echo "KeyPair '$SSH_KEY_NAME' already exists."
+        else
+            echo "KeyPair not found. Creating a new keypair."
+            # Given these are temp nodes, outputting key for devs to copy it to use for debugging
+            #ToDo - store it in s3 for devs to download it.
+            aws ec2 create-key-pair --region $(params.region) --key-name $SSH_KEY_NAME --query 'KeyMaterial' --output text
         fi
 
         launch_template_name=$(params.cluster-name)-launchTemplate
