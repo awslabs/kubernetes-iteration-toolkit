@@ -69,7 +69,17 @@ spec:
       asgs=$((nodes/max_nodes))
       echo "asgs: $asgs"
       node_group=$(params.nodegroup-prefix)$(params.cluster-name)-nodes
-    
+      SSH_KEY_NAME=scaletest-$(params.region)-nodegroups-ssh-key
+      if [[ "$(aws ec2 --region $(params.region) describe-key-pairs --key-names $SSH_KEY_NAME --query 'KeyPairs[?KeyName==`'$SSH_KEY_NAME'`].KeyName' --output text)" -eq 0 ]]; 
+      then 
+          echo "KeyPair not found"; 
+          rm -f $HOME/.ssh/$SSH_KEY_NAME.pem
+          aws ec2 create-key-pair --region $(params.region) --key-name $SSH_KEY_NAME --query 'KeyMaterial' --output text > $HOME/.ssh/$SSH_KEY_NAME.pem
+          chmod 400 $HOME/.ssh/$SSH_KEY_NAME.pem
+          ssh-add -k $HOME/.ssh/$SSH_KEY_NAME.pem
+      else 
+          echo "KeyPair already exists"; 
+      fi
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
@@ -86,6 +96,7 @@ spec:
           --region $(params.region) \
           --instance-types $EC2_INSTANCES \
           --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
+          --remote-access ec2SshKey=$SSH_KEY_NAME \
           --subnets $NG_SUBNETS $TAINTS_FLAG
         fi
         echo "CREATED_NODEGROUP=$node_group_name"
