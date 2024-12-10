@@ -9,6 +9,10 @@
         "ClusterName": {
             "Type": "String",
             "Description": "Name of the Cluster"
+        },
+        "SSHKeyName": {
+            "Type": "String",
+            "Description": "SSH Key Name for EC2 instances"
         }
     },
     "Resources": {
@@ -17,6 +21,7 @@
             "Properties": {
                 "LaunchTemplateName": { "Ref": "LaunchTemplateName" },
                 "LaunchTemplateData": {
+                    "KeyName": { "Ref": "SSHKeyName" },
                     "BlockDeviceMappings": [
                         {
                             "DeviceName": "/dev/xvda",
