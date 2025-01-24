@@ -38,6 +38,7 @@ spec:
           aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
       done;
       aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
+      sleep 900
   - name: teardown-eks-role-stack
     image: alpine/k8s:1.23.7
     script: |
