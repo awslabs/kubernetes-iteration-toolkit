@@ -172,6 +172,11 @@ func (in *MasterSpec) DeepCopyInto(out *MasterSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.EncryptionProvider != nil {
+		in, out := &in.EncryptionProvider, &out.EncryptionProvider
+		*out = new(Component)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Scheduler != nil {
 		in, out := &in.Scheduler, &out.Scheduler
 		*out = new(Component)
