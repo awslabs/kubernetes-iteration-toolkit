@@ -1,0 +1,97 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-cfn-launch-template-al2023
+  namespace: scalability
+spec:
+  description: |
+    Create an EKS CFN stack to output a launch template for AL2023-based nodes.
+    This Task can be used to create an EKS CFN stack that outputs a launch template.
+    The launch template may be used for a managed nodegroup with or without a custom AMI.
+  params:
+    - name: cluster-name
+      description: EKS cluster you want to create CFN stack for.
+    - name: stack-name
+      description: Stack name you want to spin.
+    - name: region
+      default: "us-west-2"
+      description: The region where the cluster is in.
+    - name: kubernetes-version
+      default: "1.32"
+      description: The EKS version to install.
+    - name: ng-cfn-url
+      description: The url of the CFN YAML/JSON to create CFN stack for NG launch template
+    - name: endpoint
+      default: ""
+    - name: kubelet-config
+      default: "{}"
+      description: "Kubelet config JSON (will be merged with default config)"
+    - name: ami
+      default: ""
+      description: The AMI ID (or SSM parameter) to use for the launch template. If not provided, the launch template will not specify an AMI.
+  workspaces:
+    - name: config
+      mountPath: /config/
+  stepTemplate:
+    env:
+      - name: KUBECONFIG
+        value: /config/kubeconfig
+  steps:
+    - name: create-launch-template
+      image: alpine/k8s:1.23.7
+      script: |
+        set -o xtrace
+        set -o errexit
+        set -o pipefail
+
+        ENDPOINT_FLAG=""
+        if [ -n "$(params.endpoint)" ]; then
+          ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+        fi
+
+        curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
+
+        SSH_KEY_NAME=scaletest-nodegroups-ssh-key
+        if [[ "$(aws ec2 --region "$(params.region)" describe-key-pairs --key-names "$SSH_KEY_NAME" --query 'KeyPairs[0].KeyName' --output text)" == "$SSH_KEY_NAME" ]]; then
+            echo "KeyPair '$SSH_KEY_NAME' already exists."
+        else
+            echo "KeyPair not found. Creating a new keypair."
+            # Given these are temp nodes, outputting key for devs to copy it to use for debugging
+            #ToDo - store it in s3 for devs to download it.
+            aws ec2 create-key-pair --region $(params.region) --key-name $SSH_KEY_NAME --query 'KeyMaterial' --output text
+        fi
+
+        aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --output json > cluster.json
+
+        launch_template_name=$(params.cluster-name)-launchTemplate
+        STACK_NAME=$(params.stack-name)
+        STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
+
+        # assemble the stack parameters as a JSON file
+        # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
+        # and we need that for kubelet-config
+        jq --null-input \
+            --arg LaunchTemplateName "${launch_template_name}" \
+            --arg ClusterName "$(params.cluster-name)" \
+            --arg SSHKeyName "${SSH_KEY_NAME}" \
+            --arg APIServerEndpoint "$(jq -r .cluster.endpoint cluster.json)" \
+            --arg ClusterCIDR "$(jq -r .cluster.kubernetesNetworkConfig.serviceIpv4Cidr cluster.json)" \
+            --arg CertificateAuthority "$(jq -r .cluster.certificateAuthority.data cluster.json)" \
+            --arg KubeletConfig '$(params.kubelet-config)' \
+            --arg AMI "$(params.ami)" \
+            '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \
+          > parameters.json
+
+        if [[ "$STACK_STATUS" == "" ]]; then
+            aws cloudformation create-stack \
+                --stack-name $STACK_NAME \
+                --template-body file://$(pwd)/amazon-ng-cfn \
+                --parameters file://$(pwd)/parameters.json \
+                --region $(params.region)
+
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $(params.region)
+            echo "CREATED_CFN_STACK=$STACK_NAME"
+        else
+            echo "$STACK_NAME Already exists"
+        fi
