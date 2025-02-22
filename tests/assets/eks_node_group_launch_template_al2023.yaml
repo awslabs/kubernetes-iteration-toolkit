@@ -1,0 +1,85 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create a launch template for use in an autoscaling group of EKS nodes
+  (Amazon Linux 2023)
+Parameters:
+  LaunchTemplateName:
+    Type: String
+    Description: Name of the Launch Template
+  ClusterName:
+    Type: String
+    Description: Name of the Cluster
+  SSHKeyName:
+    Type: String
+    Description: SSH Key Name for EC2 instances
+  APIServerEndpoint:
+    Type: String
+    Description: Kubernetes API Server Endpoint
+  CertificateAuthority:
+    Type: String
+    Description: Certificate Authority data (base64 encoded)
+  ClusterCIDR:
+    Type: String
+    Description: CIDR for cluster (IP range for pods)
+  KubeletConfig:
+    Type: String
+    Description: Kubelet config JSON (will be merged with default config)
+    Default: '{}'
+  AMI:
+    Type: String
+    Description: Launch template ImageId value, which may be an AMI ID or resolve:ssm reference.
+    Default: ''
+Conditions:
+  AMIProvided:
+    !Not [!Equals [!Ref AMI, '']]
+Resources:
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName:
+        Ref: LaunchTemplateName
+      LaunchTemplateData:
+        KeyName:
+          Ref: SSHKeyName
+        BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeSize: 40
+            VolumeType: gp3
+        MetadataOptions:
+          HttpPutResponseHopLimit: 2
+          HttpEndpoint: enabled
+          HttpTokens: required
+        ImageId:
+          !If
+          - AMIProvided
+          - !Ref AMI
+          - !Ref "AWS::NoValue"
+        UserData:
+          Fn::Base64:
+            Fn::Sub: |
+              Content-Type: multipart/mixed; boundary="BOUNDARY"
+              MIME-Version: 1.0
+              
+              --BOUNDARY
+              Content-Type: application/node.eks.aws
+              MIME-Version: 1.0
+              
+              ---
+              apiVersion: node.eks.aws/v1alpha1
+              kind: NodeConfig
+              spec:
+                cluster:
+                  name: ${ClusterName}
+                  apiServerEndpoint: ${APIServerEndpoint}
+                  certificateAuthority: ${CertificateAuthority}
+                  cidr: ${ClusterCIDR}
+                kubelet:
+                  config: ${KubeletConfig}
+
+              --BOUNDARY--
+Outputs:
+  LaunchTemplateName:
+    Description: Name of the Node Group Launch Template
+    Value:
+      Ref: LaunchTemplate
