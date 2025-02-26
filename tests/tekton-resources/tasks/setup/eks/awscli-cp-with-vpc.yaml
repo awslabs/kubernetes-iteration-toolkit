@@ -3,11 +3,11 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: awscli-eks-cluster-create-with-vpc-stack
-  namespace: scalability  
+  namespace: scalability
 spec:
   description: |
     Create an EKS cluster.
-    This Task can be used to create an EKS cluster for a given service role, region in an AWS account 
+    This Task can be used to create an EKS cluster for a given service role, region in an AWS account
   params:
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
@@ -53,11 +53,11 @@ spec:
       echo "subnets=$subnets"
       sg=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.vpc-stack-name) --query='Stacks[].Outputs[?OutputKey==`SecurityGroups`].OutputValue' --output text)
       echo "securitygroup=$sg"
-      
+
       if [ "$CREATED_CLUSTER" == "" ]; then
         aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
       fi
-      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
   - name: write-kubeconfig
     image: alpine/k8s:1.23.7
     script: |
@@ -69,8 +69,8 @@ spec:
   - name: install-addons-and-validate
     image: alpine/k8s:1.23.7
     script: |
-      # enable PD on the cluster 
-      kubectl api-versions 
+      # enable PD on the cluster
+      kubectl api-versions
       kubectl api-resources
       # Apiserver is not recongnizing deamonset for sometime inconsistently, need to see if livez/readyz are healthy
       while true; do date && kubectl get --raw "/readyz" --v=10 && break ; sleep 5; done
@@ -110,11 +110,10 @@ spec:
         }
       }' -n kube-system
       kubectl scale --replicas 1000 deploy coredns -n kube-system
-      #ToDo - remove these comments after experimentation
-      # Install EKS Pod Identity Agent 
-      # ENDPOINT_FLAG=""
-      # if [ -n "$(params.endpoint)" ]; then
-      #   ENDPOINT_FLAG="--endpoint $(params.endpoint)"
-      # fi
-      # aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version v1.0.0-eksbuild.1
-      # aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name) 
+      # Install EKS Pod Identity Agent
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version v1.3.5-eksbuild.2
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
