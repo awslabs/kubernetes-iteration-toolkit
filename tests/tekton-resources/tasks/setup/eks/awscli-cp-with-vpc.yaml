@@ -27,6 +27,9 @@ spec:
   - name: aws-ebs-csi-driver-version
     default: release-1.13
     description: The release version for aws ebs csi driver.
+  - name: aws-pod-identity-agent-version
+    default: v1.3.5-eksbuild.2
+    description: The release version for aws pod identity agent.
   workspaces:
   - name: config
     mountPath: /config/
@@ -115,5 +118,5 @@ spec:
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
-      aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version v1.3.5-eksbuild.2
+      aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version $(params.aws-pod-identity-agent-version)
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
