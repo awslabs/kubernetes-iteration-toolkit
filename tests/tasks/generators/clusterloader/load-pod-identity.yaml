@@ -15,19 +15,19 @@ spec:
     default: "eks-pod-identity"
   - name: cl2-eks-pod-identity-pods
     description: "pods for testing eks pod identity service"
-    default: "5000"
+    default: "2000"
   - name: cl2-default-qps
     description: "default qps"
     default: "500"
   - name: cl2-default-burst
     description: "default burst"
-    default: "1000"
+    default: "800"
   - name: cl2-uniform-qps
     description: "uniform qps"
-    default: "500"
+    default: "400"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
-    default: "1000"
+    default: "800"
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
   - name: region
@@ -37,10 +37,10 @@ spec:
     description: "The name of the EKS cluster you want to spin"
   - name: namespace-prefix
     default: "default"
-    description: "The namespace prefix"
-  - name: namespaces
+    description: "The prefix of namespaces for EKS Pod Identity test."
+  - name: namespace-count
     default: "1"
-    description: "The number of namespaces"
+    description: "The number of namespaces for EKS Pod Identity test"
   - name: amp-workspace-id
     description: The AMP workspace ID where remote write needs to happen.
     default: ""
@@ -82,7 +82,7 @@ spec:
       CL2_DEFAULT_BURST: $(params.cl2-default-burst)
       CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
       CL2_NAMESPACE_PREFIX: $(params.namespace-prefix)
-      CL2_NAMESPACES: $(params.namespaces)
+      CL2_NAMESPACE_COUNT: $(params.namespace-count)
       CL2_PROMETHEUS_NODE_SELECTOR: "eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1"
       EOL
       cat $(workspaces.source.path)/overrides.yaml

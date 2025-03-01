@@ -16,8 +16,9 @@ spec:
     description: The region where the cluster is in.
   - name: endpoint
     default: ""
-  - name: namespaces
-    default: "1"
+  - name: namespace-count
+    description: The number of namespaces for EKS Pod Identity test.
+    default: "0"
   - name: slack-hook
     default: ""
   - name: slack-message
@@ -47,7 +48,7 @@ spec:
       echo "Cluster is deleted..."
 
       MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
-      for i in $(seq 1 $(params.namespaces)); do
+      for i in $(seq 1 $(params.namespace-count)); do
         PIA_ROLE_NAME=$(params.cluster-name)-pia-role-$i
         PIA_ROLE_EXISTS=$(aws iam get-role --role-name $PIA_ROLE_NAME --query 'Role.RoleName' --output text 2>/dev/null)
         if [ "$PIA_ROLE_EXISTS" == "$PIA_ROLE_NAME" ]; then

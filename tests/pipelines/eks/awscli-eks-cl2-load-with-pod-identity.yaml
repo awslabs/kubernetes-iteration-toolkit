@@ -20,8 +20,10 @@ spec:
     default: "500"
   - name: namespace-prefix
     default: "default"
-  - name: namespaces
+    description: "The prefix of namespaces for EKS Pod Identity test."
+  - name: namespace-count
     default: "1"
+    description: "The number of namespaces for EKS Pod Identity test."
   - name: results-bucket
   - name: slack-hook
   - name: slack-message
@@ -37,6 +39,8 @@ spec:
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_service_role.json"
   - name: node-role-cfn-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_role.json"
+  - name: pia-trust-policy-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/pia-trust-policy.json"
   tasks:
   - name: slack-notification
     params:
@@ -184,8 +188,10 @@ spec:
       value: $(params.endpoint)
     - name: namespace-prefix
       value: $(params.namespace-prefix)
-    - name: namespaces
-      value: $(params.namespaces)
+    - name: namespace-count
+      value: $(params.namespace-count)
+    - name: pia-trust-policy-url
+      value: $(params.pia-trust-policy-url)
     runAfter:
     - create-mng-nodes
     taskRef:
@@ -212,8 +218,8 @@ spec:
       value: $(params.cluster-name)
     - name: namespace-prefix
       value: $(params.namespace-prefix)
-    - name: namespaces
-      value: $(params.namespaces)
+    - name: namespace-count
+      value: $(params.namespace-count)
     - name: amp-workspace-id
       value: '$(params.amp-workspace-id)'
     runAfter:
@@ -249,8 +255,8 @@ spec:
       value: $(params.cluster-name)
     - name: endpoint
       value: $(params.endpoint)
-    - name: namespaces
-      value: $(params.namespaces)
+    - name: namespace-count
+      value: $(params.namespace-count)
     - name: slack-hook
       value: $(params.slack-hook)
     - name: slack-message
