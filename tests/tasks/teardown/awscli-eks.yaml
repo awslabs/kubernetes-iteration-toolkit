@@ -27,6 +27,7 @@ spec:
   - name: delete-cluster
     image: alpine/k8s:1.23.7
     script: |
+      set +e
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
@@ -37,7 +38,11 @@ spec:
           aws eks delete-nodegroup --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
           aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
       done;
+      echo "Starting to delete cluster..."
       aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
+      echo "Waiting for cluster to be deleted..."
+      aws eks wait cluster-deleted --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
+      echo "Cluster is deleted..."
   - name: teardown-eks-role-stack
     image: alpine/k8s:1.23.7
     script: |
