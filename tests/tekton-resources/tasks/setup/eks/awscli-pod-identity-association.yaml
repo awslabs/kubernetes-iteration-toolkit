@@ -23,7 +23,7 @@ spec:
     default: "1"
     description: "The number of namespaces for EKS Pod Identity test."
   - name: pia-trust-policy-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/pia-trust-policy.json"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pia-trust-policy.json"
   workspaces:
   - name: config
     mountPath: /config/
@@ -52,23 +52,6 @@ spec:
       TRUST_POLICY_FILE="pia-trust-policy.json"
       # create a trust policy json file
       curl -s $(params.pia-trust-policy-url) -o ./$TRUST_POLICY_FILE
-      cat > $TRUST_POLICY_FILE <<EOF
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Principal": {
-              "Service": "beta.pods.eks.aws.internal"
-            },
-            "Action": [
-              "sts:AssumeRole",
-              "sts:TagSession"
-            ]
-          }
-        ]
-      }
-      EOF
       for i in $(seq 1 $(params.namespace-count)); do
         kubectl create namespace $(params.namespace-prefix)-$i
 

@@ -9,10 +9,10 @@ spec:
   params:
   - name: giturl
     description: "git url to clone the package"
-    default: https://github.com/xdu31/perf-tests.git
+    default: https://github.com/kubernetes/perf-tests.git
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
-    default: "eks-pod-identity"
+    default: "master"
   - name: cl2-eks-pod-identity-pods
     description: "pods for testing eks pod identity service"
     default: "2000"
@@ -41,6 +41,12 @@ spec:
   - name: namespace-count
     default: "1"
     description: "The number of namespaces for EKS Pod Identity test"
+  - name: pia-test-config-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/config.yaml"
+  - name: pia-test-pod-spec-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/pod-default.yaml"
+  - name: timeout-pia-pod-creation
+    default: "5m"
   - name: amp-workspace-id
     description: The AMP workspace ID where remote write needs to happen.
     default: ""
@@ -83,6 +89,7 @@ spec:
       CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
       CL2_NAMESPACE_PREFIX: $(params.namespace-prefix)
       CL2_NAMESPACE_COUNT: $(params.namespace-count)
+      CL2_TIMEOUT_EKS_POD_IDENTITY_POD_CREATION: $(params.timeout-pia-pod-creation)
       CL2_PROMETHEUS_NODE_SELECTOR: "eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1"
       EOL
       cat $(workspaces.source.path)/overrides.yaml
@@ -140,8 +147,15 @@ spec:
         export PROMETHEUS_KUBE_PROXY_SELECTOR_KEY=k8s-app
         export PROMETHEUS_SCRAPE_APISERVER_ONLY=true
       fi
+
+      #prepare eks pod identity load test config
+      mkdir -p $(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity
+      curl -s $(params.pia-test-config-url) -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/config.yaml
+      curl -s $(params.pia-test-pod-spec-url) -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/pod-default.yaml
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/config.yaml
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/pod-default.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
+
       ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
       exit_code=$?
       if [ $exit_code -eq 0 ]; then
