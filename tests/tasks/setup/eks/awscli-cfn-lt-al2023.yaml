@@ -30,6 +30,8 @@ spec:
     - name: ami
       default: ""
       description: The AMI ID (or SSM parameter) to use for the launch template. If not provided, the launch template will not specify an AMI.
+    - name: node-role-name
+      description: The name of the IAM role to use for the node's instance profile, specified in the launch template.
   workspaces:
     - name: config
       mountPath: /config/
@@ -80,6 +82,8 @@ spec:
             --arg CertificateAuthority "$(jq -r .cluster.certificateAuthority.data cluster.json)" \
             --arg KubeletConfig '$(params.kubelet-config)' \
             --arg AMI "$(params.ami)" \
+            --arg SecurityGroup "$(jq -r .cluster.resourcesVpcConfig.clusterSecurityGroupId cluster.json)" \
+            --arg NodeRoleName '$(params.node-role-name)' \
             '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \
           > parameters.json
 
@@ -88,6 +92,7 @@ spec:
                 --stack-name $STACK_NAME \
                 --template-body file://$(pwd)/amazon-ng-cfn \
                 --parameters file://$(pwd)/parameters.json \
+                --capabilities CAPABILITY_IAM \
                 --region $(params.region)
 
             aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $(params.region)
