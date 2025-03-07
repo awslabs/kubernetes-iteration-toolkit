@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -21,7 +21,7 @@ jobs:
             ${{ runner.os }}-go-
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.17.1'
+          go-version: "1.17.1"
       - name: Build & Test
         run: |
           echo "/usr/local/kubebuilder/bin" >> $GITHUB_PATH
@@ -34,20 +34,21 @@ jobs:
         arch: ["amd64"]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cache/go-build
-          ~/go/pkg/mod
-          ~/go/bin/
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-    - uses: actions/setup-go@v2
-      with:
-        go-version: '1.17.1'
-    - name: Build the KIT CLI
-      run: |
-        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ./bin/kitctl ./cmd/kitctl/
-      working-directory: substrate
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/go/bin/
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.17.1"
+      - name: Build the KIT CLI
+        run: |
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -o ./bin/kitctl ./cmd/kitctl/
+        working-directory: substrate
+
