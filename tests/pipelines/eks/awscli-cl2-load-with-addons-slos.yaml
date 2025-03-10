@@ -79,13 +79,13 @@ spec:
   - name: cl2-eks-pod-identity-pods
     default: "5000"
   - name: cl2-default-qps
-    default: "500"
+    default: "200"
   - name: cl2-default-burst
-    default: "1000"
+    default: "400"
   - name: cl2-uniform-qps
-    default: "500"
+    default: "200"
   - name: timeout-pia-pod-creation
-    default: "5m"
+    default: "10m"
   tasks:
   - name: slack-notification
     params:
