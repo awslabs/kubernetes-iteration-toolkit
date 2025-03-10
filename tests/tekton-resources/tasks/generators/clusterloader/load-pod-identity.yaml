@@ -18,13 +18,13 @@ spec:
     default: "2000"
   - name: cl2-default-qps
     description: "default qps"
-    default: "500"
+    default: "200"
   - name: cl2-default-burst
     description: "default burst"
-    default: "800"
+    default: "400"
   - name: cl2-uniform-qps
     description: "uniform qps"
-    default: "400"
+    default: "200"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
     default: "800"

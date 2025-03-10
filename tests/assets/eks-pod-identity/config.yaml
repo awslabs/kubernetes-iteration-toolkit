@@ -26,7 +26,7 @@ steps:
     Params:
       action: start
       labelSelector: group = eks-pod-identity
-      threshold: 10s
+      threshold: 300s
   - Identifier: EksPodIdentity
 # TODO: Move to SchedulingThroughputPrometheus which requires cl2 prom stack setup as pre-req
     Method: SchedulingThroughput
