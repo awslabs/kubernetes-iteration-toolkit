@@ -6,7 +6,7 @@
 {{$defaultBurst := DefaultParam .CL2_DEFAULT_BURST 1000}}
 {{$uniformQps := DefaultParam .CL2_UNIFORM_QPS 500}}
 
-{{$SCHEDULER_THROUGHPUT_THRESHOLD := DefaultParam .CL2_SCHEDULER_THROUGHPUT_THRESHOLD 300}}
+{{$SCHEDULER_THROUGHPUT_THRESHOLD := DefaultParam .CL2_SCHEDULER_THROUGHPUT_THRESHOLD 100}}
 
 name: eks-pod-identity
 tuningSets:

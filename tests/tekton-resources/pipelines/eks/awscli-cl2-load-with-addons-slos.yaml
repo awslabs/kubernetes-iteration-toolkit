@@ -218,34 +218,6 @@ spec:
     workspaces:
     - name: config
       workspace: config
-  - name: generate
-    params:
-    - name: cluster-name
-      value: $(params.cluster-name)
-    - name: pods-per-node
-      value: $(params.pods-per-node)
-    - name: nodes-per-namespace
-      value: $(params.nodes-per-namespace)
-    - name: cl2-load-test-throughput
-      value: $(params.cl2-load-test-throughput)
-    - name: results-bucket
-      value: $(params.results-bucket)
-    - name: nodes
-      value: $(params.desired-nodes)
-    - name: amp-workspace-id
-      value: $(params.amp-workspace-id)
-    runAfter:
-    - create-mng-nodes
-    taskRef:
-      kind: Task
-      name: load-slos
-    workspaces:
-    - name: source
-      workspace: source
-    - name: results
-      workspace: results
-    - name: config
-      workspace: config
   - name: create-pod-identity-association
     params:
     - name: cluster-name
@@ -259,7 +231,7 @@ spec:
     - name: pia-trust-policy-url
       value: $(params.pia-trust-policy-url)
     runAfter:
-    - generate
+    - create-mng-nodes
     taskRef:
       kind: Task
       name:  awscli-eks-pia-create
@@ -299,6 +271,34 @@ spec:
     taskRef:
       kind: Task
       name: load-pod-identity
+    workspaces:
+    - name: source
+      workspace: source
+    - name: results
+      workspace: results
+    - name: config
+      workspace: config
+  - name: generate
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: pods-per-node
+      value: $(params.pods-per-node)
+    - name: nodes-per-namespace
+      value: $(params.nodes-per-namespace)
+    - name: cl2-load-test-throughput
+      value: $(params.cl2-load-test-throughput)
+    - name: results-bucket
+      value: $(params.results-bucket)
+    - name: nodes
+      value: $(params.desired-nodes)
+    - name: amp-workspace-id
+      value: $(params.amp-workspace-id)
+    runAfter:
+    - generate-eks-pod-identity
+    taskRef:
+      kind: Task
+      name: load-slos
     workspaces:
     - name: source
       workspace: source
