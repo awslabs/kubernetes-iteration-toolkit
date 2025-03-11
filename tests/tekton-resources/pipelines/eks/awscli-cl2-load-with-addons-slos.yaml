@@ -21,6 +21,8 @@ spec:
       value: $(params.cluster-name)-node-role
     - name: launch-template-stack-name
       value: $(params.cluster-name)-launch-template
+    - name: namespace-count
+      value: $(params.namespace-count)
     retries: 10
     taskRef:
       kind: Task
@@ -61,6 +63,29 @@ spec:
   - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_role.json
     name: node-role-cfn-url
     type: string
+  - name: namespace-prefix
+    default: "default"
+    description: "The prefix of namespaces for EKS Pod Identity test."
+  - name: namespace-count
+    default: "1"
+    description: "The number of namespaces for EKS Pod Identity test."
+  - name: pia-trust-policy-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pia-trust-policy.json"
+    type: string
+  - name: pia-test-config-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/config.yaml"
+  - name: pia-test-pod-spec-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/pod-default.yaml"
+  - name: cl2-eks-pod-identity-pods
+    default: "5000"
+  - name: cl2-default-qps
+    default: "200"
+  - name: cl2-default-burst
+    default: "400"
+  - name: cl2-uniform-qps
+    default: "200"
+  - name: timeout-pia-pod-creation
+    default: "10m"
   tasks:
   - name: slack-notification
     params:
@@ -193,6 +218,66 @@ spec:
     workspaces:
     - name: config
       workspace: config
+  - name: create-pod-identity-association
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: namespace-prefix
+      value: $(params.namespace-prefix)
+    - name: namespace-count
+      value: $(params.namespace-count)
+    - name: pia-trust-policy-url
+      value: $(params.pia-trust-policy-url)
+    runAfter:
+    - create-mng-nodes
+    taskRef:
+      kind: Task
+      name:  awscli-eks-pia-create
+    workspaces:
+    - name: config
+      workspace: config
+  - name: generate-eks-pod-identity
+    params:
+    - name: cl2-eks-pod-identity-pods
+      value: $(params.cl2-eks-pod-identity-pods)
+    - name: cl2-default-qps
+      value: $(params.cl2-default-qps)
+    - name: cl2-default-burst
+      value: $(params.cl2-default-burst)
+    - name: cl2-uniform-qps
+      value: $(params.cl2-uniform-qps)
+    - name: results-bucket
+      value: $(params.results-bucket)
+    - name: nodes
+      value: $(params.desired-nodes)
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: namespace-prefix
+      value: $(params.namespace-prefix)
+    - name: namespace-count
+      value: $(params.namespace-count)
+    - name: pia-test-config-url
+      value: $(params.pia-test-config-url)
+    - name: pia-test-pod-spec-url
+      value: $(params.pia-test-pod-spec-url)
+    - name: timeout-pia-pod-creation
+      value: $(params.timeout-pia-pod-creation)
+    - name: amp-workspace-id
+      value: '$(params.amp-workspace-id)'
+    runAfter:
+    - create-pod-identity-association
+    taskRef:
+      kind: Task
+      name: load-pod-identity
+    workspaces:
+    - name: source
+      workspace: source
+    - name: results
+      workspace: results
+    - name: config
+      workspace: config
   - name: generate
     params:
     - name: cluster-name
@@ -210,7 +295,7 @@ spec:
     - name: amp-workspace-id
       value: $(params.amp-workspace-id)
     runAfter:
-    - create-mng-nodes
+    - generate-eks-pod-identity
     taskRef:
       kind: Task
       name: load-slos
@@ -230,7 +315,7 @@ spec:
     - name: namespace
       value: $(params.kubernetes-version)
     runAfter:
-    - generate
+    - generate-eks-pod-identity
     taskRef:
       kind: Task
       name: cloudwatch
