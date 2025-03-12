@@ -7,9 +7,17 @@ metadata:
 spec:
   containers:
   - image: registry.k8s.io/pause:3.9
+    imagePullPolicy: IfNotPresent
     name: pause
   initContainers:
   - name: app-init
     image: amazon/aws-cli:latest
-    command: ["/bin/sh"]
-    args: ["-c", "aws sts get-caller-identity"]
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+      - -c
+      - |
+        while ! aws s3 ls; do
+            echo "Waiting for S3 bucket access..."
+        done
+        echo "S3 bucket is accessible, proceeding."
