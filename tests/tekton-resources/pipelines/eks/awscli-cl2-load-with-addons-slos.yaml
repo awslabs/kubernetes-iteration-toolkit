@@ -306,6 +306,19 @@ spec:
       workspace: results
     - name: config
       workspace: config
+  - name: cw-metrics-eks-pod-identity
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate-eks-pod-identity.results.datapoint)
+    - name: namespace
+      value: eks-pod-identity-$(params.kubernetes-version)
+    runAfter:
+    - generate-eks-pod-identity
+    taskRef:
+      kind: Task
+      name: cloudwatch
   - name: cw-metrics
     params:
     - name: dimensions
