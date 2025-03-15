@@ -79,13 +79,15 @@ spec:
   - name: cl2-eks-pod-identity-pods
     default: "5000"
   - name: cl2-default-qps
-    default: "200"
+    default: "100"
   - name: cl2-default-burst
-    default: "400"
-  - name: cl2-uniform-qps
     default: "200"
+  - name: cl2-uniform-qps
+    default: "100"
   - name: timeout-pia-pod-creation
-    default: "10m"
+    default: "20m"
+  - name: timeout-pia-pod-startup
+    default: "5m"
   tasks:
   - name: slack-notification
     params:
@@ -264,6 +266,8 @@ spec:
       value: $(params.pia-test-pod-spec-url)
     - name: timeout-pia-pod-creation
       value: $(params.timeout-pia-pod-creation)
+    - name: timeout-pia-pod-startup
+      value: $(params.timeout-pia-pod-startup)
     - name: amp-workspace-id
       value: '$(params.amp-workspace-id)'
     runAfter:

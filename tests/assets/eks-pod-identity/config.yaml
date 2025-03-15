@@ -1,7 +1,7 @@
 {{$namespacePrefix := DefaultParam .CL2_NAMESPACE_PREFIX "default"}}
 {{$namespaceCount := DefaultParam .CL2_NAMESPACE_COUNT 1}}
 {{$totalEksPodIdentityPods := DefaultParam .CL2_EKS_POD_IDENTITY_PODS 5000}}
-{{$timeoutEksPodIdentityPodCreation := DefaultParam .CL2_TIMEOUT_EKS_POD_IDENTITY_POD_CREATION "7m"}}
+{{$timeoutEksPodIdentityPodCreation := DefaultParam .CL2_TIMEOUT_EKS_POD_IDENTITY_POD_CREATION "20m"}}
 {{$timeoutEksPodIdentityPodStartup := DefaultParam .CL2_TIMEOUT_EKS_POD_IDENTITY_POD_STARTUP "5m"}}
 {{$defaultQps := DefaultParam .CL2_DEFAULT_QPS  500}}
 {{$defaultBurst := DefaultParam .CL2_DEFAULT_BURST 1000}}
