@@ -15,19 +15,19 @@ spec:
     default: "master"
   - name: cl2-eks-pod-identity-pods
     description: "pods for testing eks pod identity service"
-    default: "2000"
+    default: "5000"
   - name: cl2-default-qps
     description: "default qps"
-    default: "200"
+    default: "100"
   - name: cl2-default-burst
     description: "default burst"
-    default: "400"
+    default: "200"
   - name: cl2-uniform-qps
     description: "uniform qps"
-    default: "200"
+    default: "100"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
-    default: "800"
+    default: "1000"
   - name: results-bucket
     description: "Results bucket with path of s3 to upload results"
   - name: region
@@ -42,10 +42,12 @@ spec:
     default: "1"
     description: "The number of namespaces for EKS Pod Identity test"
   - name: pia-test-config-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/config.yaml"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/config.yaml"
   - name: pia-test-pod-spec-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/pod-default.yaml"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pod-default.yaml"
   - name: timeout-pia-pod-creation
+    default: "20m"
+  - name: timeout-pia-pod-startup
     default: "5m"
   - name: amp-workspace-id
     description: The AMP workspace ID where remote write needs to happen.
@@ -90,6 +92,7 @@ spec:
       CL2_NAMESPACE_PREFIX: $(params.namespace-prefix)
       CL2_NAMESPACE_COUNT: $(params.namespace-count)
       CL2_TIMEOUT_EKS_POD_IDENTITY_POD_CREATION: $(params.timeout-pia-pod-creation)
+      CL2_TIMEOUT_EKS_POD_IDENTITY_POD_STARTUP: $(params.timeout-pia-pod-startup)
       CL2_PROMETHEUS_NODE_SELECTOR: "eks.amazonaws.com/nodegroup: monitoring-$(params.cluster-name)-nodes-1"
       EOL
       cat $(workspaces.source.path)/overrides.yaml

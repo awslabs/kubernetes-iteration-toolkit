@@ -73,19 +73,21 @@ spec:
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pia-trust-policy.json"
     type: string
   - name: pia-test-config-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/config.yaml"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/config.yaml"
   - name: pia-test-pod-spec-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/eks-pod-identity/pod-default.yaml"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pod-default.yaml"
   - name: cl2-eks-pod-identity-pods
     default: "5000"
   - name: cl2-default-qps
-    default: "200"
+    default: "100"
   - name: cl2-default-burst
-    default: "400"
-  - name: cl2-uniform-qps
     default: "200"
+  - name: cl2-uniform-qps
+    default: "100"
   - name: timeout-pia-pod-creation
-    default: "10m"
+    default: "20m"
+  - name: timeout-pia-pod-startup
+    default: "5m"
   tasks:
   - name: slack-notification
     params:
@@ -264,6 +266,8 @@ spec:
       value: $(params.pia-test-pod-spec-url)
     - name: timeout-pia-pod-creation
       value: $(params.timeout-pia-pod-creation)
+    - name: timeout-pia-pod-startup
+      value: $(params.timeout-pia-pod-startup)
     - name: amp-workspace-id
       value: '$(params.amp-workspace-id)'
     runAfter:
@@ -306,6 +310,19 @@ spec:
       workspace: results
     - name: config
       workspace: config
+  - name: cw-metrics-eks-pod-identity
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate-eks-pod-identity.results.datapoint)
+    - name: namespace
+      value: eks-pod-identity-$(params.kubernetes-version)
+    runAfter:
+    - generate-eks-pod-identity
+    taskRef:
+      kind: Task
+      name: cloudwatch
   - name: cw-metrics
     params:
     - name: dimensions
@@ -315,7 +332,7 @@ spec:
     - name: namespace
       value: $(params.kubernetes-version)
     runAfter:
-    - generate-eks-pod-identity
+    - generate
     taskRef:
       kind: Task
       name: cloudwatch
