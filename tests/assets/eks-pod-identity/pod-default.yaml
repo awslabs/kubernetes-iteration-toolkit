@@ -11,7 +11,7 @@ spec:
     name: pause
   initContainers:
   - name: app-init
-    image: amazon/aws-cli:latest
+    image: public.ecr.aws/aws-cli/aws-cli:latest
     imagePullPolicy: IfNotPresent
     command:
       - sh
