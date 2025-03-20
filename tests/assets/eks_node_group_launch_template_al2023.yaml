@@ -29,10 +29,22 @@ Parameters:
     Type: String
     Description: Launch template ImageId value, which may be an AMI ID or resolve:ssm reference.
     Default: ''
+  NodeRoleName:
+    Type: String
+    Description: Name of the IAM Role for the node instances.
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: EKS-created cluster security group that allows node communication with the control plane.
 Conditions:
   AMIProvided:
     !Not [!Equals [!Ref AMI, '']]
 Resources:
+  NodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref NodeRoleName
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
@@ -50,6 +62,10 @@ Resources:
           HttpPutResponseHopLimit: 2
           HttpEndpoint: enabled
           HttpTokens: required
+        IamInstanceProfile:
+          Arn: !GetAtt NodeInstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref SecurityGroup
         ImageId:
           !If
           - AMIProvided
