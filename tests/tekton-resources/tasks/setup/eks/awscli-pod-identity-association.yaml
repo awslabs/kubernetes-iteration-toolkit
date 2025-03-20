@@ -1,0 +1,75 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-pia-create
+  namespace: scalability
+spec:
+  description: |
+    Create an EKS Pod Identity Association for a given cluster.
+    This Task can be used to create an EKS Pod Identity Association for namespace default and service account default.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to create an EKS Pod Identity Association for.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+  - name: namespace-prefix
+    default: "default"
+    description: "The prefix of namespaces for EKS Pod Identity test."
+  - name: namespace-count
+    default: "1"
+    description: "The number of namespaces for EKS Pod Identity test."
+  - name: pia-trust-policy-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pia-trust-policy.json"
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+  - name: write-kubeconfig
+    image: alpine/k8s:1.31.5
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+  - name: create-pia
+    image: alpine/k8s:1.31.5
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+
+      MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+      TRUST_POLICY_FILE="pia-trust-policy.json"
+      # create a trust policy json file
+      curl -s $(params.pia-trust-policy-url) -o ./$TRUST_POLICY_FILE
+      for i in $(seq 1 $(params.namespace-count)); do
+        kubectl create namespace $(params.namespace-prefix)-$i
+
+        PIA_ROLE_NAME=$(params.cluster-name)-pia-role-$i
+        aws iam create-role --role-name $PIA_ROLE_NAME --assume-role-policy-document file://$TRUST_POLICY_FILE
+        aws iam attach-role-policy --role-name $PIA_ROLE_NAME --policy-arn $MANAGED_POLICY_ARN
+        PIA_ROLE_ARN=$(aws iam get-role --role-name $PIA_ROLE_NAME --query 'Role.Arn' --output text)
+        echo "$PIA_ROLE_ARN is created"
+
+        aws eks $ENDPOINT_FLAG --region $(params.region) create-pod-identity-association \
+        --cluster-name $(params.cluster-name) \
+        --namespace $(params.namespace-prefix)-$i \
+        --service-account default \
+        --role-arn $PIA_ROLE_ARN
+      done
+
+      aws eks $ENDPOINT_FLAG --region $(params.region) list-pod-identity-associations --cluster-name $(params.cluster-name) --query 'associations'
+
+      echo "waiting for 30 seconds..."
+      sleep 30
+      echo "resuming execution..."
