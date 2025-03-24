@@ -1,0 +1,97 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: install-neuron-device-plugin
+  namespace: neuron
+spec:
+  description: |
+    Install AWS Neuron device plugin on an existing EKS cluster using Helm.
+  params:
+  - name: cluster-name
+  - name: region
+  - name: endpoint
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+  - name: write-kubeconfig
+    image: alpine/k8s:1.23.7
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      
+      # sanity checks
+      echo "Checking if neuron namespace exists..."
+      if ! kubectl get namespace neuron > /dev/null 2>&1; then
+        echo "Creating neuron namespace..."
+        kubectl create namespace neuron
+      else
+        echo "neuron namespace already exists, skipping creation..."
+      fi
+      kubectl get ns
+  - name: install-helm
+    image: alpine/k8s:1.23.7
+    script: |
+      # Install required dependencies
+      apk add --no-cache openssl curl bash
+      
+      # Install Helm
+      curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash  
+  - name: install-neuron
+    image: alpine/k8s:1.23.7
+    script: |
+      # Update kubeconfig with token
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+
+      # TOKEN=$(aws eks $ENDPOINT_FLAG get-token --cluster-name $(params.cluster-name) --region $(params.region) --query 'status.token' --output text)
+      # echo $TOKEN
+      # kubectl config set-credentials aws --token="${TOKEN}"
+      
+      echo "Verifying cluster access..."
+      kubectl get nodes
+
+      # Create values file for Helm
+      cat << EOF > /tmp/values.yaml
+      devicePlugin:
+        env:
+        - name: KUBECONFIG
+          value: /etc/kubernetes/kubelet.conf
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NEURON_DEVICE_PLUGIN_EMULATION_MODE
+          value: "64"
+      scheduler:
+        enabled: true
+        env:
+        - name: PORT
+          value: "12345"
+        - name: NEURON_SCHEDULER_EMULATION_MODE
+          value: "64"
+      neuronInstances:
+      - m6i.4xlarge
+      npd:
+        enabled: false
+      EOF
+
+      # Install Neuron using values file
+      helm upgrade --install \
+        neuron \
+        oci://public.ecr.aws/neuron/neuron-helm-chart \
+        --namespace neuron \
+        -f /tmp/values.yaml
+
+      echo "Verifying Installation..."
+      kubectl get all -A -o wide | grep neuron

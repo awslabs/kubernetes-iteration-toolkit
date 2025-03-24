@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: load-neuron
+  namespace: scalability
+spec:
+  description: "Run Neuron load test using clusterloader2"
+  params:
+    - name: cl2-neuron-pods
+      description: "Number of pods for Neuron test"
+      default: "100"
+    - name: cl2-uniform-qps
+      default: "500"
+    - name: results-bucket
+    - name: cluster-name
+    - name: amp-workspace-id
+  workspaces:
+    - name: source
+    - name: results
+    - name: config
+  steps:
+    - name: prepare-test
+      image: golang:1.22
+      script: |
+        # Create test configuration
+        mkdir -p $(workspaces.source.path)/testing/neuron
+        cat > $(workspaces.source.path)/testing/neuron/config.yaml <<EOL
+        # Content from your config.yaml
+        EOL
+        
+        cat > $(workspaces.source.path)/testing/neuron/pod.yaml <<EOL
+        # Content from your pod.yaml
+        EOL
+        
+    - name: run-test
+      image: alpine/k8s:1.30.2
+      script: |
+        cd $(workspaces.source.path)
+        ./clusterloader2 \
+          --testconfig=testing/neuron/config.yaml \
+          --provider=eks \
+          --kubeconfig=${KUBECONFIG} \
+          --report-dir=$(workspaces.results.path)
