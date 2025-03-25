@@ -40,7 +40,7 @@ spec:
     default: ""
     description: URL for "unmanaged nodegroup" (AutoScaling group) CloudFormation template. If not specified, a managed nodegroup will be created.
   - name: launch-template-name
-    default: "$(params.cluster-name)-launchTemplate"
+    default: ""
     description: Name of the launch template to be used for the nodegroup.
   workspaces:
   - name: config
