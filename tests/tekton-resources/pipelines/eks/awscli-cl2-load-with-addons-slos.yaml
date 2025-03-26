@@ -92,11 +92,17 @@ spec:
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/neuron/config.yaml"
   - name: neuron-test-pod-spec-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/neuron/pod.yaml"
-  - name: cl2-load-test-throughput
-    default: string
+  - name: neuron-test-instance-types
+    description: "Comma-separated list of instance types to enable Neuron emulation for. If empty, will auto-detect from cluster."
+    default: ""
   - name: cl2-neuron-pods
-    description: "Number of Neuron pods to create"
-    type: string
+    description: "Number of pods to create during test. Defaults to number of nodes if not specified."
+  - name: cl2-neuron-uniform-qps
+    description: "Rate of pod operations (create/delete) in queries per second. Defaults to 500 QPS."
+    default: "500"
+  - name: cl2-neuron-resources-per-pod
+    description: "Neuron device units requested per pod. Defaults to 64 units."
+    default: "64"
   tasks:
   - name: slack-notification
     params:
@@ -234,7 +240,7 @@ spec:
       - name: cluster-name
         value: $(params.cluster-name)
       - name: instance-types
-        value: $(params.instance-types)
+        value: $(params.neuron-test-instance-types)
     runAfter: create-mng-nodes
     taskRef:
       kind: Task
@@ -342,6 +348,10 @@ spec:
         value: $(params.desired-nodes)
       - name: cl2-neuron-pods
         value: $(params.cl2-neuron-pods)
+      - name: cl2-uniform-qps
+        value: $(params.cl2-neuron-uniform-qps)
+      - name: cl2-neuron-resources-per-pod
+        value: $(params.cl2-neuron-resources-per-pod)
       - name: amp-workspace-id
         value: $(params.amp-workspace-id)
     runAfter: install-neuron-device-plugin
