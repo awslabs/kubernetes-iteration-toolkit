@@ -112,6 +112,35 @@ spec:
             sleep 5
           done
         else
+          echo "Creating or updating aws-auth ConfigMap..."
+          if ! kubectl get configmap aws-auth -n kube-system &> /dev/null; then
+            # Download the official template as shown in the Amazon EKS User Guide:
+            # https://docs.aws.amazon.com/eks/latest/userguide/auth-configmap.html#aws-auth-configmap
+            curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/aws-auth-cm.yaml
+
+            # Replace the placeholder with our role ARN and apply the configmap
+            sed -i.bak -e "s|<ARN of instance role (not instance profile)>|${NODE_ROLE_ARN}|" aws-auth-cm.yaml
+
+            kubectl apply -f aws-auth-cm.yaml
+            echo "Created aws-auth ConfigMap"
+            # Wait for the config map to be ready
+            echo "Verifying aws-auth ConfigMap..."
+            for i in {1..10}; do
+              if kubectl get configmap aws-auth -n kube-system -o yaml | grep -q "${NODE_ROLE_ARN}"; then
+                echo "aws-auth ConfigMap verified successfully"
+                break
+              fi
+              if [ $i -eq 10 ]; then
+                echo "Warning: Could not verify aws-auth ConfigMap after 10 attempts"
+              else
+                echo "Waiting for aws-auth ConfigMap to be ready... attempt $i"
+                sleep 5
+              fi
+            done
+          else
+            echo "aws-auth ConfigMap already exists"
+          fi
+
           STACK_NAME=$node_group_name
           STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
           if [[ "$STACK_STATUS" == "" ]]; then
