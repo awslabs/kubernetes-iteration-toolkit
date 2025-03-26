@@ -88,6 +88,15 @@ spec:
     default: "20m"
   - name: timeout-pia-pod-startup
     default: "5m"
+  - name: neuron-test-config-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/neuron/config.yaml"
+  - name: neuron-test-pod-spec-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/neuron/pod.yaml"
+  - name: cl2-load-test-throughput
+    default: string
+  - name: cl2-neuron-pods
+    description: "Number of Neuron pods to create"
+    type: string
   tasks:
   - name: slack-notification
     params:
@@ -220,6 +229,19 @@ spec:
     workspaces:
     - name: config
       workspace: config
+  - name: install-neuron-device-plugin
+    params:
+      - name: cluster-name
+        value: $(params.cluster-name)
+      - name: instance-types
+        value: $(params.instance-types)
+    runAfter: create-mng-nodes
+    taskRef:
+      kind: Task
+      name: install-neuron-device-plugin
+    workspaces:
+      - name: config
+        workspace: config
   - name: create-pod-identity-association
     params:
     - name: cluster-name
@@ -310,6 +332,29 @@ spec:
       workspace: results
     - name: config
       workspace: config
+  - name: generate-neuron-load
+    params:
+      - name: cluster-name
+        value: $(params.cluster-name)
+      - name: results-bucket
+        value: $(params.results-bucket) 
+      - name: nodes
+        value: $(params.desired-nodes)
+      - name: cl2-neuron-pods
+        value: $(params.cl2-neuron-pods)
+      - name: amp-workspace-id
+        value: $(params.amp-workspace-id)
+    runAfter: install-neuron-device-plugin
+    taskRef:
+      kind: Task
+      name: load-neuron-device-plugin
+    workspaces:
+      - name: source
+        workspace: source
+      - name: results
+        workspace: results
+      - name: config
+        workspace: config
   - name: cw-metrics-eks-pod-identity
     params:
     - name: dimensions
@@ -333,6 +378,57 @@ spec:
       value: $(params.kubernetes-version)
     runAfter:
     - generate
+    taskRef:
+      kind: Task
+      name: cloudwatch
+  - name: cw-metrics-neuron-device-plugin-latency-p50
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate-neuron-load.results.pod_startup_p50)
+    - name: namespace
+      value: neuron-device-plugin-$(params.kubernetes-version)
+    - name: metric-name
+      value: pod_startup_latency_p50 
+    - name: unit
+      value: Milliseconds
+    runAfter:
+    - generate-neuron-load
+    taskRef:
+      kind: Task
+      name: cloudwatch
+  - name: cw-metrics-neuron-device-plugin-latency-p90
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate-neuron-load.results.pod_startup_p90)
+    - name: namespace
+      value: neuron-device-plugin-$(params.kubernetes-version)
+    - name: metric-name
+      value: pod_startup_latency_p90
+    - name: unit
+      value: Milliseconds
+    runAfter:
+    - generate-neuron-load
+    taskRef:
+      kind: Task
+      name: cloudwatch
+  - name: cw-metrics-neuron-device-plugin-latency-p99
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate-neuron-load.results.pod_startup_p99)
+    - name: namespace
+      value: neuron-device-plugin-$(params.kubernetes-version)
+    - name: metric-name
+      value: pod_startup_latency_p99
+    - name: unit
+      value: Milliseconds
+    runAfter:
+    - generate-neuron-load
     taskRef:
       kind: Task
       name: cloudwatch
