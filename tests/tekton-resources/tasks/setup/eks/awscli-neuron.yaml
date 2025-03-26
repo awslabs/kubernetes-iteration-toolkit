@@ -2,14 +2,21 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: install-neuron-device-plugin
-  namespace: neuron
+  namespace: scalability
 spec:
   description: |
     Install AWS Neuron device plugin on an existing EKS cluster using Helm.
   params:
   - name: cluster-name
+    description: The name of the EKS cluster.
   - name: region
+    default: ""
+    description: The region where the cluster is in.
   - name: endpoint
+    default: ""
+  - name: instance-types
+    description: "Comma-separated list of instance types to enable Neuron emulation for. If empty, will auto-detect from cluster."
+    default: ""
   workspaces:
   - name: config
     mountPath: /config/
@@ -26,16 +33,14 @@ spec:
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
-      
-      # sanity checks
-      echo "Checking if neuron namespace exists..."
-      if ! kubectl get namespace neuron > /dev/null 2>&1; then
-        echo "Creating neuron namespace..."
-        kubectl create namespace neuron
-      else
-        echo "neuron namespace already exists, skipping creation..."
-      fi
-      kubectl get ns
+
+      aws --version
+      aws sts get-caller-identity
+
+      echo "Available nodes in the cluster:"
+      # List nodegroups in the cluster
+      aws eks $ENDPOINT_FLAG list-nodegroups --cluster-name $(params.cluster-name) --region $(params.region)
+
   - name: install-helm
     image: alpine/k8s:1.23.7
     script: |
@@ -53,13 +58,18 @@ spec:
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
-
-      # TOKEN=$(aws eks $ENDPOINT_FLAG get-token --cluster-name $(params.cluster-name) --region $(params.region) --query 'status.token' --output text)
-      # echo $TOKEN
-      # kubectl config set-credentials aws --token="${TOKEN}"
       
-      echo "Verifying cluster access..."
+      echo "Verifying access to the cluster..."
       kubectl get nodes
+      
+      # Determine instance types
+      if [ -n "$(params.instance-types)" ]; then
+        INSTANCE_TYPES="$(params.instance-types)"
+        echo "Will install Neuron device plugin in emulation mode for specified instance types: $INSTANCE_TYPES"
+      else
+        INSTANCE_TYPES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.labels.node\.kubernetes\.io/instance-type}' | tr ' ' '\n' | sort -u | tr '\n' ',')
+        echo "Auto-detected instance types from cluster: $INSTANCE_TYPES"
+      fi
 
       # Create values file for Helm
       cat << EOF > /tmp/values.yaml
@@ -73,6 +83,12 @@ spec:
               fieldPath: spec.nodeName
         - name: NEURON_DEVICE_PLUGIN_EMULATION_MODE
           value: "64"
+        nodeSelector: null
+        tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        updateStrategy:
+          type: RollingUpdate
       scheduler:
         enabled: true
         env:
@@ -80,18 +96,20 @@ spec:
           value: "12345"
         - name: NEURON_SCHEDULER_EMULATION_MODE
           value: "64"
-      neuronInstances:
-      - m6i.4xlarge
+      neuronInstances: [${INSTANCE_TYPES}]
       npd:
         enabled: false
       EOF
+
+      echo "Using this values.yaml:"
+      cat /tmp/values.yaml
 
       # Install Neuron using values file
       helm upgrade --install \
         neuron \
         oci://public.ecr.aws/neuron/neuron-helm-chart \
-        --namespace neuron \
+        --namespace kube-system \
         -f /tmp/values.yaml
 
       echo "Verifying Installation..."
-      kubectl get all -A -o wide | grep neuron
+      kubectl get daemonsets -n kube-system | grep neuron
