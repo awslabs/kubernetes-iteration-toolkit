@@ -165,7 +165,7 @@ spec:
             > parameters.json
 
             # cloudformation really fights you every step of the way to pass JSON in, so let's just hack it
-            LAUNCH_TEMPLATE_OVERRIDES=$(echo "$EC2_INSTANCES" | jq -R -c 'split(" ") | map({"InstanceType": .})')
+            LAUNCH_TEMPLATE_OVERRIDES=$(echo "$EC2_INSTANCES" | awk '{$1=$1}1' | jq -R -c 'split(" ") | map({"InstanceType": .})')
             sed -i "s/PLACEHOLDER_LAUNCH_TEMPLATE_OVERRIDES/$LAUNCH_TEMPLATE_OVERRIDES/g" cfn-template
 
             aws cloudformation create-stack \
