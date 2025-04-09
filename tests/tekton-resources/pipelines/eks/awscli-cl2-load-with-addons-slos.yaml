@@ -226,7 +226,7 @@ spec:
     - name: unmanaged-nodegroup-cfn-url
       value: $(params.unmanaged-nodegroup-cfn-url)
     runAfter:
-    - create-mng-monitoring-nodes
+    - create-smng-monitoring-nodes
     taskRef:
       kind: Task
       name: awscli-eks-nodegroup-create
@@ -246,7 +246,7 @@ spec:
     - name: pia-trust-policy-url
       value: $(params.pia-trust-policy-url)
     runAfter:
-    - create-mng-nodes
+    - create-smng-nodes
     taskRef:
       kind: Task
       name:  awscli-eks-pia-create

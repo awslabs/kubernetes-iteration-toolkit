@@ -53,11 +53,6 @@ spec:
   - name: create-nodegroup
     image: alpine/k8s:1.23.7
     script: |
-      set -o xtrace
-      set -o errexit
-      set -o pipefail
-      set -o nounset
-
       ENDPOINT_FLAG=""
 
       NODE_ROLE_NAME=$(params.host-cluster-node-role-name)
@@ -66,6 +61,7 @@ spec:
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
 
       if [ -n "$(params.host-taints)" ]; then
         TAINTS_FLAG="--taints $(params.host-taints)"
@@ -107,8 +103,7 @@ spec:
             echo "$node_group_name is "CREATING" at $(date)"
             sleep 2
           done
-          # TODO: do this for unmanaged nodes as well
-          # right now we don't have an appropriate label to filter on for unmanaged nodes
+          
           while true; do
             ready_node=$(kubectl get nodes -l eks.amazonaws.com/nodegroup=$node_group_name --no-headers 2>/dev/null | grep -w Ready | wc -l)
             echo "ready-nodes=$ready_node out of $2, for nodegroup: $node_group_name"
@@ -150,19 +145,19 @@ spec:
           if [[ "$STACK_STATUS" == "" ]]; then
             curl -s $(params.unmanaged-nodegroup-cfn-url) -o ./cfn-template
 
-          # assemble the stack parameters as a JSON file
-          # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
-          # and we need that for kubelet-config
-          jq --null-input \
-              --arg LaunchTemplateName "$launch_template_name" \
-              --arg ClusterName "$(params.cluster-name)" \
-              --arg AutoScalingGroupName "${node_group_name}" \
-              --arg NodeCount "$2" \
-              --arg SubnetIds $(jq -r '.cluster.resourcesVpcConfig.subnetIds | join(",")' cluster.json) \
-              --arg SecurityGroup "$(jq -r '.cluster.resourcesVpcConfig.clusterSecurityGroupId' cluster.json)" \
-              --arg VpcId $(jq -r '.cluster.resourcesVpcConfig.vpcId' cluster.json) \
-              '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \
-            > parameters.json
+            # assemble the stack parameters as a JSON file
+            # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
+            # and we need that for kubelet-config
+            jq --null-input \
+                --arg LaunchTemplateName "$launch_template_name" \
+                --arg ClusterName "$(params.cluster-name)" \
+                --arg AutoScalingGroupName "${node_group_name}" \
+                --arg NodeCount "$2" \
+                --arg SubnetIds $(jq -r '.cluster.resourcesVpcConfig.subnetIds | join(",")' cluster.json) \
+                --arg SecurityGroup "$(jq -r '.cluster.resourcesVpcConfig.clusterSecurityGroupId' cluster.json)" \
+                --arg VpcId $(jq -r '.cluster.resourcesVpcConfig.vpcId' cluster.json) \
+                '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \
+              > parameters.json
 
             # cloudformation really fights you every step of the way to pass JSON in, so let's just hack it
             LAUNCH_TEMPLATE_OVERRIDES=$(echo "$EC2_INSTANCES" | awk '{$1=$1}1' | jq -R -c 'split(" ") | map({"InstanceType": .})')
@@ -174,8 +169,23 @@ spec:
               --template-body file://$(pwd)/cfn-template \
               --parameters file://$(pwd)/parameters.json
 
-              aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $(params.region)
-              echo "CREATED_CFN_STACK=$STACK_NAME"
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $(params.region)
+            echo "CREATED_CFN_STACK=$STACK_NAME"
+
+            # Right now we don't have an appropriate label to filter on for unmanaged nodes
+            # so we just check if number of nodes in NotReady state are 0
+            echo "Waiting for the nodes to join the cluster..."
+            sleep 10
+            while true; do
+              not_ready_nodes=$(kubectl get nodes --no-headers  | grep -w NotReady | wc -l)
+              echo "NotReady nodes: $not_ready_nodes"
+              if [[ "$not_ready_nodes" -eq 0 ]]; then
+                  echo "All nodes are Ready"
+                  break
+              fi
+              sleep 5
+            done
+
           else
               echo "$STACK_NAME Already exists"
           fi
