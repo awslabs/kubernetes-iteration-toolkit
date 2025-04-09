@@ -82,6 +82,10 @@ spec:
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
+        launch_template_name="$(params.launch-template-name)"
+        if [ -z "$launch_template_name" ]; then
+          launch_template_name="$(params.cluster-name)-launchTemplate"
+        fi
         EC2_INSTANCES=$3
         # if no unmanaged nodegroup cfn template is provided, assume we want managed nodegroups
         if [ "$(params.unmanaged-nodegroup-cfn-url)" = "" ]; then
@@ -91,7 +95,7 @@ spec:
             --cluster-name $(params.cluster-name) \
             --nodegroup-name $node_group_name \
             --node-role $NODE_ROLE_ARN \
-            --launch-template name=$(params.launch-template-name) \
+            --launch-template name=$launch_template_name \
             --region $(params.region) \
             --instance-types $EC2_INSTANCES \
             --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
@@ -150,7 +154,7 @@ spec:
           # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
           # and we need that for kubelet-config
           jq --null-input \
-              --arg LaunchTemplateName "$(params.launch-template-name)" \
+              --arg LaunchTemplateName "$launch_template_name" \
               --arg ClusterName "$(params.cluster-name)" \
               --arg AutoScalingGroupName "${node_group_name}" \
               --arg NodeCount "$2" \
