@@ -53,7 +53,7 @@ spec:
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/amazon-eks-vpc.json"
     type: string
   - name: ng-cfn-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template.json"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template_al2023.yaml"
     type: string
   - name: kubernetes-version
     type: string
@@ -88,6 +88,10 @@ spec:
     default: "20m"
   - name: timeout-pia-pod-startup
     default: "5m"
+  - name: unmanaged-nodegroup-cfn-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/asg_node_group.yaml"
+  - name: launch-template-ami
+    default: resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
   tasks:
   - name: slack-notification
     params:
@@ -168,15 +172,19 @@ spec:
         value: "$(params.ng-cfn-url)"
       - name: endpoint
         value: $(params.endpoint)
+      - name: node-role-name 
+        value: $(params.cluster-name)-node-role
+      - name: ami
+        value: $(params.launch-template-ami)
     runAfter:
       - create-eks-cluster
     taskRef:
       kind: Task
-      name: awscli-eks-cfn-launch-template
+      name: awscli-eks-cfn-launch-template-al2023
     workspaces:
       - name: config
         workspace: config
-  - name: create-mng-monitoring-nodes
+  - name: create-smng-monitoring-nodes
     params:
     - name: cluster-name
       value: $(params.cluster-name)
@@ -194,6 +202,8 @@ spec:
       value: key=monitoring,value=true,effect=NO_SCHEDULE
     - name: nodegroup-prefix
       value: monitoring-
+    - name: unmanaged-nodegroup-cfn-url
+      value: $(params.unmanaged-nodegroup-cfn-url)
     runAfter:
     - create-launch-template
     taskRef:
@@ -202,7 +212,7 @@ spec:
     workspaces:
     - name: config
       workspace: config
-  - name: create-mng-nodes
+  - name: create-smng-nodes
     params:
     - name: cluster-name
       value: $(params.cluster-name)
@@ -212,6 +222,8 @@ spec:
       value: $(params.cluster-name)-node-role
     - name: endpoint
       value: $(params.endpoint)
+    - name: unmanaged-nodegroup-cfn-url
+      value: $(params.unmanaged-nodegroup-cfn-url)
     runAfter:
     - create-mng-monitoring-nodes
     taskRef:
