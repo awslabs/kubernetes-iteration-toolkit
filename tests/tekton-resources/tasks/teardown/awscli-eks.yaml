@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: awscli-eks-cluster-teardown
+  name: awscli-eks-cluster-teardown-shvbsle
   namespace: scalability
 spec:
   description: |
@@ -89,3 +89,41 @@ spec:
       # Wait for the stack to be deleted
       aws cloudformation wait stack-delete-complete --region $(params.region) --stack-name $(params.cluster-name)
       echo "Stack deleted successfully!"
+  - name: awscli-delete-asg
+    image: alpine/k8s:1.23.7
+    script: |
+      #!/bin/bash
+      set -e
+      aws sts get-caller-identity 
+      # Stack ids for self managed node groups will have pattern <cluster-name>-nodes-<num>
+      STACK_IDS=$(aws cloudformation describe-stacks \
+        --region $(params.region) \
+        --query 'Stacks[?contains(StackName, `'$(params.cluster-name)'-nodes-`)].StackName' \
+        --output text)
+      
+      if [ -z "$STACK_IDS" ]; then
+        echo "No stacks found matching pattern: $(params.cluster-name)-nodes-"
+        exit 0
+      fi
+      
+      echo "Found stacks to delete: $STACK_IDS"
+      # Delete each stack and wait for completion
+      for stack_name in $STACK_IDS; do
+        echo "Deleting stack: $stack_name"
+        
+        # Delete the stack
+        aws cloudformation delete-stack \
+          --region $(params.region) \
+          --stack-name "$stack_name"
+        
+        echo "Waiting for stack deletion to complete..."
+        
+        # Wait for deletion to complete
+        aws cloudformation wait stack-delete-complete \
+          --region $(params.region) \
+          --stack-name "$stack_name"
+        
+        echo "Stack $stack_name deleted successfully!"
+      done
+      
+      echo "All matching stacks have been deleted!"

@@ -51,6 +51,7 @@ spec:
         if [ -n "$(params.endpoint)" ]; then
           ENDPOINT_FLAG="--endpoint $(params.endpoint)"
         fi
+        aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
 
         curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
 
@@ -65,6 +66,8 @@ spec:
         fi
 
         aws eks $ENDPOINT_FLAG describe-cluster --name $(params.cluster-name) --region $(params.region) --output json > cluster.json
+
+        cat cluster.json
 
         launch_template_name=$(params.cluster-name)-launchTemplate
         STACK_NAME=$(params.stack-name)
@@ -86,6 +89,8 @@ spec:
             --arg NodeRoleName '$(params.node-role-name)' \
             '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \
           > parameters.json
+        
+        cat parameters.json
 
         if [[ "$STACK_STATUS" == "" ]]; then
             aws cloudformation create-stack \
