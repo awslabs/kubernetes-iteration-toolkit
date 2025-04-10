@@ -186,7 +186,7 @@ spec:
     workspaces:
       - name: config
         workspace: config
-  - name: create-smng-monitoring-nodes
+  - name: create-mng-monitoring-nodes
     params:
     - name: cluster-name
       value: $(params.cluster-name)
@@ -214,7 +214,7 @@ spec:
     workspaces:
     - name: config
       workspace: config
-  - name: create-smng-nodes
+  - name: create-mng-nodes
     params:
     - name: cluster-name
       value: $(params.cluster-name)
@@ -227,7 +227,7 @@ spec:
     - name: unmanaged-nodegroup-cfn-url
       value: $(params.unmanaged-nodegroup-cfn-url)
     runAfter:
-    - create-smng-monitoring-nodes
+    - create-mng-monitoring-nodes
     taskRef:
       kind: Task
       name: awscli-eks-nodegroup-create
@@ -247,7 +247,7 @@ spec:
     - name: pia-trust-policy-url
       value: $(params.pia-trust-policy-url)
     runAfter:
-    - create-smng-nodes
+    - create-mng-nodes
     taskRef:
       kind: Task
       name:  awscli-eks-pia-create
