@@ -91,7 +91,8 @@ spec:
   - name: unmanaged-nodegroup-cfn-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/asg_node_group.yaml"
   - name: launch-template-ami
-    description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. Ex. for 1.31 resolve:ssm:/aws/service/eks/optimized-ami/1.31/amazon-linux-2023/x86_64/standard/recommended/image_id"
+    default: ""
+    description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. By default resolve to the lates AL2023 ami for cluster version"
     type: string
   tasks:
   - name: slack-notification

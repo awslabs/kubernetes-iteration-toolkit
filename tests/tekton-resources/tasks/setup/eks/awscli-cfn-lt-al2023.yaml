@@ -73,6 +73,20 @@ spec:
         STACK_NAME=$(params.stack-name)
         STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
 
+        # get the current live cluster's cluster version. As a fall back use default in the params
+        KVERSION=$(aws eks $ENDPOINT_FLAG describe-cluster --name $(params.cluster-name) --region $(params.region) --query cluster.version | sed 's/"//g' || echo "$(params.kubernetes-version)")
+        if [[ -z "$KVERSION" ]]; then
+            echo "Failed to get cluster version, using provided kubernetes-version: $(params.kubernetes-version)"
+            KVERSION="$(params.kubernetes-version)"
+        fi
+        
+        # resolve ami
+        if [[ -n "$(params.ami)" ]]; then
+            AMI_VALUE="$(params.ami)"
+        else
+            AMI_VALUE="resolve:ssm:/aws/service/eks/optimized-ami/$KVERSION/amazon-linux-2023/x86_64/standard/recommended/image_id"
+        fi
+
         # assemble the stack parameters as a JSON file
         # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
         # and we need that for kubelet-config
@@ -84,7 +98,7 @@ spec:
             --arg ClusterCIDR "$(jq -r .cluster.kubernetesNetworkConfig.serviceIpv4Cidr cluster.json)" \
             --arg CertificateAuthority "$(jq -r .cluster.certificateAuthority.data cluster.json)" \
             --arg KubeletConfig '$(params.kubelet-config)' \
-            --arg AMI "$(params.ami)" \
+            --arg AMI "$AMI_VALUE" \
             --arg SecurityGroup "$(jq -r .cluster.resourcesVpcConfig.clusterSecurityGroupId cluster.json)" \
             --arg NodeRoleName '$(params.node-role-name)' \
             '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \

@@ -78,10 +78,13 @@ spec:
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
-        launch_template_name="$(params.launch-template-name)"
-        if [ -z "$launch_template_name" ]; then
-          launch_template_name="$(params.cluster-name)-launchTemplate"
+        
+        # by default assume <cluster-name>-launchTemplate convention
+        launch_template_name="$(params.cluster-name)-launchTemplate"
+        if [ -n "$(params.launch-template-name)" ]; then
+          launch_template_name="$(params.launch-template-name)"
         fi
+        
         EC2_INSTANCES=$3
         # if no unmanaged nodegroup cfn template is provided, assume we want managed nodegroups
         if [ "$(params.unmanaged-nodegroup-cfn-url)" = "" ]; then
