@@ -96,8 +96,8 @@ spec:
     description: "Comma-separated list of instance types to enable Neuron emulation for. If empty, will auto-detect from cluster."
     default: ""
   - name: cl2-neuron-pods
-    description: "Number of pods to create during test. Defaults to number of nodes if not specified."
     default: "10"
+    description: "Number of pods to create during test. Defaults to number of nodes if not specified."
   - name: cl2-neuron-uniform-qps
     description: "Rate of pod operations (create/delete) in queries per second. Defaults to 500 QPS."
     default: "500"
@@ -250,6 +250,34 @@ spec:
     workspaces:
       - name: config
         workspace: config
+  - name: generate-neuron-load
+    params:
+      - name: cluster-name
+        value: $(params.cluster-name)
+      - name: results-bucket
+        value: $(params.results-bucket)
+      - name: nodes
+        value: $(params.desired-nodes)
+      - name: cl2-neuron-pods
+        value: $(params.cl2-neuron-pods)
+      - name: cl2-uniform-qps
+        value: $(params.cl2-neuron-uniform-qps)
+      - name: cl2-neuron-resources-per-pod
+        value: $(params.cl2-neuron-resources-per-pod)
+      - name: amp-workspace-id
+        value: $(params.amp-workspace-id)
+    runAfter:
+    - install-neuron-device-plugin
+    taskRef:
+      kind: Task
+      name: load-neuron-device-plugin
+    workspaces:
+      - name: source
+        workspace: source
+      - name: results
+        workspace: results
+      - name: config
+        workspace: config
   - name: create-pod-identity-association
     params:
     - name: cluster-name
@@ -263,7 +291,7 @@ spec:
     - name: pia-trust-policy-url
       value: $(params.pia-trust-policy-url)
     runAfter:
-    - create-mng-nodes
+    - generate-neuron-load
     taskRef:
       kind: Task
       name:  awscli-eks-pia-create
@@ -340,34 +368,6 @@ spec:
       workspace: results
     - name: config
       workspace: config
-  - name: generate-neuron-load
-    params:
-      - name: cluster-name
-        value: $(params.cluster-name)
-      - name: results-bucket
-        value: $(params.results-bucket) 
-      - name: nodes
-        value: $(params.desired-nodes)
-      - name: cl2-neuron-pods
-        value: $(params.cl2-neuron-pods)
-      - name: cl2-uniform-qps
-        value: $(params.cl2-neuron-uniform-qps)
-      - name: cl2-neuron-resources-per-pod
-        value: $(params.cl2-neuron-resources-per-pod)
-      - name: amp-workspace-id
-        value: $(params.amp-workspace-id)
-    runAfter: 
-    - install-neuron-device-plugin
-    taskRef:
-      kind: Task
-      name: load-neuron-device-plugin
-    workspaces:
-      - name: source
-        workspace: source
-      - name: results
-        workspace: results
-      - name: config
-        workspace: config
   - name: cw-metrics-eks-pod-identity
     params:
     - name: dimensions
