@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: awscli-eks-cluster-teardown-shvbsle
+  name: awscli-eks-cluster-teardown
   namespace: scalability
 spec:
   description: |
