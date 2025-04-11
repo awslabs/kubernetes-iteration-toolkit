@@ -97,6 +97,7 @@ spec:
     default: ""
   - name: cl2-neuron-pods
     description: "Number of pods to create during test. Defaults to number of nodes if not specified."
+    default: "10"
   - name: cl2-neuron-uniform-qps
     description: "Rate of pod operations (create/delete) in queries per second. Defaults to 500 QPS."
     default: "500"
@@ -241,7 +242,8 @@ spec:
         value: $(params.cluster-name)
       - name: instance-types
         value: $(params.neuron-test-instance-types)
-    runAfter: create-mng-nodes
+    runAfter: 
+    - create-mng-nodes
     taskRef:
       kind: Task
       name: install-neuron-device-plugin
@@ -354,7 +356,8 @@ spec:
         value: $(params.cl2-neuron-resources-per-pod)
       - name: amp-workspace-id
         value: $(params.amp-workspace-id)
-    runAfter: install-neuron-device-plugin
+    runAfter: 
+    - install-neuron-device-plugin
     taskRef:
       kind: Task
       name: load-neuron-device-plugin
@@ -437,6 +440,21 @@ spec:
       value: pod_startup_latency_p99
     - name: unit
       value: Milliseconds
+    runAfter:
+    - generate-neuron-load
+    taskRef:
+      kind: Task
+      name: cloudwatch
+  - name: cw-metrics-neuron-load-test-outcome
+    params:
+    - name: dimensions
+      value: $(params.desired-nodes)
+    - name: value
+      value: $(tasks.generate-neuron-load.results.datapoint)
+    - name: metric-name
+      value: outcome
+    - name: namespace
+      value: neuron-device-plugin-$(params.kubernetes-version)
     runAfter:
     - generate-neuron-load
     taskRef:
