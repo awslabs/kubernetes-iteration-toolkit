@@ -1,0 +1,197 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: load-neuron-device-plugin
+  namespace: scalability
+spec:
+  description: "Run Neuron device plugin load test using clusterloader2"
+  params:
+    - name: giturl
+      description: "git url to clone the package"
+      default: https://github.com/kubernetes/perf-tests.git
+    - name: cl2-branch
+      description: "The branch of clusterloader2 you want to use"
+      default: "master"
+    - name: cl2-neuron-pods
+      description: "Number of pods to create during test. Defaults to number of nodes if not specified."
+      default: ""
+    - name: cl2-uniform-qps
+      description: "Rate of pod operations (create/delete) in queries per second. Defaults to 500 QPS."
+      default: ""
+    - name: cl2-neuron-resources-per-pod
+      description: "Neuron device units requested per pod. Defaults to 64 units."
+      default: ""
+    - name: neuron-config-url
+      description: "URL for the Neuron test configuration file for loadtest"
+      default: ""
+    - name: neuron-pod-url
+      description: "URL for the Neuron pod specification file for loadtest"
+      default: ""
+    - name: nodes
+      description: "number of dataplane nodes to run the load test against"
+      default: "12"
+    - name: results-bucket
+      description: "S3 bucket for results"
+    - name: cluster-name
+      description: "The name of the EKS cluster"
+    - name: region
+      default: "us-west-2"
+    - name: amp-workspace-id
+      default: ""
+  results:
+    - name: datapoint
+      description: Stores the CL2 result that can be consumed by other tasks
+    - name: s3_result
+      description: Stores the S3 result path after compute
+    - name: pod_startup_p50
+      description: 50th percentile pod startup latency
+    - name: pod_startup_p90
+      description: 90th percentile pod startup latency
+    - name: pod_startup_p99
+      description: 99th percentile pod startup latency
+  workspaces:
+    - name: source
+      mountPath: /src/k8s.io/
+    - name: results
+    - name: config
+      mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+    - name: git-clone
+      image: alpine/git
+      workingDir: $(workspaces.source.path)
+      script: |
+        # Remove existing directory if it exists
+        rm -rf perf-tests
+        
+        # Clone fresh copy
+        git clone $(params.giturl)
+        cd $(workspaces.source.path)/perf-tests/
+        git fetch origin --verbose --tags
+        git checkout $(params.cl2-branch)
+        git branch
+
+    - name: prepare-test
+      image: golang:1.24
+      workingDir: $(workspaces.source.path)
+      script: |
+        S3_RESULT_PATH=$(params.results-bucket)
+        echo $S3_RESULT_PATH > $(results.s3_result.path)
+        echo "S3 Path: $S3_RESULT_PATH"
+        
+        echo "# Override configurations" > "$(workspaces.source.path)/overrides.yaml"
+        if [ -n "$(params.cl2-neuron-pods)" ]; then
+          echo "CL2_NEURON_PODS: $(params.cl2-neuron-pods)" >> "$(workspaces.source.path)/overrides.yaml"
+        fi
+        
+        if [ -n "$(params.cl2-uniform-qps)" ]; then
+          echo "CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)" >> "$(workspaces.source.path)/overrides.yaml"
+        fi
+        
+        if [ -n "$(params.cl2-neuron-resources-per-pod)" ]; then
+          echo "CL2_NEURON_RESOURCES_PER_POD: $(params.cl2-neuron-resources-per-pod)" >> "$(workspaces.source.path)/overrides.yaml"
+        fi
+        
+        echo "Generated overrides.yaml:"
+        cat $(workspaces.source.path)/overrides.yaml
+        cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
+
+        # Create test directory
+        mkdir -p $(workspaces.source.path)/perf-tests/clusterloader2/testing/neuron
+
+        # Download test configurations
+        curl -s $(params.neuron-config-url) \
+          -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/neuron/config.yaml
+        curl -s $(params.neuron-pod-url) \
+          -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/neuron/pod.yaml
+
+        # Building clusterloader2 binary
+        cd $(workspaces.source.path)/perf-tests/clusterloader2/
+        GOOS=linux CGO_ENABLED=0 go build -v -o ./clusterloader ./cmd
+
+    - name: run-test
+      image: alpine/k8s:1.30.2
+      script: |
+        echo "Starting run-test step"
+        
+        cd $(workspaces.source.path)/perf-tests/clusterloader2/
+        
+        echo "Checking for clusterloader binary"
+        if [ ! -f "./clusterloader" ]; then
+          echo "Error: clusterloader binary not found in $(pwd)"
+          echo "Listing workspace root:"
+          ls -la $(workspaces.source.path)
+          echo "Listing perf-tests directory:"
+          ls -la $(workspaces.source.path)/perf-tests
+          exit 1
+        fi
+        
+        chmod +x ./clusterloader
+        
+        echo "Verifying test configuration files"
+        echo "Content of testing/neuron/config.yaml:"
+        cat testing/neuron/config.yaml
+        echo "Content of testing/neuron/pod.yaml:"
+        cat testing/neuron/pod.yaml
+        
+        echo "Starting clusterloader test"
+        ENABLE_EXEC_SERVICE=false ./clusterloader \
+          --testconfig=testing/neuron/config.yaml \
+          --testoverrides=$(workspaces.source.path)/overrides.yaml \
+          --nodes=$(params.nodes) \
+          --provider=eks \
+          --kubeconfig=${KUBECONFIG} \
+          --report-dir=$(workspaces.results.path) \
+          --alsologtostderr \
+          --v=2
+        
+        exit_code=$?
+        echo "Test completed with exit code: $exit_code"
+        
+        if [ $exit_code -eq 0 ]; then
+          echo "Test succeeded"
+          echo "1" | tee $(results.datapoint.path)
+        else
+          echo "Test failed"
+          echo "0" | tee $(results.datapoint.path)
+        fi
+        
+        exit $exit_code
+      timeout: 30000s
+
+    - name: process-metrics
+      image: alpine
+      workingDir: $(workspaces.results.path)
+      script: |
+        apk add --no-cache jq
+
+        # find the pod startup metrics in the JSON
+        POD_STARTUP_METRICS=$(jq '.dataItems[] | select(.labels.Metric == "pod_startup") | .data' PodStartupLatency_*.json)
+        
+        if [ -z "$POD_STARTUP_METRICS" ]; then
+          echo "Error: Could not find pod_startup metrics"
+          exit 1
+        fi
+
+        # get the pod startup p50, p90 and p99
+        echo "$POD_STARTUP_METRICS" | jq -r '.Perc50' > $(results.pod_startup_p50.path)
+        echo "$POD_STARTUP_METRICS" | jq -r '.Perc90' > $(results.pod_startup_p90.path)
+        echo "$POD_STARTUP_METRICS" | jq -r '.Perc99' > $(results.pod_startup_p99.path)
+
+        echo "Extracted metrics:"
+        echo "P50: $(cat $(results.pod_startup_p50.path))"
+        echo "P90: $(cat $(results.pod_startup_p90.path))"
+        echo "P99: $(cat $(results.pod_startup_p99.path))"
+
+    - name: upload-results
+      image: amazon/aws-cli
+      workingDir: $(workspaces.results.path)
+      script: |
+        S3_RESULT_PATH=$(cat $(results.s3_result.path))
+        echo "S3 Path: $S3_RESULT_PATH"
+        aws sts get-caller-identity
+        ls -larth
+        aws s3 cp . s3://$S3_RESULT_PATH/ --recursive
