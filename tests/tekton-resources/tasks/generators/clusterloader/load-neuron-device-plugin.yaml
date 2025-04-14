@@ -81,6 +81,8 @@ spec:
         S3_RESULT_PATH=$(params.results-bucket)
         echo $S3_RESULT_PATH > $(results.s3_result.path)
         echo "S3 Path: $S3_RESULT_PATH"
+        echo "$(params.neuron-config-url)"
+        echo "$(params.neuron-pod-url)"
         
         echo "# Override configurations" > "$(workspaces.source.path)/overrides.yaml"
         if [ -n "$(params.cl2-neuron-pods)" ]; then

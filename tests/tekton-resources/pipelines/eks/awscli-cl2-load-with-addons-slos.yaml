@@ -96,10 +96,10 @@ spec:
     description: "Comma-separated list of instance types to enable Neuron emulation for. If empty, will auto-detect from cluster."
     default: ""
   - name: cl2-neuron-pods
-    default: "10"
+    default: ""
     description: "Number of pods to create during test. Defaults to number of nodes if not specified."
   - name: cl2-neuron-uniform-qps
-    description: "Rate of pod operations (create/delete) in queries per second. Defaults to 500 QPS."
+    description: "Rate at which pods are created/deleted. Defaults to 500 QPS."
     default: "500"
   - name: cl2-neuron-resources-per-pod
     description: "Neuron device units requested per pod. Defaults to 64 units."
@@ -264,6 +264,10 @@ spec:
         value: $(params.cl2-neuron-uniform-qps)
       - name: cl2-neuron-resources-per-pod
         value: $(params.cl2-neuron-resources-per-pod)
+      - name: neuron-config-url
+        value: $(params.neuron-test-config-url) 
+      - name: neuron-pod-url
+        value: $(params.neuron-test-pod-spec-url)
       - name: amp-workspace-id
         value: $(params.amp-workspace-id)
     runAfter:
