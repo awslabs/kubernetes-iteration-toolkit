@@ -162,6 +162,33 @@ spec:
     workspaces:
     - name: config
       workspace: config
+  - name: create-launch-template-monitoring-nodes
+    params:
+      - name: cluster-name
+        value: $(params.cluster-name)
+      - name: stack-name
+        value: $(params.cluster-name)-monitoring-nodes-launch-template
+      - name: kubernetes-version
+        value: "$(params.kubernetes-version)"
+      - name: ng-cfn-url
+        value: "$(params.ng-cfn-url)"
+      - name: endpoint
+        value: $(params.endpoint)
+      - name: node-role-name
+        value: $(params.cluster-name)-node-role
+      - name: ami
+        value: $(params.launch-template-ami)
+      - name: launch-template-name
+        value: $(params.cluster-name)-monitoringNodes-launchTemplate
+      - name: kubelet-config
+        value: '{"registerWithTaints": [{"key": "monitoring", "value": "true", "effect": "NoSchedule"}]}'
+    runAfter:
+      - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-eks-cfn-launch-template-al2023
+    workspaces:
+      - name: config
   - name: create-launch-template
     params:
       - name: cluster-name
@@ -179,7 +206,7 @@ spec:
       - name: ami
         value: $(params.launch-template-ami)
     runAfter:
-      - create-eks-cluster
+      - create-launch-template-monitoring-nodes
     taskRef:
       kind: Task
       name: awscli-eks-cfn-launch-template-al2023
@@ -206,6 +233,8 @@ spec:
       value: monitoring-
     - name: unmanaged-nodegroup-cfn-url
       value: $(params.unmanaged-nodegroup-cfn-url)
+    - name: launch-template-name
+      value: $(params.cluster-name)-monitoringNodes-launchTemplate
     runAfter:
     - create-launch-template
     taskRef:

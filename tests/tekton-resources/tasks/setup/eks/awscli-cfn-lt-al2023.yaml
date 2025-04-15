@@ -32,6 +32,9 @@ spec:
       description: The AMI ID (or SSM parameter) to use for the launch template. If not provided, the launch template will not specify an AMI.
     - name: node-role-name
       description: The name of the IAM role to use for the node's instance profile, specified in the launch template.
+    - name: launch-template-name
+      default: ""
+      description: Name of the launch template to be used for the nodegroup.
   workspaces:
     - name: config
       mountPath: /config/
@@ -69,7 +72,12 @@ spec:
 
         cat cluster.json
 
+        # by default assume <cluster-name>-launchTemplate convention
         launch_template_name=$(params.cluster-name)-launchTemplate
+        if [ -n "$(params.launch-template-name)" ]; then
+          launch_template_name="$(params.launch-template-name)"
+        fi
+
         STACK_NAME=$(params.stack-name)
         STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
 
