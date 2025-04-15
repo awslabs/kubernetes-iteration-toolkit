@@ -35,9 +35,15 @@ Parameters:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup::Id
     Description: EKS-created cluster security group that allows node communication with the control plane.
+  NodeTaints:
+    Type: String
+    Description: "Taints to be added to the nodes (comma-separated)"
+    Default: ''
 Conditions:
   AMIProvided:
     !Not [!Equals [!Ref AMI, '']]
+  TaintsProvided:
+    !Not [!Equals [!Ref NodeTaints, '']]
 Resources:
   NodeInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -92,6 +98,7 @@ Resources:
                   cidr: ${ClusterCIDR}
                 kubelet:
                   config: ${KubeletConfig}
+                ${NodeTaints}
 
               --BOUNDARY--
 Outputs:
