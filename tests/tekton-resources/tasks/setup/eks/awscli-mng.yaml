@@ -37,11 +37,9 @@ spec:
     description: Prefix that needs to be appended to asg names.
     default: ""
   - name: unmanaged-nodegroup-cfn-url
-    default: ""
-    description: URL for "unmanaged nodegroup" (AutoScaling group) CloudFormation template. If not specified, a managed nodegroup will be created.
+    description: URL for "unmanaged nodegroup" (AutoScaling group) CloudFormation template. If empty string passed then, a managed nodegroup will be created.
   - name: launch-template-name
-    default: ""
-    description: Name of the launch template to be used for the nodegroup.
+    description: Name of the launch template to be used for the nodegroup. If empty string passed then assumes <cluster-name>-launchTemplate name
   workspaces:
   - name: config
     mountPath: /config/
