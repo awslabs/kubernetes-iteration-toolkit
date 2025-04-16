@@ -33,7 +33,6 @@ spec:
     - name: node-role-name
       description: The name of the IAM role to use for the node's instance profile, specified in the launch template.
     - name: launch-template-name
-      default: ""
       description: Name of the launch template to be used for the nodegroup.
   workspaces:
     - name: config
