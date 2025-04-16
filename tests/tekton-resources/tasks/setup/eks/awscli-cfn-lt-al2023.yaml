@@ -8,7 +8,7 @@ spec:
   description: |
     Create an EKS CFN stack to output a launch template for AL2023-based nodes.
     This Task can be used to create an EKS CFN stack that outputs a launch template.
-    The launch template may be used for a managed nodegroup with or without a custom AMI.
+    The launch template may be used for a self-managed nodegroup with or without a custom AMI.
   params:
     - name: cluster-name
       description: EKS cluster you want to create CFN stack for.
@@ -114,6 +114,8 @@ spec:
         
         cat parameters.json
 
+        # This CAPABILITY_IAM flag is used to acknowledge that the cloud formation stack can make IAM related changes to your AWS account. 
+        # docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_CreateStack.html
         if [[ "$STACK_STATUS" == "" ]]; then
             aws cloudformation create-stack \
                 --stack-name $STACK_NAME \
