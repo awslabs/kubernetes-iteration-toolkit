@@ -53,7 +53,7 @@ spec:
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/amazon-eks-vpc.json"
     type: string
   - name: ng-cfn-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template.json"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template_al2023.yaml"
     type: string
   - name: kubernetes-version
     type: string
@@ -88,6 +88,14 @@ spec:
     default: "20m"
   - name: timeout-pia-pod-startup
     default: "5m"
+  - name: unmanaged-nodegroup-cfn-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/asg_node_group.yaml"
+  - name: launch-template-ami
+    default: ""
+    description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. By default resolve to the lates AL2023 ami for cluster version"
+    type: string
+  - name: ng-cfn-url-monitoring
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template.json"
   tasks:
   - name: slack-notification
     params:
@@ -156,6 +164,25 @@ spec:
     workspaces:
     - name: config
       workspace: config
+  - name: create-launch-template-monitoring-nodes
+    params:
+      - name: cluster-name
+        value: $(params.cluster-name)
+      - name: stack-name
+        value: $(params.cluster-name)-monitoring-nodes-launch-template
+      - name: kubernetes-version
+        value: "$(params.kubernetes-version)"
+      - name: ng-cfn-url
+        value: "$(params.ng-cfn-url-monitoring)"
+      - name: endpoint
+        value: $(params.endpoint)
+    runAfter:
+      - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-eks-cfn-launch-template
+    workspaces:
+      - name: config
   - name: create-launch-template
     params:
       - name: cluster-name
@@ -168,11 +195,17 @@ spec:
         value: "$(params.ng-cfn-url)"
       - name: endpoint
         value: $(params.endpoint)
+      - name: node-role-name 
+        value: $(params.cluster-name)-node-role
+      - name: ami
+        value: $(params.launch-template-ami)
+      - name: launch-template-name
+        value: $(params.cluster-name)-smng-launchTemplate
     runAfter:
-      - create-eks-cluster
+      - create-launch-template-monitoring-nodes
     taskRef:
       kind: Task
-      name: awscli-eks-cfn-launch-template
+      name: awscli-eks-cfn-launch-template-al2023
     workspaces:
       - name: config
         workspace: config
@@ -194,6 +227,10 @@ spec:
       value: key=monitoring,value=true,effect=NO_SCHEDULE
     - name: nodegroup-prefix
       value: monitoring-
+    - name: unmanaged-nodegroup-cfn-url
+      value: ""
+    - name: launch-template-name
+      value: ""
     runAfter:
     - create-launch-template
     taskRef:
@@ -212,6 +249,10 @@ spec:
       value: $(params.cluster-name)-node-role
     - name: endpoint
       value: $(params.endpoint)
+    - name: unmanaged-nodegroup-cfn-url
+      value: $(params.unmanaged-nodegroup-cfn-url)
+    - name: launch-template-name
+      value: $(params.cluster-name)-smng-launchTemplate
     runAfter:
     - create-mng-monitoring-nodes
     taskRef:

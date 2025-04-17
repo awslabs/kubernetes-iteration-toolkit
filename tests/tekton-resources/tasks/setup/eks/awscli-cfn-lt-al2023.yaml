@@ -8,7 +8,7 @@ spec:
   description: |
     Create an EKS CFN stack to output a launch template for AL2023-based nodes.
     This Task can be used to create an EKS CFN stack that outputs a launch template.
-    The launch template may be used for a managed nodegroup with or without a custom AMI.
+    The launch template may be used for a self-managed nodegroup with or without a custom AMI.
   params:
     - name: cluster-name
       description: EKS cluster you want to create CFN stack for.
@@ -30,6 +30,10 @@ spec:
     - name: ami
       default: ""
       description: The AMI ID (or SSM parameter) to use for the launch template. If not provided, the launch template will not specify an AMI.
+    - name: node-role-name
+      description: The name of the IAM role to use for the node's instance profile, specified in the launch template.
+    - name: launch-template-name
+      description: Name of the launch template to be used for the nodegroup.
   workspaces:
     - name: config
       mountPath: /config/
@@ -49,6 +53,7 @@ spec:
         if [ -n "$(params.endpoint)" ]; then
           ENDPOINT_FLAG="--endpoint $(params.endpoint)"
         fi
+        aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
 
         curl -s $(params.ng-cfn-url) -o ./amazon-ng-cfn
 
@@ -62,11 +67,32 @@ spec:
             aws ec2 create-key-pair --region $(params.region) --key-name $SSH_KEY_NAME --query 'KeyMaterial' --output text
         fi
 
-        aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --output json > cluster.json
+        aws eks $ENDPOINT_FLAG describe-cluster --name $(params.cluster-name) --region $(params.region) --output json > cluster.json
 
+        cat cluster.json
+
+        # by default assume <cluster-name>-launchTemplate convention
         launch_template_name=$(params.cluster-name)-launchTemplate
+        if [ -n "$(params.launch-template-name)" ]; then
+          launch_template_name="$(params.launch-template-name)"
+        fi
+
         STACK_NAME=$(params.stack-name)
         STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
+
+        # get the current live cluster's cluster version. As a fall back use default in the params
+        KVERSION=$(aws eks $ENDPOINT_FLAG describe-cluster --name $(params.cluster-name) --region $(params.region) --query cluster.version | sed 's/"//g' || echo "$(params.kubernetes-version)")
+        if [[ -z "$KVERSION" ]]; then
+            echo "Failed to get cluster version, using provided kubernetes-version: $(params.kubernetes-version)"
+            KVERSION="$(params.kubernetes-version)"
+        fi
+        
+        # resolve ami
+        if [[ -n "$(params.ami)" ]]; then
+            AMI_VALUE="$(params.ami)"
+        else
+            AMI_VALUE="resolve:ssm:/aws/service/eks/optimized-ami/$KVERSION/amazon-linux-2023/x86_64/standard/recommended/image_id"
+        fi
 
         # assemble the stack parameters as a JSON file
         # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
@@ -79,15 +105,22 @@ spec:
             --arg ClusterCIDR "$(jq -r .cluster.kubernetesNetworkConfig.serviceIpv4Cidr cluster.json)" \
             --arg CertificateAuthority "$(jq -r .cluster.certificateAuthority.data cluster.json)" \
             --arg KubeletConfig '$(params.kubelet-config)' \
-            --arg AMI "$(params.ami)" \
+            --arg AMI "$AMI_VALUE" \
+            --arg SecurityGroup "$(jq -r .cluster.resourcesVpcConfig.clusterSecurityGroupId cluster.json)" \
+            --arg NodeRoleName '$(params.node-role-name)' \
             '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \
           > parameters.json
+        
+        cat parameters.json
 
+        # This CAPABILITY_IAM flag is used to acknowledge that the cloud formation stack can make IAM related changes to your AWS account. 
+        # docs: https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_CreateStack.html
         if [[ "$STACK_STATUS" == "" ]]; then
             aws cloudformation create-stack \
                 --stack-name $STACK_NAME \
                 --template-body file://$(pwd)/amazon-ng-cfn \
                 --parameters file://$(pwd)/parameters.json \
+                --capabilities CAPABILITY_IAM \
                 --region $(params.region)
 
             aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $(params.region)
