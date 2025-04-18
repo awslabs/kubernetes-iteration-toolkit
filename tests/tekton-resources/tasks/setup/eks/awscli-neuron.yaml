@@ -13,10 +13,8 @@ spec:
     default: us-west-2
     description: The region where the cluster is in.
   - name: endpoint
-    default: ""
   - name: instance-types
     description: "Comma-separated list of instance types to enable Neuron emulation for. If empty, will auto-detect from cluster."
-    default: ""
   workspaces:
   - name: config
     mountPath: /config/

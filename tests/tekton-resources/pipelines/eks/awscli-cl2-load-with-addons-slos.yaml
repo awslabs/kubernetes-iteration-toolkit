@@ -283,6 +283,8 @@ spec:
         value: $(params.cluster-name)
       - name: instance-types
         value: $(params.neuron-test-instance-types)
+      - name: endpoint
+        value: $(params.endpoint)
     runAfter: 
     - create-mng-nodes
     taskRef:
