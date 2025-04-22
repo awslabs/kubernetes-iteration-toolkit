@@ -28,7 +28,6 @@ spec:
       default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/neuron/pod.yaml"
     - name: nodes
       description: "number of dataplane nodes to run the load test against"
-      default: "12"
     - name: results-bucket
       description: "S3 bucket for results"
     - name: cluster-name
