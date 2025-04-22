@@ -87,13 +87,6 @@ spec:
           effect: NoSchedule
         updateStrategy:
           type: RollingUpdate
-      scheduler:
-        enabled: true
-        env:
-        - name: PORT
-          value: "12345"
-        - name: NEURON_SCHEDULER_EMULATION_MODE
-          value: "64"
       neuronInstances: [${INSTANCE_TYPES}]
       npd:
         enabled: false
@@ -111,4 +104,17 @@ spec:
 
       sleep 5
       echo "Verifying Installation..."
-      kubectl get daemonsets -n kube-system | grep neuron
+      while true; do
+        DESIRED=$(kubectl get ds neuron-device-plugin -n kube-system -o jsonpath='{.status.desiredNumberScheduled}')
+        READY=$(kubectl get ds neuron-device-plugin -n kube-system -o jsonpath='{.status.numberReady}')
+        
+        echo "Desired: $DESIRED, Ready: $READY"
+        
+        if [ "$DESIRED" == "$READY" ] && [ "$DESIRED" -gt 0 ]; then
+            echo "Neuron device plugin installation verified successfully"
+            break
+        else
+            echo "Waiting for neuron-device-plugin daemonset to be ready..."
+            sleep 5
+        fi
+      done
