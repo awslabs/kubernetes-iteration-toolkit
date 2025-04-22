@@ -13,20 +13,19 @@ spec:
       description: "The branch of clusterloader2 you want to use"
       default: "master"
     - name: cl2-neuron-pods
-      description: "Number of pods to create during test. Defaults to number of nodes if not specified."
-      default: ""
+      description: "Number of pods to create during test"
     - name: cl2-uniform-qps
       description: "Rate of pod operations (create/delete) in queries per second. Defaults to 500 QPS."
-      default: ""
+      default: "500"
     - name: cl2-neuron-resources-per-pod
       description: "Neuron device units requested per pod. Defaults to 64 units."
-      default: ""
+      default: "64"
     - name: neuron-config-url
       description: "URL for the Neuron test configuration file for loadtest"
-      default: ""
+      default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/neuron/config.yaml"
     - name: neuron-pod-url
       description: "URL for the Neuron pod specification file for loadtest"
-      default: ""
+      default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/neuron/pod.yaml"
     - name: nodes
       description: "number of dataplane nodes to run the load test against"
       default: "12"

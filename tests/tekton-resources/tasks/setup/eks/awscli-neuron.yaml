@@ -14,6 +14,7 @@ spec:
     description: The region where the cluster is in.
   - name: endpoint
   - name: instance-types
+    default: ""
     description: "Comma-separated list of instance types to enable Neuron emulation for. If empty, will auto-detect from cluster."
   workspaces:
   - name: config
