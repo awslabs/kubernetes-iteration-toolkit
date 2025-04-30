@@ -96,6 +96,15 @@ spec:
     type: string
   - name: ng-cfn-url-monitoring
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template.json"
+  - name: dataplane-configuration
+    default: ""
+    type: string
+  - name: eksadm-s3-path
+    default: ""
+    type: string
+  - name: cluster-type
+    default: "raft"
+    type: string
   tasks:
   - name: slack-notification
     params:
@@ -153,6 +162,12 @@ spec:
       value: $(params.cluster-name)
     - name: kubernetes-version
       value: $(params.kubernetes-version)
+    - name: dataplane-configuration
+      value: $(params.dataplane-configuration)
+    - name: eksadm-s3-path
+      value: $(params.eksadm-s3-path)
+    - name: cluster-type
+      value: $(params.cluster-type)
     retries: 3
     runAfter:
     - create-cluster-node-role
@@ -358,7 +373,7 @@ spec:
     - name: value
       value: $(tasks.generate-eks-pod-identity.results.datapoint)
     - name: namespace
-      value: eks-pod-identity-$(params.kubernetes-version)
+      value: eks-pod-identity-$(params.kubernetes-version)-$(params.cluster-type)
     runAfter:
     - generate-eks-pod-identity
     taskRef:
@@ -371,7 +386,7 @@ spec:
     - name: value
       value: $(tasks.generate.results.datapoint)
     - name: namespace
-      value: $(params.kubernetes-version)
+      value: $(params.kubernetes-version)-$(params.cluster-type)
     runAfter:
     - generate
     taskRef:
