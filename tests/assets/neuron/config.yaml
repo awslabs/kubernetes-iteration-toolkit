@@ -18,7 +18,7 @@ steps:
     Params:
       action: start
       labelSelector: group = neuron-worker
-      threshold: 60s
+      threshold: 25s
 - name: Create pods
   phases:
   - namespaceRange:
