@@ -20,7 +20,8 @@ spec:
     - name: kubernetes-version
       default: "1.32"
       description: The EKS version to install.
-    - name: ng-cfn-url
+    - default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template_al2023.yaml"
+      name: ng-cfn-url
       description: The url of the CFN YAML/JSON to create CFN stack for NG launch template
     - name: endpoint
       default: ""

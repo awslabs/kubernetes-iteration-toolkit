@@ -38,6 +38,7 @@ spec:
     default: ""
   - name: self-managed-nodegroup-cfn-url
     description: URL for "self-managed nodegroup" (AutoScaling group) CloudFormation template.
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/asg_node_group.yaml"
   - name: launch-template-name
     description: Name of the launch template to be used for the nodegroup.
   workspaces:

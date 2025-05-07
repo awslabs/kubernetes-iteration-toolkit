@@ -88,14 +88,9 @@ spec:
     default: "20m"
   - name: timeout-pia-pod-startup
     default: "5m"
-  - name: self-managed-nodegroup-cfn-url
-    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/asg_node_group.yaml"
   - name: launch-template-ami
     default: ""
     description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. By default resolve to the lates AL2023 ami for cluster version"
-    type: string
-  - default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template_al2023.yaml"
-    name: ng-cfn-url-smng
     type: string
   tasks:
   - name: slack-notification
@@ -192,8 +187,6 @@ spec:
         value: $(params.cluster-name)-launch-template
       - name: kubernetes-version
         value: "$(params.kubernetes-version)"
-      - name: ng-cfn-url
-        value: "$(params.ng-cfn-url-smng)"
       - name: endpoint
         value: $(params.endpoint)
       - name: node-role-name 
@@ -246,8 +239,6 @@ spec:
       value: $(params.cluster-name)-node-role
     - name: endpoint
       value: $(params.endpoint)
-    - name: self-managed-nodegroup-cfn-url
-      value: $(params.self-managed-nodegroup-cfn-url)
     - name: launch-template-name
       value: $(params.cluster-name)-smng-launchTemplate
     runAfter:
