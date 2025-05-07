@@ -6,8 +6,8 @@ metadata:
   namespace: scalability
 spec:
   description: |
-    Create an EKS nodegroup, managed or unmanaged, for a given cluster.
-    This Task can be used to create an EKS managed or unmanaged nodegroup for a given VPC Subnets, security groups and service role in an AWS account.
+    Create an EKS managed nodegroup for a given cluster.
+    This Task can be used to create an EKS managed nodegroup for a given VPC Subnets, security groups and service role in an AWS account.
   params:
   - name: cluster-name
     description: The name of the EKS cluster you want to spin managed nodegroups for.
@@ -36,10 +36,6 @@ spec:
   - name: nodegroup-prefix
     description: Prefix that needs to be appended to asg names.
     default: ""
-  - name: unmanaged-nodegroup-cfn-url
-    description: URL for "unmanaged nodegroup" (AutoScaling group) CloudFormation template. If empty string passed then, a managed nodegroup will be created.
-  - name: launch-template-name
-    description: Name of the launch template to be used for the nodegroup. If empty string passed then assumes <cluster-name>-launchTemplate name
   workspaces:
   - name: config
     mountPath: /config/
@@ -59,14 +55,14 @@ spec:
       if [ -n "$(params.endpoint)" ]; then
         ENDPOINT_FLAG="--endpoint $(params.endpoint)"
       fi
-      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
 
       if [ -n "$(params.host-taints)" ]; then
         TAINTS_FLAG="--taints $(params.host-taints)"
       fi
 
-      aws eks $ENDPOINT_FLAG --region $(params.region)  describe-cluster --name $(params.cluster-name) --output json > cluster.json
-      NG_SUBNETS=$(jq -r '.cluster.resourcesVpcConfig.subnetIds | join(" ")' cluster.json)
+      NG_SUBNETS=$(aws eks $ENDPOINT_FLAG --region $(params.region)  describe-cluster --name $(params.cluster-name) \
+      --query cluster.resourcesVpcConfig.subnetIds --output text \
+      )
       
       max_nodes=$(params.max-nodes)
       nodes=$(params.desired-nodes)
@@ -76,121 +72,33 @@ spec:
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
-        
-        # by default assume <cluster-name>-launchTemplate convention
-        launch_template_name="$(params.cluster-name)-launchTemplate"
-        if [ -n "$(params.launch-template-name)" ]; then
-          launch_template_name="$(params.launch-template-name)"
-        fi
-        
+        launch_template_name=$(params.cluster-name)-launchTemplate
+        CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$node_group_name'`]' --output text)
         EC2_INSTANCES=$3
-        # if no unmanaged nodegroup cfn template is provided, assume we want managed nodegroups
-        if [ "$(params.unmanaged-nodegroup-cfn-url)" = "" ]; then
-          CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$node_group_name'`]' --output text)
-          if [ "$CREATED_NODEGROUP" == "" ]; then
-            aws eks $ENDPOINT_FLAG create-nodegroup \
-            --cluster-name $(params.cluster-name) \
-            --nodegroup-name $node_group_name \
-            --node-role $NODE_ROLE_ARN \
-            --launch-template name=$launch_template_name \
-            --region $(params.region) \
-            --instance-types $EC2_INSTANCES \
-            --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
-            --subnets $NG_SUBNETS $TAINTS_FLAG
-          fi
-          echo "CREATED_NODEGROUP=$node_group_name"
-          while [[ "$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $node_group_name --query nodegroup.status --output text)" == "CREATING" ]]
-          do
-            echo "$node_group_name is "CREATING" at $(date)"
-            sleep 2
-          done
-          
-          while true; do
-            ready_node=$(kubectl get nodes -l eks.amazonaws.com/nodegroup=$node_group_name --no-headers 2>/dev/null | grep -w Ready | wc -l)
-            echo "ready-nodes=$ready_node out of $2, for nodegroup: $node_group_name"
-            if [[ "$ready_node" -eq $2 ]]; then break; fi
-            sleep 5
-          done
-        else
-          echo "Creating or updating aws-auth ConfigMap..."
-          if ! kubectl get configmap aws-auth -n kube-system &> /dev/null; then
-            # Download the official template as shown in the Amazon EKS User Guide:
-            # https://docs.aws.amazon.com/eks/latest/userguide/auth-configmap.html#aws-auth-configmap
-            curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/aws-auth-cm.yaml
-
-            # Replace the placeholder with our role ARN and apply the configmap
-            sed -i.bak -e "s|<ARN of instance role (not instance profile)>|${NODE_ROLE_ARN}|" aws-auth-cm.yaml
-
-            kubectl apply -f aws-auth-cm.yaml
-            echo "Created aws-auth ConfigMap"
-            # Wait for the config map to be ready
-            echo "Verifying aws-auth ConfigMap..."
-            for i in {1..10}; do
-              if kubectl get configmap aws-auth -n kube-system -o yaml | grep -q "${NODE_ROLE_ARN}"; then
-                echo "aws-auth ConfigMap verified successfully"
-                break
-              fi
-              if [ $i -eq 10 ]; then
-                echo "Warning: Could not verify aws-auth ConfigMap after 10 attempts"
-              else
-                echo "Waiting for aws-auth ConfigMap to be ready... attempt $i"
-                sleep 5
-              fi
-            done
-          else
-            echo "aws-auth ConfigMap already exists"
-          fi
-
-          STACK_NAME=$node_group_name
-          STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
-          if [[ "$STACK_STATUS" == "" ]]; then
-            curl -s $(params.unmanaged-nodegroup-cfn-url) -o ./cfn-template
-
-            # assemble the stack parameters as a JSON file
-            # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
-            # and we need that for kubelet-config
-            jq --null-input \
-                --arg LaunchTemplateName "$launch_template_name" \
-                --arg ClusterName "$(params.cluster-name)" \
-                --arg AutoScalingGroupName "${node_group_name}" \
-                --arg NodeCount "$2" \
-                --arg SubnetIds $(jq -r '.cluster.resourcesVpcConfig.subnetIds | join(",")' cluster.json) \
-                --arg SecurityGroup "$(jq -r '.cluster.resourcesVpcConfig.clusterSecurityGroupId' cluster.json)" \
-                --arg VpcId $(jq -r '.cluster.resourcesVpcConfig.vpcId' cluster.json) \
-                '$ARGS.named | to_entries | map({"ParameterKey": .key, "ParameterValue": .value})' \
-              > parameters.json
-
-            # cloudformation really fights you every step of the way to pass JSON in, so let's just hack it
-            LAUNCH_TEMPLATE_OVERRIDES=$(echo "$EC2_INSTANCES" | awk '{$1=$1}1' | jq -R -c 'split(" ") | map({"InstanceType": .})')
-            sed -i "s/PLACEHOLDER_LAUNCH_TEMPLATE_OVERRIDES/$LAUNCH_TEMPLATE_OVERRIDES/g" cfn-template
-
-            aws cloudformation create-stack \
-              --region $(params.region) \
-              --stack-name $STACK_NAME \
-              --template-body file://$(pwd)/cfn-template \
-              --parameters file://$(pwd)/parameters.json
-
-            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME --region $(params.region)
-            echo "CREATED_CFN_STACK=$STACK_NAME"
-
-            # Right now we don't have an appropriate label to filter on for unmanaged nodes
-            # so we just check if number of nodes in NotReady state are 0
-            echo "Waiting for the nodes to join the cluster..."
-            sleep 10
-            while true; do
-              not_ready_nodes=$(kubectl get nodes --no-headers  | grep -w NotReady | wc -l)
-              echo "NotReady nodes: $not_ready_nodes"
-              if [[ "$not_ready_nodes" -eq 0 ]]; then
-                  echo "All nodes are Ready"
-                  break
-              fi
-              sleep 5
-            done
-
-          else
-              echo "$STACK_NAME Already exists"
-          fi
+        if [ "$CREATED_NODEGROUP" == "" ]; then
+          #create node group
+          aws eks $ENDPOINT_FLAG create-nodegroup \
+          --cluster-name $(params.cluster-name) \
+          --nodegroup-name $node_group_name \
+          --node-role $NODE_ROLE_ARN \
+          --launch-template name=$launch_template_name\
+          --region $(params.region) \
+          --instance-types $EC2_INSTANCES \
+          --scaling-config minSize=$(params.min-nodes),maxSize=$2,desiredSize=$2 \
+          --subnets $NG_SUBNETS $TAINTS_FLAG
         fi
+        echo "CREATED_NODEGROUP=$node_group_name"
+        while [[ "$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $node_group_name --query nodegroup.status --output text)" == "CREATING" ]]
+        do
+          echo "$node_group_name is "CREATING" at $(date)"
+          sleep 2
+        done
+        while true; do
+          ready_node=$(kubectl get nodes -l eks.amazonaws.com/nodegroup=$node_group_name --no-headers 2>/dev/null | grep -w Ready | wc -l)
+          echo "ready-nodes=$ready_node out of $2, for nodegroup: $node_group_name"
+          if [[ "$ready_node" -eq $2 ]]; then break; fi
+          sleep 5
+        done
       }
       for i in $(seq 1 $asgs)
       do
