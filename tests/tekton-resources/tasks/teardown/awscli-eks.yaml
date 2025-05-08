@@ -115,8 +115,8 @@ spec:
       #!/bin/bash
       aws sts get-caller-identity
       # Check if the stack exists
-      DESCRIBE_STACK=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.cluster-name))
-      if [ -z $DESCRIBE_STACK ]; then
+      aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.cluster-name)
+      if [ $? -ne 0 ]; then
         echo "Stack $(params.cluster-name) not found. Exiting..."
         exit 1
       else
