@@ -30,6 +30,12 @@ spec:
   - name: aws-pod-identity-agent-version
     default: v1.3.5-eksbuild.2
     description: The release version for aws pod identity agent.
+  - name: dataplane-configuration
+    description: ""
+  - name: eksadm-s3-path
+    description: ""
+  - name: cluster-type
+    description: ""
   workspaces:
   - name: config
     mountPath: /config/
@@ -58,7 +64,14 @@ spec:
       echo "securitygroup=$sg"
 
       if [ "$CREATED_CLUSTER" == "" ]; then
-        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
+        if [ -n "$(params.dataplane-configuration)" ] && [ -n "$(params.eksadm-s3-path)" ]  && [ "$(params.cluster-type)" = "obelisk" ]; then
+          aws s3 cp $(params.eksadm-s3-path) ./eksadm # Download eksadm binary to create the cluster that is obelisk/journal based
+          chmod +x eksadm
+          echo "Creating cluster using eksadm..."
+          ./eksadm createCluster $ENDPOINT_FLAG --kubernetes-version $(params.kubernetes-version) --region $(params.region) --dataplane-configuration $(params.dataplane-configuration) --cluster-name $(params.cluster-name) --role-arn $SERVICE_ROLE_ARN --subnet-ids $subnets --security-group-ids $sg
+        else
+          aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg $ENDPOINT_FLAG
+        fi
       fi
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
   - name: write-kubeconfig
