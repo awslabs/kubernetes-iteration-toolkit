@@ -71,55 +71,6 @@ spec:
       if [ -n "$(params.slack-hook)" ]; then
         curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)
       fi
-  - name: awscli-delete-vpc
-    image: alpine/k8s:1.23.7
-    script: |
-      #!/bin/bash
-      aws sts get-caller-identity
-      # Check if the stack exists
-      aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.cluster-name)
-      if [ $? -ne 0 ]; then
-        echo "Stack $(params.cluster-name) not found. Exiting..."
-        exit 1
-      else
-        echo "Deleting stack $(params.cluster-name)..."
-      fi
-      #Deletes the CFN stack
-      aws cloudformation delete-stack --region $(params.region) --stack-name $(params.cluster-name)
-      # Wait for the stack to be deleted
-      aws cloudformation wait stack-delete-complete --region $(params.region) --stack-name $(params.cluster-name)
-      if [ $? -ne 0 ]; then
-        # Get vpc id from stack that is blocking deletion
-        VPC_ID=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.cluster-name) | jq -r '.[].[].Outputs.[] | select(.OutputKey == "VpcId") | .OutputValue')
-        echo "$VPC_ID"
-        # Get security group ids from vpc that is blocking deletion. Have to get the security group this way because it doesn't report as part
-        # of the stack. Filter only security groups with cluster-name key to prevent deleting default sg
-        SG_IDS=$(aws ec2 describe-security-groups --region $(params.region) --filters 'Name=vpc-id, Values='$VPC_ID | jq -r '.[].[] | select(. | select(.Tags != null) | .Tags.[] | select(.Key == "aws:eks:cluster-name")) | .GroupId')
-        echo "$SG_IDS"
-        for sg in $SG_IDS; do
-          echo "deleting security group $sg"
-          aws ec2 delete-security-group --region $(params.region) --group-id "$sg"
-          if [ $? -ne 0 ]; then
-            echo "failed to delete security group $sg"
-            exit 1
-          fi
-        done
-        # Retry deleting the stack now that no resources should be blocking vpc deletion
-        echo "retrying deleting stack $(params.cluster-name)..."
-        #Deletes the CFN stack
-        aws cloudformation delete-stack --region $(params.region) --stack-name $(params.cluster-name)
-        # Wait for the stack to be deleted
-        aws cloudformation wait stack-delete-complete --region $(params.region) --stack-name $(params.cluster-name)
-        # Validate retry succeeded if not, error out
-        if [ $? -ne 0 ]; then
-          echo "retry failed to delete stack. Manual intervention required to cleanup resources"
-          exit 1
-        else
-          echo "retry deleted successfully"
-        fi
-      else
-        echo "Stack deleted successfully!"
-      fi
   - name: awscli-delete-asg
     image: alpine/k8s:1.23.7
     script: |
@@ -158,3 +109,52 @@ spec:
       done
       
       echo "All matching stacks have been deleted!"
+  - name: awscli-delete-vpc
+    image: alpine/k8s:1.23.7
+    script: |
+      #!/bin/bash
+      aws sts get-caller-identity
+      # Check if the stack exists
+      aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.cluster-name)
+      if [ $? -ne 0 ]; then
+        echo "Stack $(params.cluster-name) not found. Exiting..."
+        exit 1
+      else
+        echo "Deleting stack $(params.cluster-name)..."
+      fi
+      #Deletes the CFN stack
+      aws cloudformation delete-stack --region $(params.region) --stack-name $(params.cluster-name)
+      # Wait for the stack to be deleted
+      aws cloudformation wait stack-delete-complete --region $(params.region) --stack-name $(params.cluster-name)
+      if [ $? -ne 0 ]; then
+        # Get vpc id from stack that is blocking deletion
+        VPC_ID=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.cluster-name) | jq -r '.Stacks[].Outputs[] | select(.OutputKey == "VpcId") | .OutputValue')
+        echo "$VPC_ID"
+        # Get security group ids from vpc that is blocking deletion. Have to get the security group this way because it doesn't report as part
+        # of the stack. Filter only security groups with cluster-name key to prevent deleting default sg
+        SG_IDS=$(aws ec2 describe-security-groups --region $(params.region) --filters 'Name=vpc-id, Values='$VPC_ID | jq -r '.[].[] | select(. | select(.Tags != null) | .Tags.[] | select(.Key == "aws:eks:cluster-name")) | .GroupId')
+        echo "$SG_IDS"
+        for sg in $SG_IDS; do
+          echo "deleting security group $sg"
+          aws ec2 delete-security-group --region $(params.region) --group-id "$sg"
+          if [ $? -ne 0 ]; then
+            echo "failed to delete security group $sg"
+            exit 1
+          fi
+        done
+        # Retry deleting the stack now that no resources should be blocking vpc deletion
+        echo "retrying deleting stack $(params.cluster-name)..."
+        #Deletes the CFN stack
+        aws cloudformation delete-stack --region $(params.region) --stack-name $(params.cluster-name)
+        # Wait for the stack to be deleted
+        aws cloudformation wait stack-delete-complete --region $(params.region) --stack-name $(params.cluster-name)
+        # Validate retry succeeded if not, error out
+        if [ $? -ne 0 ]; then
+          echo "retry failed to delete stack. Manual intervention required to cleanup resources"
+          exit 1
+        else
+          echo "retry deleted successfully"
+        fi
+      else
+        echo "Stack deleted successfully!"
+      fi
