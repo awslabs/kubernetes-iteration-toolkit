@@ -132,7 +132,7 @@ spec:
         echo "$VPC_ID"
         # Get security group ids from vpc that is blocking deletion. Have to get the security group this way because it doesn't report as part
         # of the stack. Filter only security groups with cluster-name key to prevent deleting default sg
-        SG_IDS=$(aws ec2 describe-security-groups --region $(params.region) --filters 'Name=vpc-id, Values='$VPC_ID | jq -r '.[].[] | select(. | select(.Tags != null) | .Tags.[] | select(.Key == "aws:eks:cluster-name")) | .GroupId')
+        SG_IDS=$(aws ec2 describe-security-groups --region $(params.region) --filters 'Name=vpc-id, Values='$VPC_ID | jq -r '.SecurityGroups[] | select(. | select(.Tags != null) | .Tags[] | select(.Key == "aws:eks:cluster-name")) | .GroupId')
         echo "$SG_IDS"
         for sg in $SG_IDS; do
           echo "deleting security group $sg"
