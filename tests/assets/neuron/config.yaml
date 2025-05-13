@@ -1,0 +1,65 @@
+{{$uniformQps := DefaultParam .CL2_UNIFORM_QPS 500}}
+{{$neuronResourcesPerPod := DefaultParam .CL2_NEURON_RESOURCES_PER_POD 64}}
+{{$neuronPods := DefaultParam .CL2_NEURON_PODS .Nodes}}
+
+name: neuron-workers
+namespace:
+  number: 1
+tuningSets:
+- name: UniformQPS
+  qpsLoad:
+    qps: {{$uniformQps}}
+
+steps:
+- name: Start measurements
+  measurements:
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: start
+      labelSelector: group = neuron-worker
+      threshold: 25s
+- name: Create pods
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+    replicasPerNamespace: {{$neuronPods}}
+    tuningSet: UniformQPS
+    objectBundle:
+    - basename: neuron-worker
+      objectTemplatePath: pod.yaml
+      templateFillMap:
+        Group: neuron-worker
+        NeuronResources: {{$neuronResourcesPerPod}}
+
+- name: Wait for pods to be running
+  measurements:
+  - Identifier: WaitForRunningPods
+    Method: WaitForRunningPods
+    Params:
+      action: gather
+      desiredPodCount: {{$neuronPods}}
+      labelSelector: group = neuron-worker
+      timeout: 5m
+
+- name: Measure pod startup latency
+  measurements:
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: gather
+
+- name: Delete pods
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+    replicasPerNamespace: 0
+    tuningSet: UniformQPS
+    objectBundle:
+    - basename: neuron-worker
+      objectTemplatePath: pod.yaml
+      templateFillMap:
+        Group: neuron-worker
+        NeuronResources: {{$neuronResourcesPerPod}}

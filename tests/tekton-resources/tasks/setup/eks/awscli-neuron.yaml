@@ -1,0 +1,121 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: install-neuron-device-plugin
+  namespace: scalability
+spec:
+  description: |
+    Install AWS Neuron device plugin on an existing EKS cluster using Helm.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster.
+  - name: region
+    default: us-west-2
+    description: The region where the cluster is in.
+  - name: endpoint
+  - name: instance-types
+    default: ""
+    description: "Comma-separated list of instance types to enable Neuron emulation for. If empty, will auto-detect from cluster."
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+  - name: write-kubeconfig
+    image: alpine/k8s:1.23.7
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+
+      aws --version
+      aws sts get-caller-identity
+
+      echo "Available nodes in the cluster:"
+      # List nodegroups in the cluster
+      aws eks $ENDPOINT_FLAG list-nodegroups --cluster-name $(params.cluster-name) --region $(params.region)
+
+  - name: install-helm
+    image: alpine/k8s:1.23.7
+    script: |
+      # Install required dependencies
+      apk add --no-cache openssl curl bash
+      
+      # Install Helm
+      curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash  
+  - name: install-neuron
+    image: alpine/k8s:1.23.7
+    script: |
+      # Update kubeconfig with token
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      
+      echo "Verifying access to the cluster..."
+      kubectl get nodes
+      
+      # Determine instance types
+      if [ -n "$(params.instance-types)" ]; then
+        INSTANCE_TYPES="$(params.instance-types)"
+        echo "Will install Neuron device plugin in emulation mode for specified instance types: $INSTANCE_TYPES"
+      else
+        INSTANCE_TYPES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.labels.node\.kubernetes\.io/instance-type}' | tr ' ' '\n' | sort -u | tr '\n' ',')
+        echo "Auto-detected instance types from cluster: $INSTANCE_TYPES"
+      fi
+
+      # Create values file for Helm
+      cat << EOF > /tmp/values.yaml
+      devicePlugin:
+        env:
+        - name: KUBECONFIG
+          value: /etc/kubernetes/kubelet.conf
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NEURON_DEVICE_PLUGIN_EMULATION_MODE
+          value: "64"
+        nodeSelector: null
+        tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        updateStrategy:
+          type: RollingUpdate
+      neuronInstances: [${INSTANCE_TYPES}]
+      npd:
+        enabled: false
+      EOF
+
+      echo "Using this values.yaml:"
+      cat /tmp/values.yaml
+
+      # Install Neuron using values file
+      helm upgrade --install \
+        neuron \
+        oci://public.ecr.aws/neuron/neuron-helm-chart \
+        --namespace kube-system \
+        -f /tmp/values.yaml
+
+      sleep 5
+      echo "Verifying Installation..."
+      while true; do
+        DESIRED=$(kubectl get ds neuron-device-plugin -n kube-system -o jsonpath='{.status.desiredNumberScheduled}')
+        READY=$(kubectl get ds neuron-device-plugin -n kube-system -o jsonpath='{.status.numberReady}')
+        
+        echo "Desired: $DESIRED, Ready: $READY"
+        
+        if [ "$DESIRED" == "$READY" ] && [ "$DESIRED" -gt 0 ]; then
+            echo "Neuron device plugin installation verified successfully"
+            break
+        else
+            echo "Waiting for neuron-device-plugin daemonset to be ready..."
+            sleep 5
+        fi
+      done
