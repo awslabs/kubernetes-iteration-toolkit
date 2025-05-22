@@ -20,4 +20,29 @@ spec:
     image: alpine/k8s:1.23.7
     script: |
       curl -s $(params.vpc-cfn-url) -o ./amazon-vpc-eks
-      aws cloudformation --region $(params.region) deploy --stack-name $(params.stack-name)  --template-file ./amazon-vpc-eks || true
+      aws cloudformation --region $(params.region) deploy --stack-name $(params.stack-name)  --template-file ./amazon-vpc-eks
+
+      VPC_ID=$(aws ec2 describe-vpcs \
+          --filters "Name=tag:Name,Values=$(params.stack-name)-VPC" \
+          --query 'Vpcs[0].VpcId' \
+          --output text)
+
+      # Get all subnets with /12 CIDR blocks from the VPC
+      SUBNETS=$(aws ec2 describe-subnets \
+          --filters "Name=vpc-id,Values=$VPC_ID" \
+          --query "Subnets[?CidrBlock!=null] | [?contains(CidrBlock, '/12')].{SubnetId:SubnetId,CidrBlock:CidrBlock}" \
+          --output json)
+
+      # Create CIDR reservations for each subnet
+      echo "$SUBNETS" | jq -c '.[]' | while read -r subnet; do
+          CIDR_BLOCK=$(echo "$subnet" | jq -r '.CidrBlock')
+          SUBNET_ID=$(echo "$subnet" | jq -r '.SubnetId')
+          # Calculate the first /13 subnet within the /12 CIDR
+          BASE_IP=$(echo "$CIDR_BLOCK" | cut -d'/' -f1)
+          NEW_CIDR="${BASE_IP}/13"
+          echo "Creating CIDR reservation for subnet $SUBNET_ID with CIDR $NEW_CIDR"
+          aws ec2 create-subnet-cidr-reservation \
+              --subnet-id "$SUBNET_ID" \
+              --cidr "$NEW_CIDR" \
+              --reservation-type prefix
+      done
