@@ -189,7 +189,7 @@ spec:
         value: "$(params.kubernetes-version)"
       - name: endpoint
         value: $(params.endpoint)
-      - name: node-role-name 
+      - name: node-role-name
         value: $(params.cluster-name)-node-role
       - name: ami
         value: $(params.launch-template-ami)
@@ -285,6 +285,8 @@ spec:
       value: $(params.desired-nodes)
     - name: cluster-name
       value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
     - name: namespace-prefix
       value: $(params.namespace-prefix)
     - name: namespace-count
