@@ -1,4 +1,8 @@
 {{$clusterName := DefaultParam .CL2_CLUSTER_NAME "default-cluster-name"}}
+{{$metricDimensionName := DefaultParam .CL2_METRIC_DIMENSION_NAME "ClusterName"}}
+{{$metricNamespace := DefaultParam .CL2_METRIC_NAMESPACE "EKSPodIdentityScalabilityTests"}}
+{{$metricLatencyName := DefaultParam .CL2_METRIC_LATENCY_NAME "CredentialFetchLatency"}}
+{{$metricPeriod := DefaultParam .CL2_METRIC_PERIOD 300}}
 {{$namespacePrefix := DefaultParam .CL2_NAMESPACE_PREFIX "default"}}
 {{$namespaceCount := DefaultParam .CL2_NAMESPACE_COUNT 1}}
 {{$totalEksPodIdentityPods := DefaultParam .CL2_EKS_POD_IDENTITY_PODS 5000}}
@@ -44,6 +48,10 @@ steps:
       templateFillMap:
         Group: eks-pod-identity
         ClusterName: {{$clusterName}}
+        MetricDimensionName: {{$metricDimensionName}}
+        MetricNamespace: {{$metricNamespace}}
+        MetricLatencyName: {{$metricLatencyName}}
+        MetricPeriod: {{$metricPeriod}}
 - name: Waiting for eks pod identity pods to be created
   measurements:
   - Identifier: WaitForEksPodIdentityPods
@@ -72,3 +80,8 @@ steps:
       objectTemplatePath: pod-default.yaml
       templateFillMap:
         Group: eks-pod-identity
+        ClusterName: {{$clusterName}}
+        MetricDimensionName: {{$metricDimensionName}}
+        MetricNamespace: {{$metricNamespace}}
+        MetricLatencyName: {{$metricLatencyName}}
+        MetricPeriod: {{$metricPeriod}}

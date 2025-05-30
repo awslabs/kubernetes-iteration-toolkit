@@ -12,6 +12,14 @@ spec:
     env:
       - name: CLUSTER_NAME
         value: "{{.ClusterName}}"
+      - name: DIMENSION_NAME
+        value: "{{.MetricDimensionName}}"
+      - name: NAMESPACE
+        value: "{{.MetricNamespace}}"
+      - name: METRIC_LATENCY_NAME
+        value: "{{.MetricLatencyName}}"
+      - name: PERIOD
+        value: "{{.MetricPeriod}}"
     command:
       - sh
       - -c
@@ -20,15 +28,13 @@ spec:
         MAX_ATTEMPTS=7
         INITIAL_DELAY=0.2  # 200ms
 
-        NAMESPACE="EKSPodIdentityScalabilityTests"
-        DIMENSION_NAME="ClusterName"
         DIMENSION_VALUE=$CLUSTER_NAME
-        METRIC_LATENCY_NAME="CredentialFetchLatency"
-        PERIOD=300
-
         METRIC_MAX_RETRIES=5
         METRIC_RETRY_DELAY=1
 
+        # make 7 attempts on credential fetching with exponential retries, and calculate the time taken
+        # push metrics on time taken on credential fetching
+        # to minimize failure from cloudwatch metrics, add retries on put-metric-data
         start_epoch=$(date +%s%3N)
         # fetch credentials
         for i in $(seq 0 $((MAX_ATTEMPTS - 1))); do

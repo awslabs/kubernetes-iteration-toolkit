@@ -25,6 +25,18 @@ spec:
   - name: cl2-uniform-qps
     description: "uniform qps"
     default: "100"
+  - name: cl2-metric-dimension-name
+    description: "default metric dimension name"
+    default: "ClusterName"
+  - name: cl2-metric-namespace
+    description: "default metric namespace for pod identity"
+    default: "EKSPodIdentityScalabilityTests"
+  - name: cl2-metric-latency-name
+    description: "default metric latency name for pod identity"
+    default: "CredentialFetchLatency"
+  - name: cl2-metric-period
+    description: "default metric period"
+    default: "300"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
     default: "1000"
@@ -92,6 +104,10 @@ spec:
       CL2_DEFAULT_BURST: $(params.cl2-default-burst)
       CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
       CL2_CLUSTER_NAME: $(params.cluster-name)
+      CL2_METRIC_DIMENSION_NAME: $(params.cl2-metric-dimension-name)
+      CL2_METRIC_NAMESPACE: $(params.cl2-metric-namespace)
+      CL2_METRIC_LATENCY_NAME: $(params.cl2-metric-latency-name)
+      CL2_METRIC_PERIOD: $(params.cl2-metric-period)
       CL2_NAMESPACE_PREFIX: $(params.namespace-prefix)
       CL2_NAMESPACE_COUNT: $(params.namespace-count)
       CL2_TIMEOUT_EKS_POD_IDENTITY_POD_CREATION: $(params.timeout-pia-pod-creation)
@@ -186,12 +202,15 @@ spec:
       fi
 
       CLUSTER_NAME=$(params.cluster-name)
-      NAMESPACE="EKSPodIdentityScalabilityTests"
-      DIMENSION_NAME="ClusterName"
+      NAMESPACE=$(params.cl2-metric-namespace)
+      DIMENSION_NAME=$(params.cl2-metric-dimension-name)
       DIMENSION_VALUE=$CLUSTER_NAME
-      METRIC_LATENCY_NAME="CredentialFetchLatency"
-      PERIOD=300
+      METRIC_LATENCY_NAME=$(params.cl2-metric-latency-name)
+      PERIOD=$(params.cl2-metric-period)
 
+      # since the scalability test is running with the same cluster name, with cluster recreation
+      # it is important to know the range of start and end time to query metrics for the current run
+      # here we use cluster creation time start as start time and the current time as end time
       START_TIME=$(aws eks $ENDPOINT_FLAG --region $REGION describe-cluster \
         --name "$CLUSTER_NAME" \
         --query "cluster.createdAt" \
@@ -210,7 +229,7 @@ spec:
         --extended-statistics p50 p90 p99 \
         --output json)
 
-      # extract p50 p90 p99
+      # extract p50 p90 p99 of credential fetching
       latest=$(echo "$response" | jq -r '.Datapoints | sort_by(.Timestamp) | last')
       p50=$(echo "$latest" | jq -r '."ExtendedStatistics"."p50" // "N/A"')
       p90=$(echo "$latest" | jq -r '."ExtendedStatistics"."p90" // "N/A"')
@@ -229,6 +248,7 @@ spec:
 
       total_samples=$(echo "$response" | jq '[.Datapoints[].SampleCount] | add // 0')
 
+      # save metric results for s3 upload
       cat <<EOF > eks_pod_identity_test_summary.json
       {
         "start_time": "$START_TIME",
@@ -243,3 +263,12 @@ spec:
       # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
       ls -larth
       aws s3 cp . s3://$S3_RESULT_PATH/  --recursive
+
+      # if p99 is equal to or more than 2 seconds, exit with failure
+      int_p99=$(echo "$p99" | awk '{printf "%d", $1}')
+      if [ "$int_p99" -lt 2 ]; then
+        echo "p99 is less than 2"
+      else
+        echo "p99 is 2 or more"
+        exit 1
+      fi
