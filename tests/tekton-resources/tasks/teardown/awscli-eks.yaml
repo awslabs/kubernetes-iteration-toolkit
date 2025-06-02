@@ -59,18 +59,6 @@ spec:
           echo "Role $PIA_ROLE_NAME does not exist, no action needed."
         fi
       done
-  - name: teardown-eks-role-stack
-    image: alpine/k8s:1.23.7
-    script: |
-      aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
-      aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
-      aws cloudformation delete-stack --stack-name $(params.launch-template-stack-name)
-  - name: send-slack-notification
-    image: alpine/k8s:1.23.7
-    script: |
-      if [ -n "$(params.slack-hook)" ]; then
-        curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)
-      fi
   - name: awscli-delete-asg
     image: alpine/k8s:1.23.7
     script: |
@@ -109,6 +97,12 @@ spec:
       done
       
       echo "All matching stacks have been deleted!"
+  - name: teardown-eks-role-stack
+    image: alpine/k8s:1.23.7
+    script: |
+      aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
+      aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
+      aws cloudformation delete-stack --stack-name $(params.launch-template-stack-name)
   - name: awscli-delete-vpc
     image: alpine/k8s:1.23.7
     script: |
@@ -157,4 +151,10 @@ spec:
         fi
       else
         echo "Stack deleted successfully!"
+      fi
+  - name: send-slack-notification
+    image: alpine/k8s:1.23.7
+    script: |
+      if [ -n "$(params.slack-hook)" ]; then
+        curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)
       fi
