@@ -38,7 +38,8 @@ spec:
         start_epoch=$(date +%s%3N)
         # fetch credentials
         for i in $(seq 0 $((MAX_ATTEMPTS - 1))); do
-          if curl -S -H "Authorization: $AUTH_TOKEN" http://169.254.170.23/v1/credentials; then
+          status_code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: $AUTH_TOKEN" http://169.254.170.23/v1/credentials)
+          if [ "$status_code" -eq 200 ]; then
             end_epoch=$(date +%s%3N)
             printf "Endpoint is reachable at try %d\n" "$i"
 
@@ -79,6 +80,33 @@ spec:
           printf "Failed. Sleeping %.3f seconds before retry...\n" "$SLEEP_TIME"
           sleep "$SLEEP_TIME"
         done
+
+        PIA_ROLE_PREFIX=$CLUSTER_NAME-pia-role
+        STS_MAX_RETRIES=5
+        STS_RETRY_DELAY=1
+        STS_SUCCESS=0
+
+        # call sts to check on associated role
+        for ((j=1; j<=STS_MAX_RETRIES; j++)); do
+          ARN=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)
+          if [[ $? -eq 0 && -n "$ARN" ]]; then
+            if [[ "$ARN" == *"$PIA_ROLE_PREFIX"* ]]; then
+              echo "ARN contains role name prefix '$PIA_ROLE_PREFIX': $ARN"
+              STS_SUCCESS=1
+              break
+            else
+              echo "ARN does not contain expected role name prefix '$PIA_ROLE_PREFIX': $ARN"
+              exit 1
+            fi
+          fi
+          echo "Attempt $i failed to get caller identity. Retrying in $STS_RETRY_DELAY seconds..."
+          sleep $STS_RETRY_DELAY
+        done
+
+        if [[ $STS_SUCCESS -ne 1 ]]; then
+          echo "Failed to retrieve matching caller identity after $STS_MAX_RETRIES attempts."
+          exit 1
+        fi
 
         # s3 api call
         while ! aws s3 ls; do

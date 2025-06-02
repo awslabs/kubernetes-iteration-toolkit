@@ -191,6 +191,8 @@ spec:
     image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
+      yum install -y jq
+
       S3_RESULT_PATH=$(cat $(results.s3_result.path))
       echo "S3 Path: $S3_RESULT_PATH"
       aws sts get-caller-identity
@@ -247,6 +249,7 @@ spec:
         --output json)
 
       total_samples=$(echo "$response" | jq '[.Datapoints[].SampleCount] | add // 0')
+      rate=$(params.cl2-default-qps)
 
       # save metric results for s3 upload
       cat <<EOF > eks_pod_identity_test_summary.json
@@ -254,6 +257,7 @@ spec:
         "start_time": "$START_TIME",
         "end_time": "$END_TIME",
         "total_samples": $total_samples,
+        "rate": $rate,
         "p50": $p50,
         "p90": $p90,
         "p99": $p99
@@ -268,7 +272,9 @@ spec:
       int_p99=$(echo "$p99" | awk '{printf "%d", $1}')
       if [ "$int_p99" -lt 2 ]; then
         echo "p99 is less than 2"
+        echo "1" | tee $(results.datapoint.path)
       else
         echo "p99 is 2 or more"
+        echo "0" | tee $(results.datapoint.path)
         exit 1
       fi
