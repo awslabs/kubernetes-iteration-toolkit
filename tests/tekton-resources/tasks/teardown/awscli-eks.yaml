@@ -106,6 +106,7 @@ spec:
       echo "waiting for launch-template stack deletion..."
       aws cloudformation wait stack-delete-complete --stack-name $(params.launch-template-stack-name)
       STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $(params.node-role-stack-name) --query 'Stacks[0].StackStatus' --output text || echo "STACK_NOT_FOUND")
+      echo $STACK_STATUS
       if [ "$STACK_STATUS" == "DELETE_FAILED" ]; then
           echo "Stack is in DELETE_FAILED state, using FORCE_DELETE_STACK"
           aws cloudformation delete-stack --stack-name $(params.node-role-stack-name) --deletion-mode FORCE_DELETE_STACK
