@@ -98,7 +98,7 @@ spec:
       
       echo "All matching stacks have been deleted!"
   - name: teardown-eks-role-stack
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.30.2
     script: |
       aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
       aws cloudformation delete-stack --stack-name $(params.launch-template-stack-name)
