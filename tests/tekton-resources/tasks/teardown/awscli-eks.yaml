@@ -105,7 +105,15 @@ spec:
       # wait for the launch-template stack to be completely deleted to avoid race-conditions.
       echo "waiting for launch-template stack deletion..."
       aws cloudformation wait stack-delete-complete --stack-name $(params.launch-template-stack-name)
-      aws cloudformation delete-stack --stack-name $(params.node-role-stack-name) --deletion-mode FORCE_DELETE_STACK
+      STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $(params.node-role-stack-name) --query 'Stacks[0].StackStatus' --output text || echo "STACK_NOT_FOUND")
+      echo $STACK_STATUS
+      if [ "$STACK_STATUS" == "DELETE_FAILED" ]; then
+          echo "Stack is in DELETE_FAILED state, using FORCE_DELETE_STACK"
+          aws cloudformation delete-stack --stack-name $(params.node-role-stack-name) --deletion-mode FORCE_DELETE_STACK
+      else
+          echo "Normal stack deletion"
+          aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
+      fi
       
   - name: awscli-delete-vpc
     image: alpine/k8s:1.23.7
