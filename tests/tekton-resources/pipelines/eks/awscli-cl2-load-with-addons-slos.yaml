@@ -97,9 +97,9 @@ spec:
     description: "default metric period"
     default: "300"
   - name: timeout-pia-pod-creation
-    default: "20m"
+    default: "80s"
   - name: timeout-pia-pod-startup
-    default: "5m"
+    default: "60s"
   - name: launch-template-ami
     default: ""
     description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. By default resolve to the lates AL2023 ami for cluster version"

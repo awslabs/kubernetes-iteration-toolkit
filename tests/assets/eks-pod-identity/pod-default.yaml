@@ -81,32 +81,10 @@ spec:
           sleep "$SLEEP_TIME"
         done
 
-        PIA_ROLE_PREFIX=$CLUSTER_NAME-pia-role
-        STS_MAX_RETRIES=5
-        STS_RETRY_DELAY=1
-        STS_SUCCESS=0
-
-        # call sts to check on associated role
-        for ((j=1; j<=STS_MAX_RETRIES; j++)); do
-          ARN=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)
-          if [[ $? -eq 0 && -n "$ARN" ]]; then
-            if [[ "$ARN" == *"$PIA_ROLE_PREFIX"* ]]; then
-              echo "ARN contains role name prefix '$PIA_ROLE_PREFIX': $ARN"
-              STS_SUCCESS=1
-              break
-            else
-              echo "ARN does not contain expected role name prefix '$PIA_ROLE_PREFIX': $ARN"
-              exit 1
-            fi
-          fi
-          echo "Attempt $i failed to get caller identity. Retrying in $STS_RETRY_DELAY seconds..."
-          sleep $STS_RETRY_DELAY
-        done
-
-        if [[ $STS_SUCCESS -ne 1 ]]; then
-          echo "Failed to retrieve matching caller identity after $STS_MAX_RETRIES attempts."
-          exit 1
-        fi
+        # it is noted that a Pod with host network will fallback to Node role permissions that includes this s3 access
+        # however, in our test case, we are not using host network
+        # https://github.com/awslabs/kubernetes-iteration-toolkit/blob/main/tests/assets/eks_node_role.json
+        # the main reason we are not doing an STS get identity verification is about the quota of STS APIs with scale tests
 
         # s3 api call
         while ! aws s3 ls; do

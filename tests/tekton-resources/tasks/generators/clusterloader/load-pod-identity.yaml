@@ -228,14 +228,14 @@ spec:
         --start-time "$START_TIME" \
         --end-time "$END_TIME" \
         --period "$PERIOD" \
-        --extended-statistics p50 p90 p99 \
+        --extended-statistics p50 p99 p99.95 \
         --output json)
 
-      # extract p50 p90 p99 of credential fetching
+      # extract p50 p99 p99.95 of credential fetching
       latest=$(echo "$response" | jq -r '.Datapoints | sort_by(.Timestamp) | last')
       p50=$(echo "$latest" | jq -r '."ExtendedStatistics"."p50" // "N/A"')
-      p90=$(echo "$latest" | jq -r '."ExtendedStatistics"."p90" // "N/A"')
       p99=$(echo "$latest" | jq -r '."ExtendedStatistics"."p99" // "N/A"')
+      p9995=$(echo "$latest" | jq -r '."ExtendedStatistics"."p99.95" // "N/A"')
 
       response=$(aws cloudwatch get-metric-statistics \
         --region "$REGION" \
@@ -259,8 +259,8 @@ spec:
         "total_samples": $total_samples,
         "rate": $rate,
         "p50": $p50,
-        "p90": $p90,
-        "p99": $p99
+        "p99": $p99,
+        "p99.95": $p9995
       }
       EOF
 
@@ -268,13 +268,13 @@ spec:
       ls -larth
       aws s3 cp . s3://$S3_RESULT_PATH/  --recursive
 
-      # if p99 is equal to or more than 2 seconds, exit with failure
-      int_p99=$(echo "$p99" | awk '{printf "%d", $1}')
-      if [ "$int_p99" -lt 2 ]; then
-        echo "p99 is less than 2"
+      # if p99.95 is equal to or more than 1 second, exit with failure
+      int_p9995=$(echo "$p9995" | awk '{printf "%d", $1}')
+      if [ "$int_p9995" -lt 1 ]; then
+        echo "p99.95 is less than 1 second"
         echo "1" | tee $(results.datapoint.path)
       else
-        echo "p99 is 2 or more"
+        echo "p99.95 is 1 second or more"
         echo "0" | tee $(results.datapoint.path)
         exit 1
       fi
