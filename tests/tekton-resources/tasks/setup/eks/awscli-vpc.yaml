@@ -22,10 +22,9 @@ spec:
       curl -s $(params.vpc-cfn-url) -o ./amazon-vpc-eks
       aws cloudformation --region $(params.region) deploy --stack-name $(params.stack-name)  --template-file ./amazon-vpc-eks
 
-      VPC_ID=$(aws ec2 describe-vpcs \
-          --filters "Name=tag:Name,Values=$(params.stack-name)-VPC" \
-          --query 'Vpcs[0].VpcId' \
-          --output text)
+      VPC_ID=$(aws cloudformation describe-stacks --stack-name $(params.stack-name) --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)
+
+      echo "VPC_ID: $(VPC_ID)"
 
       # Get all subnets with /12 CIDR blocks from the VPC
       SUBNETS=$(aws ec2 describe-subnets \
