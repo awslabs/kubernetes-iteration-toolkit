@@ -25,6 +25,18 @@ spec:
   - name: cl2-uniform-qps
     description: "uniform qps"
     default: "100"
+  - name: cl2-metric-dimension-name
+    description: "default metric dimension name"
+    default: "ClusterName"
+  - name: cl2-metric-namespace
+    description: "default metric namespace for pod identity"
+    default: "EKSPodIdentityScalabilityTests"
+  - name: cl2-metric-latency-name
+    description: "default metric latency name for pod identity"
+    default: "CredentialFetchLatency"
+  - name: cl2-metric-period
+    description: "default metric period"
+    default: "300"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
     default: "1000"
@@ -35,6 +47,8 @@ spec:
     description: The region where the cluster is in.
   - name: cluster-name
     description: "The name of the EKS cluster you want to spin"
+  - name: endpoint
+    default: ""
   - name: namespace-prefix
     default: "default"
     description: "The prefix of namespaces for EKS Pod Identity test."
@@ -89,6 +103,11 @@ spec:
       CL2_DEFAULT_QPS: $(params.cl2-default-qps)
       CL2_DEFAULT_BURST: $(params.cl2-default-burst)
       CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
+      CL2_CLUSTER_NAME: $(params.cluster-name)
+      CL2_METRIC_DIMENSION_NAME: $(params.cl2-metric-dimension-name)
+      CL2_METRIC_NAMESPACE: $(params.cl2-metric-namespace)
+      CL2_METRIC_LATENCY_NAME: $(params.cl2-metric-latency-name)
+      CL2_METRIC_PERIOD: $(params.cl2-metric-period)
       CL2_NAMESPACE_PREFIX: $(params.namespace-prefix)
       CL2_NAMESPACE_COUNT: $(params.namespace-count)
       CL2_TIMEOUT_EKS_POD_IDENTITY_POD_CREATION: $(params.timeout-pia-pod-creation)
@@ -172,9 +191,90 @@ spec:
     image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
     script: |
+      yum install -y jq
+
       S3_RESULT_PATH=$(cat $(results.s3_result.path))
       echo "S3 Path: $S3_RESULT_PATH"
       aws sts get-caller-identity
+
+      REGION=$(params.region)
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+
+      CLUSTER_NAME=$(params.cluster-name)
+      NAMESPACE=$(params.cl2-metric-namespace)
+      DIMENSION_NAME=$(params.cl2-metric-dimension-name)
+      DIMENSION_VALUE=$CLUSTER_NAME
+      METRIC_LATENCY_NAME=$(params.cl2-metric-latency-name)
+      PERIOD=$(params.cl2-metric-period)
+
+      # since the scalability test is running with the same cluster name, with cluster recreation
+      # it is important to know the range of start and end time to query metrics for the current run
+      # here we use cluster creation time start as start time and the current time as end time
+      START_TIME=$(aws eks $ENDPOINT_FLAG --region $REGION describe-cluster \
+        --name "$CLUSTER_NAME" \
+        --query "cluster.createdAt" \
+        --output text)
+
+      END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+      response=$(aws cloudwatch get-metric-statistics \
+        --region "$REGION" \
+        --namespace "$NAMESPACE" \
+        --metric-name "$METRIC_LATENCY_NAME" \
+        --dimensions Name="$DIMENSION_NAME",Value="$DIMENSION_VALUE" \
+        --start-time "$START_TIME" \
+        --end-time "$END_TIME" \
+        --period "$PERIOD" \
+        --extended-statistics p50 p99 p99.95 \
+        --output json)
+
+      # extract p50 p99 p99.95 of credential fetching
+      latest=$(echo "$response" | jq -r '.Datapoints | sort_by(.Timestamp) | last')
+      p50=$(echo "$latest" | jq -r '."ExtendedStatistics"."p50" // "N/A"')
+      p99=$(echo "$latest" | jq -r '."ExtendedStatistics"."p99" // "N/A"')
+      p9995=$(echo "$latest" | jq -r '."ExtendedStatistics"."p99.95" // "N/A"')
+
+      response=$(aws cloudwatch get-metric-statistics \
+        --region "$REGION" \
+        --namespace "$NAMESPACE" \
+        --metric-name "$METRIC_LATENCY_NAME" \
+        --dimensions Name="$DIMENSION_NAME",Value="$DIMENSION_VALUE" \
+        --start-time "$START_TIME" \
+        --end-time "$END_TIME" \
+        --period "$PERIOD" \
+        --statistics SampleCount \
+        --output json)
+
+      total_samples=$(echo "$response" | jq '[.Datapoints[].SampleCount] | add // 0')
+      rate=$(params.cl2-default-qps)
+
+      # save metric results for s3 upload
+      cat <<EOF > eks_pod_identity_test_summary.json
+      {
+        "start_time": "$START_TIME",
+        "end_time": "$END_TIME",
+        "total_samples": $total_samples,
+        "rate": $rate,
+        "p50": $p50,
+        "p99": $p99,
+        "p99.95": $p9995
+      }
+      EOF
+
       # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
       ls -larth
       aws s3 cp . s3://$S3_RESULT_PATH/  --recursive
+
+      # if p99.95 is equal to or more than 1 second, exit with failure
+      int_p9995=$(echo "$p9995" | awk '{printf "%d", $1}')
+      if [ "$int_p9995" -lt 1 ]; then
+        echo "p99.95 is less than 1 second"
+        echo "1" | tee $(results.datapoint.path)
+      else
+        echo "p99.95 is 1 second or more"
+        echo "0" | tee $(results.datapoint.path)
+        exit 1
+      fi
