@@ -78,8 +78,8 @@ spec:
       # Apiserver is not recongnizing deamonset for sometime inconsistently, need to see if livez/readyz are healthy
       while true; do date && kubectl get --raw "/readyz" --v=10 && break ; sleep 5; done
       #ToDo remove this, adding to help eks networking evaluate ec2 DescribeNetworkInterface feature performance
-      kubectl set image daemonset/aws-node -n kube-system aws-node=public.ecr.aws/b4u2x4n7/cni:v1.19.1-rc1
-      kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true
+      kubectl set image daemonset/aws-node -n kube-system aws-node=602401143452.dkr.ecr.us-east-2.amazonaws.com/amazon-k8s-cni:v1.19.6-eksbuild.4
+      kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true DISABLE_LEAKED_ENI_CLEANUP=true MINIMUM_IP_TARGET=30 WARM_IP_TARGET=5
       # install csi drivers.
       kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=$(params.aws-ebs-csi-driver-version)"
       # TODO: Calculate replicas based on the cluster size going forward.
