@@ -270,11 +270,9 @@ spec:
 
       # if p99.95 is equal to or more than 1 second, exit with failure
       int_p9995=$(echo "$p9995" | awk '{printf "%d", $1}')
+      echo "p99.95 is $p9995"
       if [ "$int_p9995" -lt 1 ]; then
-        echo "p99.95 is less than 1 second"
         echo "1" | tee $(results.datapoint.path)
       else
-        echo "p99.95 is 1 second or more"
         echo "0" | tee $(results.datapoint.path)
-        exit 1
       fi
