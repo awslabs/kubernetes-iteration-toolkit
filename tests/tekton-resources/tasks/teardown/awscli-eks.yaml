@@ -47,12 +47,23 @@ spec:
       aws eks wait cluster-deleted --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
       echo "Cluster is deleted..."
 
-      MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
       for i in $(seq 1 $(params.namespace-count)); do
         PIA_ROLE_NAME=$(params.cluster-name)-pia-role-$i
         PIA_ROLE_EXISTS=$(aws iam get-role --role-name $PIA_ROLE_NAME --query 'Role.RoleName' --output text 2>/dev/null)
         if [ "$PIA_ROLE_EXISTS" == "$PIA_ROLE_NAME" ]; then
-          aws iam detach-role-policy --role-name $PIA_ROLE_NAME --policy-arn $MANAGED_POLICY_ARN
+          # Detach all attached managed policies
+          aws iam list-attached-role-policies --role-name "$PIA_ROLE_NAME" \
+            --query 'AttachedPolicies[*].PolicyArn' --output text | while read -r policy_arn; do
+            echo "Detaching managed policy: $policy_arn"
+            aws iam detach-role-policy --role-name "$PIA_ROLE_NAME" --policy-arn "$policy_arn"
+          done
+          # Delete all inline policies
+          aws iam list-role-policies --role-name "$PIA_ROLE_NAME" \
+            --query 'PolicyNames' --output text | while read -r policy_name; do
+            echo "Deleting inline policy: $policy_name"
+            aws iam delete-role-policy --role-name "$PIA_ROLE_NAME" --policy-name "$policy_name"
+          done
+          # Delete role
           aws iam delete-role --role-name $PIA_ROLE_NAME
           echo "Role $PIA_ROLE_NAME deleted successfully."
         else
