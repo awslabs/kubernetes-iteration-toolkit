@@ -53,13 +53,13 @@ spec:
         if [ "$PIA_ROLE_EXISTS" == "$PIA_ROLE_NAME" ]; then
           # Detach all attached managed policies
           aws iam list-attached-role-policies --role-name "$PIA_ROLE_NAME" \
-            --query 'AttachedPolicies[*].PolicyArn' --output text | while read -r policy_arn; do
+            --query 'AttachedPolicies[*].PolicyArn' --output json | jq -r '.[]' | while read -r policy_arn; do
             echo "Detaching managed policy: $policy_arn"
             aws iam detach-role-policy --role-name "$PIA_ROLE_NAME" --policy-arn "$policy_arn"
           done
           # Delete all inline policies
           aws iam list-role-policies --role-name "$PIA_ROLE_NAME" \
-            --query 'PolicyNames' --output text | while read -r policy_name; do
+            --query 'PolicyNames' --output json | jq -r '.[]' | while read -r policy_name; do
             echo "Deleting inline policy: $policy_name"
             aws iam delete-role-policy --role-name "$PIA_ROLE_NAME" --policy-name "$policy_name"
           done
