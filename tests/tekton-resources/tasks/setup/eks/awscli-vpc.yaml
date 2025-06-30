@@ -26,19 +26,19 @@ spec:
 
       echo "VPC_ID: $(VPC_ID)"
 
-      # Get all subnets with /12 CIDR blocks from the VPC
+      # Get all subnets with /13 CIDR blocks from the VPC
       SUBNETS=$(aws ec2 describe-subnets \
           --filters "Name=vpc-id,Values=$VPC_ID" \
-          --query "Subnets[?CidrBlock!=null] | [?contains(CidrBlock, '/12')].{SubnetId:SubnetId,CidrBlock:CidrBlock}" \
+          --query "Subnets[?CidrBlock!=null] | [?contains(CidrBlock, '/13')].{SubnetId:SubnetId,CidrBlock:CidrBlock}" \
           --output json)
 
       # Create CIDR reservations for each subnet
       echo "$SUBNETS" | jq -c '.[]' | while read -r subnet; do
           CIDR_BLOCK=$(echo "$subnet" | jq -r '.CidrBlock')
           SUBNET_ID=$(echo "$subnet" | jq -r '.SubnetId')
-          # Calculate the first /13 subnet within the /12 CIDR
+          # Calculate the first /14 subnet within the /13 CIDR
           BASE_IP=$(echo "$CIDR_BLOCK" | cut -d'/' -f1)
-          NEW_CIDR="${BASE_IP}/13"
+          NEW_CIDR="${BASE_IP}/14"
           echo "Creating CIDR reservation for subnet $SUBNET_ID with CIDR $NEW_CIDR"
           aws ec2 create-subnet-cidr-reservation \
               --subnet-id "$SUBNET_ID" \
