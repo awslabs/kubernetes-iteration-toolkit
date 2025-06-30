@@ -1,2143 +1,2216 @@
 {
-    "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "Amazon EKS Sample VPC - Private and Public subnets",
-    "Parameters": {
-      "VpcBlock1": {
-        "Type": "String",
-        "Default": "10.0.0.0/16",
-        "Description": "The primary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock2": {
-        "Type": "String",
-        "Default": "10.1.0.0/16",
-        "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock3": {
-        "Type": "String",
-        "Default": "10.2.0.0/16",
-        "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock4": {
-        "Type": "String",
-        "Default": "10.3.0.0/16",
-        "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock5": {
-        "Type": "String",
-        "Default": "10.4.0.0/16",
-        "Description": "The CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock6": {
-        "Type": "String",
-        "Default": "10.5.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock7": {
-        "Type": "String",
-        "Default": "10.6.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock8": {
-        "Type": "String",
-        "Default": "10.7.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock9": {
-        "Type": "String",
-        "Default": "10.8.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock10": {
-        "Type": "String",
-        "Default": "10.9.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock11": {
-        "Type": "String",
-        "Default": "10.10.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock12": {
-        "Type": "String",
-        "Default": "10.11.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock13": {
-        "Type": "String",
-        "Default": "10.12.0.0/16",
-        "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock14": {
-        "Type": "String",
-        "Default": "10.13.0.0/16",
-        "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock15": {
-        "Type": "String",
-        "Default": "10.14.0.0/16",
-        "Description": "The CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock16": {
-        "Type": "String",
-        "Default": "10.15.0.0/16",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock17": {
-        "Type": "String",
-        "Default": "10.16.0.0/12",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock18": {
-        "Type": "String",
-        "Default": "10.32.0.0/12",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock19": {
-        "Type": "String",
-        "Default": "10.48.0.0/12",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock20": {
-        "Type": "String",
-        "Default": "10.64.0.0/12",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock21": {
-        "Type": "String",
-        "Default": "10.80.0.0/12",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "VpcBlock22": {
-        "Type": "String",
-        "Default": "10.96.0.0/12",
-        "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
-      },
-      "PublicSubnet01Block": {
-        "Type": "String",
-        "Default": "10.0.0.0/16",
-        "Description": "CidrBlock for public subnet 01 within the VPC"
-      },
-      "PublicSubnet02Block": {
-        "Type": "String",
-        "Default": "10.1.0.0/16",
-        "Description": "CidrBlock for public subnet 02 within the VPC"
-      },
-      "PublicSubnet03Block": {
-        "Type": "String",
-        "Default": "10.2.0.0/16",
-        "Description": "CidrBlock for public subnet 03 within the VPC"
-      },
-      "PublicSubnet04Block": {
-        "Type": "String",
-        "Default": "10.3.0.0/16",
-        "Description": "CidrBlock for public subnet 04 within the VPC"
-      },
-      "PrivateSubnet01Block": {
-        "Type": "String",
-        "Default": "10.4.0.0/16",
-        "Description": "CidrBlock for private subnet 01 within the VPC"
-      },
-      "PrivateSubnet02Block": {
-        "Type": "String",
-        "Default": "10.5.0.0/16",
-        "Description": "CidrBlock for private subnet 02 within the VPC"
-      },
-      "PrivateSubnet03Block": {
-        "Type": "String",
-        "Default": "10.6.0.0/16",
-        "Description": "CidrBlock for private subnet 03 within the VPC"
-      },
-      "PrivateSubnet04Block": {
-        "Type": "String",
-        "Default": "10.7.0.0/16",
-        "Description": "CidrBlock for private subnet 04 within the VPC"
-      },
-      "PrivateSubnet05Block": {
-        "Type": "String",
-        "Default": "10.8.0.0/16",
-        "Description": "CidrBlock for private subnet 05 within the VPC"
-      },
-      "PrivateSubnet06Block": {
-        "Type": "String",
-        "Default": "10.9.0.0/16",
-        "Description": "CidrBlock for private subnet 06 within the VPC"
-      },
-      "PrivateSubnet07Block": {
-        "Type": "String",
-        "Default": "10.10.0.0/16",
-        "Description": "CidrBlock for private subnet 07 within the VPC"
-      },
-      "PrivateSubnet08Block": {
-        "Type": "String",
-        "Default": "10.11.0.0/16",
-        "Description": "CidrBlock for private subnet 08 within the VPC"
-      },
-      "PrivateSubnet09Block": {
-        "Type": "String",
-        "Default": "10.12.0.0/16",
-        "Description": "CidrBlock for private subnet 09 within the VPC"
-      },
-      "PrivateSubnet10Block": {
-        "Type": "String",
-        "Default": "10.13.0.0/16",
-        "Description": "CidrBlock for private subnet 10 within the VPC"
-      },
-      "PrivateSubnet11Block": {
-        "Type": "String",
-        "Default": "10.14.0.0/16",
-        "Description": "CidrBlock for private subnet 11 within the VPC"
-      },
-      "PrivateSubnet12Block": {
-        "Type": "String",
-        "Default": "10.15.0.0/16",
-        "Description": "CidrBlock for private subnet 12 within the VPC"
-      },
-      "PrivateSubnet13Block": {
-        "Type": "String",
-        "Default": "10.16.0.0/12",
-        "Description": "CidrBlock for private subnet 13 within the VPC"
-      },
-      "PrivateSubnet14Block": {
-        "Type": "String",
-        "Default": "10.32.0.0/12",
-        "Description": "CidrBlock for private subnet 14 within the VPC"
-      },
-      "PrivateSubnet15Block": {
-        "Type": "String",
-        "Default": "10.48.0.0/12",
-        "Description": "CidrBlock for private subnet 15 within the VPC"
-      },
-      "PrivateSubnet16Block": {
-        "Type": "String",
-        "Default": "10.64.0.0/12",
-        "Description": "CidrBlock for private subnet 16 within the VPC"
-      },
-      "PrivateSubnet17Block": {
-        "Type": "String",
-        "Default": "10.80.0.0/12",
-        "Description": "CidrBlock for private subnet 17 within the VPC"
-      },
-      "PrivateSubnet18Block": {
-        "Type": "String",
-        "Default": "10.96.0.0/12",
-        "Description": "CidrBlock for private subnet 18 within the VPC"
-      }
-    },
-    "Metadata": {
-      "AWS::CloudFormation::Interface": {
-        "ParameterGroups": [
-          {
-            "Label": {
-              "default": "Worker Network Configuration"
-            },
-            "Parameters": [
-              "VpcBlock1",
-              "VpcBlock2",
-              "VpcBlock3",
-              "VpcBlock4",
-              "VpcBlock5",
-              "VpcBlock6",
-              "VpcBlock7",
-              "VpcBlock8",
-              "VpcBlock9",
-              "VpcBlock10",
-              "VpcBlock11",
-              "VpcBlock12",
-              "VpcBlock13",
-              "VpcBlock14",
-              "VpcBlock15",
-              "VpcBlock16",
-              "VpcBlock17",
-              "VpcBlock18",
-              "VpcBlock19",
-              "VpcBlock20",
-              "VpcBlock21",
-              "VpcBlock22",
-              "PublicSubnet01Block",
-              "PublicSubnet02Block",
-              "PublicSubnet03Block",
-              "PublicSubnet04Block",
-              "PrivateSubnet01Block",
-              "PrivateSubnet02Block",
-              "PrivateSubnet03Block",
-              "PrivateSubnet04Block",
-              "PrivateSubnet05Block",
-              "PrivateSubnet06Block",
-              "PrivateSubnet07Block",
-              "PrivateSubnet08Block",
-              "PrivateSubnet09Block",
-              "PrivateSubnet10Block",
-              "PrivateSubnet11Block",
-              "PrivateSubnet12Block",
-              "PrivateSubnet13Block",
-              "PrivateSubnet14Block",
-              "PrivateSubnet15Block",
-              "PrivateSubnet16Block",
-              "PrivateSubnet17Block",
-              "PrivateSubnet18Block"
-            ]
-          }
-        ]
-      }
-    },
-    "Conditions": {
-      "HasMoreThan2Azs": {
-        "Fn::Not": [
-          {
-            "Fn::Or": [
-              {
-                "Fn::Equals": [
-                  {
-                    "Ref": "AWS::Region"
-                  },
-                  "cn-north-1"
-                ]
-              },
-              {
-                "Fn::Equals": [
-                  {
-                    "Ref": "AWS::Region"
-                  },
-                  "us-isob-east-1"
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    },
-    "Resources": {
-      "VPC": {
-        "Type": "AWS::EC2::VPC",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock1"
-          },
-          "EnableDnsSupport": true,
-          "EnableDnsHostnames": true,
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-VPC"
-              }
-            }
-          ]
-        }
-      },
-      "VPCCIDRBlock2": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock2"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock3": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock3"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock4": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock4"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock5": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock5"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock6": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock6"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock7": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock7"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock8": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock8"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock9": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock9"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock10": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock10"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock11": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock11"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock12": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock12"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock13": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock13"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock14": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock14"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock15": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock15"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock16": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock16"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock17": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock17"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock18": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock18"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock19": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock19"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock20": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock20"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock21": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock21"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "VPCCIDRBlock22": {
-        "Type": "AWS::EC2::VPCCidrBlock",
-        "Properties": {
-          "CidrBlock": {
-            "Ref": "VpcBlock22"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "InternetGateway": {
-        "Type": "AWS::EC2::InternetGateway"
-      },
-      "VPCGatewayAttachment": {
-        "Type": "AWS::EC2::VPCGatewayAttachment",
-        "Properties": {
-          "InternetGatewayId": {
-            "Ref": "InternetGateway"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      },
-      "PublicRouteTable": {
-        "Type": "AWS::EC2::RouteTable",
-        "Properties": {
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": "Public Subnets"
-            },
-            {
-              "Key": "Network",
-              "Value": "Public"
-            }
-          ]
-        }
-      },
-      "PrivateRouteTable01": {
-        "Type": "AWS::EC2::RouteTable",
-        "Properties": {
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": "Private Subnet AZ1"
-            },
-            {
-              "Key": "Network",
-              "Value": "Private01"
-            }
-          ]
-        }
-      },
-      "PrivateRouteTable02": {
-        "Type": "AWS::EC2::RouteTable",
-        "Properties": {
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": "Private Subnet AZ2"
-            },
-            {
-              "Key": "Network",
-              "Value": "Private02"
-            }
-          ]
-        }
-      },
-      "PrivateRouteTable03": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::RouteTable",
-        "Properties": {
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": "Private Subnet AZ3"
-            },
-            {
-              "Key": "Network",
-              "Value": "Private03"
-            }
-          ]
-        }
-      },
-      "PrivateRouteTable04": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::RouteTable",
-        "Properties": {
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": "Private Subnet AZ4"
-            },
-            {
-              "Key": "Network",
-              "Value": "Private04"
-            }
-          ]
-        }
-      },
-      "PublicRoute": {
-        "DependsOn": "VPCGatewayAttachment",
-        "Type": "AWS::EC2::Route",
-        "Properties": {
-          "RouteTableId": {
-            "Ref": "PublicRouteTable"
-          },
-          "DestinationCidrBlock": "0.0.0.0/0",
-          "GatewayId": {
-            "Ref": "InternetGateway"
-          }
-        }
-      },
-      "PrivateRoute01": {
-        "DependsOn": [
-          "VPCGatewayAttachment",
-          "NatGateway01"
-        ],
-        "Type": "AWS::EC2::Route",
-        "Properties": {
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable01"
-          },
-          "DestinationCidrBlock": "0.0.0.0/0",
-          "NatGatewayId": {
-            "Ref": "NatGateway01"
-          }
-        }
-      },
-      "PrivateRoute02": {
-        "DependsOn": [
-          "VPCGatewayAttachment",
-          "NatGateway02"
-        ],
-        "Type": "AWS::EC2::Route",
-        "Properties": {
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable02"
-          },
-          "DestinationCidrBlock": "0.0.0.0/0",
-          "NatGatewayId": {
-            "Ref": "NatGateway02"
-          }
-        }
-      },
-      "PrivateRoute03": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": [
-          "VPCGatewayAttachment",
-          "NatGateway03"
-        ],
-        "Type": "AWS::EC2::Route",
-        "Properties": {
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable03"
-          },
-          "DestinationCidrBlock": "0.0.0.0/0",
-          "NatGatewayId": {
-            "Ref": "NatGateway03"
-          }
-        }
-      },
-      "PrivateRoute04": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": [
-          "VPCGatewayAttachment",
-          "NatGateway04"
-        ],
-        "Type": "AWS::EC2::Route",
-        "Properties": {
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable04"
-          },
-          "DestinationCidrBlock": "0.0.0.0/0",
-          "NatGatewayId": {
-            "Ref": "NatGateway04"
-          }
-        }
-      },
-      "NatGateway01": {
-        "DependsOn": [
-          "NatGatewayEIP1",
-          "PublicSubnet01",
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::NatGateway",
-        "Properties": {
-          "AllocationId": {
-            "Fn::GetAtt": [
-              "NatGatewayEIP1",
-              "AllocationId"
-            ]
-          },
-          "SubnetId": {
-            "Ref": "PublicSubnet01"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-NatGatewayAZ1"
-              }
-            }
-          ]
-        }
-      },
-      "NatGateway02": {
-        "DependsOn": [
-          "NatGatewayEIP2",
-          "PublicSubnet02",
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::NatGateway",
-        "Properties": {
-          "AllocationId": {
-            "Fn::GetAtt": [
-              "NatGatewayEIP2",
-              "AllocationId"
-            ]
-          },
-          "SubnetId": {
-            "Ref": "PublicSubnet02"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-NatGatewayAZ2"
-              }
-            }
-          ]
-        }
-      },
-      "NatGateway03": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": [
-          "NatGatewayEIP3",
-          "PublicSubnet03",
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::NatGateway",
-        "Properties": {
-          "AllocationId": {
-            "Fn::GetAtt": [
-              "NatGatewayEIP3",
-              "AllocationId"
-            ]
-          },
-          "SubnetId": {
-            "Ref": "PublicSubnet03"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-NatGatewayAZ3"
-              }
-            }
-          ]
-        }
-      },
-      "NatGateway04": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": [
-          "NatGatewayEIP4",
-          "PublicSubnet04",
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::NatGateway",
-        "Properties": {
-          "AllocationId": {
-            "Fn::GetAtt": [
-              "NatGatewayEIP4",
-              "AllocationId"
-            ]
-          },
-          "SubnetId": {
-            "Ref": "PublicSubnet04"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-NatGatewayAZ4"
-              }
-            }
-          ]
-        }
-      },
-      "NatGatewayEIP1": {
-        "DependsOn": [
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::EIP",
-        "Properties": {
-          "Domain": "vpc"
-        }
-      },
-      "NatGatewayEIP2": {
-        "DependsOn": [
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::EIP",
-        "Properties": {
-          "Domain": "vpc"
-        }
-      },
-      "NatGatewayEIP3": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": [
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::EIP",
-        "Properties": {
-          "Domain": "vpc"
-        }
-      },
-      "NatGatewayEIP4": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": [
-          "VPCGatewayAttachment"
-        ],
-        "Type": "AWS::EC2::EIP",
-        "Properties": {
-          "Domain": "vpc"
-        }
-      },
-      "PublicSubnet01": {
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPC",
-        "Metadata": {
-          "Comment": "Subnet 01"
-        },
-        "Properties": {
-          "MapPublicIpOnLaunch": true,
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "0",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PublicSubnet01Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PublicSubnet01"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PublicSubnet02": {
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock2",
-        "Metadata": {
-          "Comment": "Subnet 02"
-        },
-        "Properties": {
-          "MapPublicIpOnLaunch": true,
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "1",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PublicSubnet02Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PublicSubnet02"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PublicSubnet03": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock3",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Subnet 03"
-        },
-        "Properties": {
-          "MapPublicIpOnLaunch": true,
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "2",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PublicSubnet03Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PublicSubnet03"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PublicSubnet04": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock4",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Subnet 04"
-        },
-        "Properties": {
-          "MapPublicIpOnLaunch": true,
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "3",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PublicSubnet04Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PublicSubnet04"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet01": {
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock5",
-        "Metadata": {
-          "Comment": "Private Subnet 01"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "0",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet01Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet01"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet02": {
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock6",
-        "Metadata": {
-          "Comment": "Private Subnet 02"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "1",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet02Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet02"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet03": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock7",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 03"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "2",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet03Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet03"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet04": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock8",
-        "Metadata": {
-          "Comment": "Private Subnet 04"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "3",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet04Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet04"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet05": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock9",
-        "Metadata": {
-          "Comment": "Private Subnet 05"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "0",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet05Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet05"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet06": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock10",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 06"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "1",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet06Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet06"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet07": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock11",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 07"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "2",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet07Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet07"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet08": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock12",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 08"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "3",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet08Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet08"
-              }
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet09": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock13",
-        "Metadata": {
-          "Comment": "Private Subnet 09"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "0",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet09Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet09"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet10": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock14",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 10"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "1",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet10Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet10"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet11": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock15",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 11"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "2",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet11Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet11"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet12": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock16",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 12"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "3",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet12Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet12"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet13": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock17",
-        "Metadata": {
-          "Comment": "Private Subnet 13"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "0",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet13Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet13"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            },
-            {
-              "Key": "kubernetes.io/role/cni",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet14": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock18",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 14"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "1",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet14Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet14"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            },
-            {
-              "Key": "kubernetes.io/role/cni",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet15": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock19",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 15"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "2",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet15Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet15"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            },
-            {
-              "Key": "kubernetes.io/role/cni",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet16": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock20",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 16"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "3",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet16Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet16"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            },
-            {
-              "Key": "kubernetes.io/role/cni",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet17": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::Subnet",
-        "DependsOn": "VPCCIDRBlock21",
-        "Metadata": {
-          "Comment": "Private Subnet 17"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "0",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet17Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet17"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            },
-            {
-              "Key": "kubernetes.io/role/cni",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PrivateSubnet18": {
-        "Condition": "HasMoreThan2Azs",
-        "DependsOn": "VPCCIDRBlock22",
-        "Type": "AWS::EC2::Subnet",
-        "Metadata": {
-          "Comment": "Private Subnet 18"
-        },
-        "Properties": {
-          "AvailabilityZone": {
-            "Fn::Select": [
-              "1",
-              {
-                "Fn::GetAZs": {
-                  "Ref": "AWS::Region"
-                }
-              }
-            ]
-          },
-          "CidrBlock": {
-            "Ref": "PrivateSubnet18Block"
-          },
-          "VpcId": {
-            "Ref": "VPC"
-          },
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": {
-                "Fn::Sub": "${AWS::StackName}-PrivateSubnet18"
-              }
-            },
-            {
-              "Key": "kubernetes.io/cluster/david-awscli-eks-load-5k-v131",
-              "Value": "shared"
-            },
-            {
-              "Key": "kubernetes.io/role/internal-elb",
-              "Value": 1
-            },
-            {
-              "Key": "kubernetes.io/role/cni",
-              "Value": 1
-            }
-          ]
-        }
-      },
-      "PublicSubnet01RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PublicSubnet01"
-          },
-          "RouteTableId": {
-            "Ref": "PublicRouteTable"
-          }
-        }
-      },
-      "PublicSubnet02RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PublicSubnet02"
-          },
-          "RouteTableId": {
-            "Ref": "PublicRouteTable"
-          }
-        }
-      },
-      "PublicSubnet03RouteTableAssociation": {
-        "Condition": "HasMoreThan2Azs",
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PublicSubnet03"
-          },
-          "RouteTableId": {
-            "Ref": "PublicRouteTable"
-          }
-        }
-      },
-      "PublicSubnet04RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PublicSubnet04"
-          },
-          "RouteTableId": {
-            "Ref": "PublicRouteTable"
-          }
-        }
-      },
-      "PrivateSubnet01RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet01"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable01"
-          }
-        }
-      },
-      "PrivateSubnet02RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet02"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable02"
-          }
-        }
-      },
-      "PrivateSubnet03RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet03"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable03"
-          }
-        }
-      },
-      "PrivateSubnet04RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet04"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable04"
-          }
-        }
-      },
-      "PrivateSubnet05RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet05"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable01"
-          }
-        }
-      },
-      "PrivateSubnet06RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet06"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable02"
-          }
-        }
-      },
-      "PrivateSubnet07RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet07"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable03"
-          }
-        }
-      },
-      "PrivateSubnet08RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet08"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable04"
-          }
-        }
-      },
-      "PrivateSubnet09RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet09"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable01"
-          }
-        }
-      },
-      "PrivateSubnet10RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet10"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable02"
-          }
-        }
-      },
-      "PrivateSubnet11RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet11"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable03"
-          }
-        }
-      },
-      "PrivateSubnet12RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet12"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable04"
-          }
-        }
-      },
-      "PrivateSubnet13RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet13"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable01"
-          }
-        }
-      },
-      "PrivateSubnet14RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet14"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable02"
-          }
-        }
-      },
-      "PrivateSubnet15RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet15"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable03"
-          }
-        }
-      },
-      "PrivateSubnet16RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet16"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable04"
-          }
-        }
-      },
-      "PrivateSubnet17RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet17"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable01"
-          }
-        }
-      },
-      "PrivateSubnet18RouteTableAssociation": {
-        "Type": "AWS::EC2::SubnetRouteTableAssociation",
-        "Properties": {
-          "SubnetId": {
-            "Ref": "PrivateSubnet18"
-          },
-          "RouteTableId": {
-            "Ref": "PrivateRouteTable02"
-          }
-        }
-      },
-      "ControlPlaneSecurityGroup": {
-        "Type": "AWS::EC2::SecurityGroup",
-        "Properties": {
-          "GroupDescription": "Cluster communication with worker nodes",
-          "VpcId": {
-            "Ref": "VPC"
-          }
-        }
-      }
-    },
-    "Outputs": {
-      "SubnetIds": {
-        "Description": "Subnets IDs in the VPC",
-        "Value": {
-          "Fn::Join": [
-            ",",
-            [
-              {
-                "Ref": "PublicSubnet01"
-              },
-              {
-                "Ref": "PublicSubnet02"
-              },
-              {
-                "Ref": "PublicSubnet03"
-              },
-              {
-                "Ref": "PublicSubnet04"
-              },
-              {
-                "Ref": "PrivateSubnet01"
-              },
-              {
-                "Ref": "PrivateSubnet02"
-              },
-              {
-                "Ref": "PrivateSubnet03"
-              },
-              {
-                "Ref": "PrivateSubnet04"
-              },
-              {
-                "Ref": "PrivateSubnet05"
-              },
-              {
-                "Ref": "PrivateSubnet06"
-              },
-              {
-                "Ref": "PrivateSubnet07"
-              },
-              {
-                "Ref": "PrivateSubnet08"
-              },
-              {
-                "Ref": "PrivateSubnet09"
-              },
-              {
-                "Ref": "PrivateSubnet10"
-              },
-              {
-                "Ref": "PrivateSubnet11"
-              },
-              {
-                "Ref": "PrivateSubnet12"
-              },
-              {
-                "Ref": "PrivateSubnet13"
-              },
-              {
-                "Ref": "PrivateSubnet14"
-              },
-              {
-                "Ref": "PrivateSubnet15"
-              },
-              {
-                "Ref": "PrivateSubnet16"
-              },
-              {
-                "Ref": "PrivateSubnet17"
-              },
-              {
-                "Ref": "PrivateSubnet18"
-              }
-            ]
-          ]
-        }
-      },
-      "SecurityGroups": {
-        "Description": "Security group for the cluster control plane communication with worker nodes",
-        "Value": {
-          "Fn::Join": [
-            ",",
-            [
-              {
-                "Ref": "ControlPlaneSecurityGroup"
-              }
-            ]
-          ]
-        }
-      },
-      "VpcId": {
-        "Description": "The VPC Id",
-        "Value": {
-          "Ref": "VPC"
-        }
-      }
-    }
+ "AWSTemplateFormatVersion": "2010-09-09",
+ "Description": "Amazon EKS Sample VPC - Private and Public subnets",
+ "Parameters": {
+  "VpcBlock1": {
+   "Type": "String",
+   "Default": "10.0.0.0/14",
+   "Description": "The primary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock2": {
+   "Type": "String",
+   "Default": "10.4.0.0/14",
+   "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock3": {
+   "Type": "String",
+   "Default": "10.8.0.0/14",
+   "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock4": {
+   "Type": "String",
+   "Default": "10.12.0.0/14",
+   "Description": "The secondary CIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock5": {
+   "Type": "String",
+   "Default": "10.16.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock6": {
+   "Type": "String",
+   "Default": "10.24.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock7": {
+   "Type": "String",
+   "Default": "10.32.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock8": {
+   "Type": "String",
+   "Default": "10.40.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock9": {
+   "Type": "String",
+   "Default": "10.48.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock10": {
+   "Type": "String",
+   "Default": "10.56.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock11": {
+   "Type": "String",
+   "Default": "10.64.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock12": {
+   "Type": "String",
+   "Default": "10.72.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock13": {
+   "Type": "String",
+   "Default": "10.80.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock14": {
+   "Type": "String",
+   "Default": "10.88.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock15": {
+   "Type": "String",
+   "Default": "10.96.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "VpcBlock16": {
+   "Type": "String",
+   "Default": "10.104.0.0/13",
+   "Description": "TheCIDR range for the VPC. This should be a valid private (RFC 1918) CIDR range."
+  },
+  "PublicSubnet01Block": {
+   "Type": "String",
+   "Default": "10.0.0.0/14",
+   "Description": "CidrBlock for public subnet 01 within the VPC"
+  },
+  "PublicSubnet02Block": {
+   "Type": "String",
+   "Default": "10.4.0.0/14",
+   "Description": "CidrBlock for public subnet 02 within the VPC"
+  },
+  "PublicSubnet03Block": {
+   "Type": "String",
+   "Default": "10.8.0.0/14",
+   "Description": "CidrBlock for public subnet 03 within the VPC"
+  },
+  "PublicSubnet04Block": {
+   "Type": "String",
+   "Default": "10.12.0.0/14",
+   "Description": "CidrBlock for public subnet 04 within the VPC"
+  },
+  "PrivateSubnet01Block": {
+   "Type": "String",
+   "Default": "10.16.0.0/13",
+   "Description": "CidrBlock for private subnet 01 within the VPC"
+  },
+  "PrivateSubnet02Block": {
+   "Type": "String",
+   "Default": "10.24.0.0/13",
+   "Description": "CidrBlock for private subnet 02 within the VPC"
+  },
+  "PrivateSubnet03Block": {
+   "Type": "String",
+   "Default": "10.32.0.0/13",
+   "Description": "CidrBlock for private subnet 03 within the VPC"
+  },
+  "PrivateSubnet04Block": {
+   "Type": "String",
+   "Default": "10.40.0.0/13",
+   "Description": "CidrBlock for private subnet 04 within the VPC"
+  },
+  "PrivateSubnet05Block": {
+   "Type": "String",
+   "Default": "10.48.0.0/13",
+   "Description": "CidrBlock for private subnet 05 within the VPC"
+  },
+  "PrivateSubnet06Block": {
+   "Type": "String",
+   "Default": "10.56.0.0/13",
+   "Description": "CidrBlock for private subnet 06 within the VPC"
+  },
+  "PrivateSubnet07Block": {
+   "Type": "String",
+   "Default": "10.64.0.0/13",
+   "Description": "CidrBlock for private subnet 07 within the VPC"
+  },
+  "PrivateSubnet08Block": {
+   "Type": "String",
+   "Default": "10.72.0.0/13",
+   "Description": "CidrBlock for private subnet 08 within the VPC"
+  },
+  "PrivateSubnet09Block": {
+   "Type": "String",
+   "Default": "10.80.0.0/13",
+   "Description": "CidrBlock for private subnet 09 within the VPC"
+  },
+  "PrivateSubnet10Block": {
+   "Type": "String",
+   "Default": "10.88.0.0/13",
+   "Description": "CidrBlock for private subnet 10 within the VPC"
+  },
+  "PrivateSubnet11Block": {
+   "Type": "String",
+   "Default": "10.96.0.0/13",
+   "Description": "CidrBlock for private subnet 11 within the VPC"
+  },
+  "PrivateSubnet12Block": {
+   "Type": "String",
+   "Default": "10.104.0.0/13",
+   "Description": "CidrBlock for private subnet 12 within the VPC"
   }
-  
+ },
+ "Metadata": {
+  "AWS::CloudFormation::Interface": {
+   "ParameterGroups": [
+    {
+     "Label": {
+      "default": "Worker Network Configuration"
+     },
+     "Parameters": [
+      "VpcBlock1",
+      "VpcBlock2",
+      "VpcBlock3",
+      "VpcBlock4",
+      "VpcBlock5",
+      "VpcBlock6",
+      "VpcBlock7",
+      "VpcBlock8",
+      "VpcBlock9",
+      "VpcBlock10",
+      "VpcBlock11",
+      "VpcBlock12",
+      "VpcBlock13",
+      "VpcBlock14",
+      "VpcBlock15",
+      "VpcBlock16",
+      "PublicSubnet01Block",
+      "PublicSubnet02Block",
+      "PublicSubnet03Block",
+      "PublicSubnet04Block",
+      "PrivateSubnet01Block",
+      "PrivateSubnet02Block",
+      "PrivateSubnet03Block",
+      "PrivateSubnet04Block",
+      "PrivateSubnet05Block",
+      "PrivateSubnet06Block",
+      "PrivateSubnet07Block",
+      "PrivateSubnet08Block",
+      "PrivateSubnet09Block",
+      "PrivateSubnet10Block",
+      "PrivateSubnet11Block",
+      "PrivateSubnet12Block"
+     ]
+    }
+   ]
+  }
+ },
+ "Conditions": {
+  "HasMoreThan2Azs": {
+   "Fn::Not": [
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "cn-north-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-isob-east-1"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "Resources": {
+  "VPC": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock1"
+    },
+    "EnableDnsSupport": true,
+    "EnableDnsHostnames": true,
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-VPC"
+      }
+     }
+    ]
+   }
+  },
+  "VPCCIDRBlock2": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock2"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock3": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock3"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock4": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock4"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock5": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock5"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock6": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock6"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock7": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock7"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock8": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock8"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock9": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock9"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock10": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock10"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock11": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock11"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock12": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock12"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock13": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock13"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock14": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock14"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock15": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock15"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "VPCCIDRBlock16": {
+   "Type": "AWS::EC2::VPCCidrBlock",
+   "Properties": {
+    "CidrBlock": {
+     "Ref": "VpcBlock16"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "InternetGateway": {
+   "Type": "AWS::EC2::InternetGateway"
+  },
+  "VPCGatewayAttachment": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "InternetGateway"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  },
+  "PublicRouteTable": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Public Subnets"
+     },
+     {
+      "Key": "Network",
+      "Value": "Public"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable01": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ1"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private01"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable02": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ2"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private02"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable03": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ3"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private03"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable04": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ4"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private04"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable05": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ1"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private05"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable06": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ2"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private06"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable07": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ3"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private07"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable08": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ4"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private08"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable09": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ1"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private09"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable10": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ2"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private10"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable11": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ3"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private11"
+     }
+    ]
+   }
+  },
+  "PrivateRouteTable12": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Private Subnet AZ4"
+     },
+     {
+      "Key": "Network",
+      "Value": "Private12"
+     }
+    ]
+   }
+  },
+  "PublicRoute": {
+   "DependsOn": "VPCGatewayAttachment",
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PublicRouteTable"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "InternetGateway"
+    }
+   }
+  },
+  "PrivateRoute01": {
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway01"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable01"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway01"
+    }
+   }
+  },
+  "PrivateRoute02": {
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway02"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable02"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway02"
+    }
+   }
+  },
+  "PrivateRoute03": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway03"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable03"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway03"
+    }
+   }
+  },
+  "PrivateRoute04": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway04"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable04"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway04"
+    }
+   }
+  },
+  "PrivateRoute05": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway05"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable05"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway05"
+    }
+   }
+  },
+  "PrivateRoute06": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway06"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable06"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway06"
+    }
+   }
+  },
+  "PrivateRoute07": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway07"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable07"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway07"
+    }
+   }
+  },
+  "PrivateRoute08": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway08"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable08"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway08"
+    }
+   }
+  },
+  "PrivateRoute09": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway09"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable09"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway09"
+    }
+   }
+  },
+  "PrivateRoute10": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway10"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable10"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway10"
+    }
+   }
+  },
+  "PrivateRoute11": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway11"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable11"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway11"
+    }
+   }
+  },
+  "PrivateRoute12": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment",
+    "NatGateway12"
+   ],
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable12"
+    },
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "NatGateway12"
+    }
+   }
+  },
+  "NatGateway01": {
+   "DependsOn": [
+    "NatGatewayEIP1",
+    "PublicSubnet01",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP1",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet01"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ1"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway02": {
+   "DependsOn": [
+    "NatGatewayEIP2",
+    "PublicSubnet02",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP2",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet02"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ2"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway03": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP3",
+    "PublicSubnet03",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP3",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet03"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ3"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway04": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP4",
+    "PublicSubnet04",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP4",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet04"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ4"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway05": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP5",
+    "PublicSubnet01",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP5",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet01"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ1"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway06": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP4",
+    "PublicSubnet02",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP6",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet02"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ2"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway07": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP7",
+    "PublicSubnet03",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP7",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet03"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ3"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway08": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP8",
+    "PublicSubnet04",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP8",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet04"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ4"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway09": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP9",
+    "PublicSubnet01",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP9",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet01"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ1"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway10": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP10",
+    "PublicSubnet02",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP10",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet02"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ2"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway11": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP11",
+    "PublicSubnet03",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP11",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet03"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ3"
+      }
+     }
+    ]
+   }
+  },
+  "NatGateway12": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "NatGatewayEIP12",
+    "PublicSubnet04",
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "NatGatewayEIP12",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "PublicSubnet04"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-NatGatewayAZ4"
+      }
+     }
+    ]
+   }
+  },
+  "NatGatewayEIP1": {
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP2": {
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP3": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP4": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP5": {
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP6": {
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP7": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP8": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP9": {
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP10": {
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP11": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "NatGatewayEIP12": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": [
+    "VPCGatewayAttachment"
+   ],
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc"
+   }
+  },
+  "PublicSubnet01": {
+   "Type": "AWS::EC2::Subnet",
+   "DependsOn": "VPC",
+   "Metadata": {
+    "Comment": "Subnet 01"
+   },
+   "Properties": {
+    "MapPublicIpOnLaunch": true,
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "0",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PublicSubnet01Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PublicSubnet01"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PublicSubnet02": {
+   "Type": "AWS::EC2::Subnet",
+   "DependsOn": "VPCCIDRBlock2",
+   "Metadata": {
+    "Comment": "Subnet 02"
+   },
+   "Properties": {
+    "MapPublicIpOnLaunch": true,
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "1",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PublicSubnet02Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PublicSubnet02"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PublicSubnet03": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock3",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Subnet 03"
+   },
+   "Properties": {
+    "MapPublicIpOnLaunch": true,
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "2",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PublicSubnet03Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PublicSubnet03"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PublicSubnet04": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock4",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Subnet 04"
+   },
+   "Properties": {
+    "MapPublicIpOnLaunch": true,
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "3",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PublicSubnet04Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PublicSubnet04"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet01": {
+   "Type": "AWS::EC2::Subnet",
+   "DependsOn": "VPCCIDRBlock5",
+   "Metadata": {
+    "Comment": "Private Subnet 01"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "0",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet01Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet01"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet02": {
+   "Type": "AWS::EC2::Subnet",
+   "DependsOn": "VPCCIDRBlock6",
+   "Metadata": {
+    "Comment": "Private Subnet 02"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "1",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet02Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet02"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet03": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock7",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Private Subnet 03"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "2",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet03Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet03"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet04": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::Subnet",
+   "DependsOn": "VPCCIDRBlock8",
+   "Metadata": {
+    "Comment": "Private Subnet 04"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "3",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet04Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet04"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet05": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::Subnet",
+   "DependsOn": "VPCCIDRBlock9",
+   "Metadata": {
+    "Comment": "Private Subnet 05"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "0",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet05Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet05"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet06": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock10",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Private Subnet 06"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "1",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet06Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet06"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet07": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock11",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Private Subnet 07"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "2",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet07Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet07"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet08": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock12",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Private Subnet 08"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "3",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet08Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet08"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet09": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::Subnet",
+   "DependsOn": "VPCCIDRBlock13",
+   "Metadata": {
+    "Comment": "Private Subnet 09"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "0",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet09Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet09"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet10": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock14",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Private Subnet 10"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "1",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet10Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet10"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet11": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock15",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Private Subnet 11"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "2",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet11Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet11"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PrivateSubnet12": {
+   "Condition": "HasMoreThan2Azs",
+   "DependsOn": "VPCCIDRBlock16",
+   "Type": "AWS::EC2::Subnet",
+   "Metadata": {
+    "Comment": "Private Subnet 12"
+   },
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      "3",
+      {
+       "Fn::GetAZs": {
+        "Ref": "AWS::Region"
+       }
+      }
+     ]
+    },
+    "CidrBlock": {
+     "Ref": "PrivateSubnet12Block"
+    },
+    "VpcId": {
+     "Ref": "VPC"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": {
+       "Fn::Sub": "${AWS::StackName}-PrivateSubnet12"
+      }
+     },
+     {
+      "Key": "kubernetes.io/role/internal-elb",
+      "Value": 1
+     }
+    ]
+   }
+  },
+  "PublicSubnet01RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PublicSubnet01"
+    },
+    "RouteTableId": {
+     "Ref": "PublicRouteTable"
+    }
+   }
+  },
+  "PublicSubnet02RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PublicSubnet02"
+    },
+    "RouteTableId": {
+     "Ref": "PublicRouteTable"
+    }
+   }
+  },
+  "PublicSubnet03RouteTableAssociation": {
+   "Condition": "HasMoreThan2Azs",
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PublicSubnet03"
+    },
+    "RouteTableId": {
+     "Ref": "PublicRouteTable"
+    }
+   }
+  },
+  "PublicSubnet04RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PublicSubnet04"
+    },
+    "RouteTableId": {
+     "Ref": "PublicRouteTable"
+    }
+   }
+  },
+  "PrivateSubnet01RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet01"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable01"
+    }
+   }
+  },
+  "PrivateSubnet02RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet02"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable02"
+    }
+   }
+  },
+  "PrivateSubnet03RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet03"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable03"
+    }
+   }
+  },
+  "PrivateSubnet04RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet04"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable04"
+    }
+   }
+  },
+  "PrivateSubnet05RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet05"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable05"
+    }
+   }
+  },
+  "PrivateSubnet06RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet06"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable06"
+    }
+   }
+  },
+  "PrivateSubnet07RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet07"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable07"
+    }
+   }
+  },
+  "PrivateSubnet08RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet08"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable08"
+    }
+   }
+  },
+  "PrivateSubnet09RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet09"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable09"
+    }
+   }
+  },
+  "PrivateSubnet10RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet10"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable10"
+    }
+   }
+  },
+  "PrivateSubnet11RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet11"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable11"
+    }
+   }
+  },
+  "PrivateSubnet12RouteTableAssociation": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "SubnetId": {
+     "Ref": "PrivateSubnet12"
+    },
+    "RouteTableId": {
+     "Ref": "PrivateRouteTable12"
+    }
+   }
+  },
+  "ControlPlaneSecurityGroup": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Cluster communication with worker nodes",
+    "VpcId": {
+     "Ref": "VPC"
+    }
+   }
+  }
+ },
+ "Outputs": {
+  "SubnetIds": {
+   "Description": "Subnets IDs in the VPC",
+   "Value": {
+    "Fn::Join": [
+     ",",
+     [
+      {
+       "Ref": "PublicSubnet01"
+      },
+      {
+       "Ref": "PublicSubnet02"
+      },
+      {
+       "Ref": "PublicSubnet03"
+      },
+      {
+       "Ref": "PublicSubnet04"
+      },
+      {
+       "Ref": "PrivateSubnet01"
+      },
+      {
+       "Ref": "PrivateSubnet02"
+      },
+      {
+       "Ref": "PrivateSubnet03"
+      },
+      {
+       "Ref": "PrivateSubnet04"
+      },
+      {
+       "Ref": "PrivateSubnet05"
+      },
+      {
+       "Ref": "PrivateSubnet06"
+      },
+      {
+       "Ref": "PrivateSubnet07"
+      },
+      {
+       "Ref": "PrivateSubnet08"
+      },
+      {
+       "Ref": "PrivateSubnet09"
+      },
+      {
+       "Ref": "PrivateSubnet10"
+      },
+      {
+       "Ref": "PrivateSubnet11"
+      },
+      {
+       "Ref": "PrivateSubnet12"
+      }
+     ]
+    ]
+   }
+  },
+  "SecurityGroups": {
+   "Description": "Security group for the cluster control plane communication with worker nodes",
+   "Value": {
+    "Fn::Join": [
+     ",",
+     [
+      {
+       "Ref": "ControlPlaneSecurityGroup"
+      }
+     ]
+    ]
+   }
+  },
+  "VpcId": {
+   "Description": "The VPC Id",
+   "Value": {
+    "Ref": "VPC"
+   }
+  }
+ }
+}
