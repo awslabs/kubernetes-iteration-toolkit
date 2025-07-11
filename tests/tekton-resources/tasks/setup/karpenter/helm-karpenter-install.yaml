@@ -1,0 +1,53 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: helm-karpenter-install
+  namespace: karpenter
+spec:
+  description: |
+    Install karpenter on the cluster
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: node-role-arn
+    description: 
+  steps:
+  - name: install karpenter
+    image: alpine/k8s:1.23.7
+    script: |
+      aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 953421922360.dkr.ecr.us-west-2.amazonaws.com
+
+      helm upgrade --install karpenter oci://953421922360.dkr.ecr.us-west-2.amazonaws.com/karpenter/karpenter --version ${KARPENTER_VERSION} \
+        --namespace "karpenter" \
+        --create-namespace \
+        --set "settings.clusterName=${CLUSTER_NAME}" \
+        --set "settings.interruptionQueue=" \
+        --set "settings.eksControlPlane=true" \
+        --set-string "settings.awsCreateQPS=60" \
+        --set "settings.featureGates.disableMetricsControllers=true" \
+        --set "settings.featureGates.nodeRepair=true" \
+        --set settings.featureGates.reservedCapacity="true" \
+        --set settings.featureGates.spotToSpotConsolidation="true" \
+        --set settings.featureGates.disableMetricsControllers="true" \
+        --set settings.preferencePolicy=Ignore \
+        --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=${CONTROLLER_ROLE_ARN}" \
+        --set controller.resources.requests.cpu=60 \
+        --set controller.resources.requests.memory=200Gi \
+        --set controller.resources.limits.cpu=60 \
+        --set controller.resources.limits.memory=200Gi \
+        --set "controller.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=dedicated" \
+        --set "controller.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=In" \
+        --set "controller.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]=karpenter" \
+        --set "tolerations[0].key=dedicated" \
+        --set "tolerations[0].value=karpenter" \
+        --set "tolerations[0].operator=Equal" \
+        --set "dnsPolicy=Default" \
+        --set-string "controller.env[0].name=AWS_ENDPOINT_URL_EKS" \
+        --set-string "controller.env[0].value=https://api.beta.us-west-2.wesley.amazonaws.com" \
+        --set-string "controller.env[1].name=KUBE_CLIENT_QPS" \
+        --set-string "controller.env[1].value=50000" \
+        --set-string "controller.env[2].name=KUBE_CLIENT_BURST" \
+        --set-string "controller.env[2].value=50000" \
+        --set-string "controller.env[3].name=ENABLE_PROFILING" \
+        --set-string "controller.env[3].value=true" \
+        --wait
