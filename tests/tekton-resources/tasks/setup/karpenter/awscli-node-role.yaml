@@ -1,0 +1,42 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-node-role
+  namespace: karpenter
+spec:
+  description: |
+    Creates the karpenter Node Role
+  results:
+  - name: node-role-arn
+    description: Stores the node role arn created by the task
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  steps:
+  - name: create-role
+    image: alpine/k8s:1.23.7
+    script: |
+      aws iam create-role --role-name "KarpenterNodeRole-$(params.cluster-name)" \
+      --assume-role-policy-document '{
+        "Version": "2012-10-17",
+        "Statement": [
+           {
+               "Effect": "Allow",
+                "Principal": {
+                    "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+            }
+        ]
+      }'
+
+      # Attach required policies
+      aws iam attach-role-policy --role-name "KarpenterNodeRole-$(params.cluster-name)" \
+        --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+      aws iam attach-role-policy --role-name "KarpenterNodeRole-$(params.cluster-name)" \
+        --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      aws iam attach-role-policy --role-name "KarpenterNodeRole-$(params.cluster-name)" \
+        --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      aws iam attach-role-policy --role-name "KarpenterNodeRole-$(params.cluster-name)" \
+        --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      aws iam get-role --role-name KarpenterNodeRole-$(params.cluster-name) --query 'Role.[Arn]' --output text > $(results.role-arn.path)
