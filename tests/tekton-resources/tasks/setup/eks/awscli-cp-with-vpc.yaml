@@ -28,7 +28,7 @@ spec:
     default: release-1.13
     description: The release version for aws ebs csi driver.
   - name: aws-pod-identity-agent-version
-    default: v1.3.7-eksbuild.2
+    default: v1.3.9-eksbuild.1
     description: The release version for aws pod identity agent.
   workspaces:
   - name: config
