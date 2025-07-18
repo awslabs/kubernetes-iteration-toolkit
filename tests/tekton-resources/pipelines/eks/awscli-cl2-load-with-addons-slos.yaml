@@ -79,11 +79,11 @@ spec:
   - name: cl2-eks-pod-identity-pods
     default: "5000"
   - name: cl2-default-qps
-    default: "100"
+    default: "200"
   - name: cl2-default-burst
     default: "200"
   - name: cl2-uniform-qps
-    default: "100"
+    default: "200"
   - name: cl2-metric-dimension-name
     description: "default metric dimension name"
     default: "ClusterName"
@@ -97,9 +97,9 @@ spec:
     description: "default metric period"
     default: "300"
   - name: timeout-pia-pod-creation
-    default: "80s"
+    default: "40s"
   - name: timeout-pia-pod-startup
-    default: "60s"
+    default: "20s"
   - name: launch-template-ami
     default: ""
     description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. By default resolve to the lates AL2023 ami for cluster version"
