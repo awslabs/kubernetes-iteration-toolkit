@@ -42,7 +42,7 @@ spec:
     default: "m5.16xlarge"
     description: Instance type for the ETCD
   - name: kubernetes-version
-    default: "1.19"
+    default: "1.28"
     description: Kubernetes version for the guest cluster 
   steps:
   - name: setup-control-plane
