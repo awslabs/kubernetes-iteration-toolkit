@@ -12,10 +12,10 @@ spec:
     resources:
       requests:
         cpu: "120m"
-        memory: "2.5Mi"
+        memory: "100Mi"
       limits:
         cpu: "150m"
-        memory: "3Mi"
+        memory: "150Mi"
     env:
       - name: CLUSTER_NAME
         value: "{{.ClusterName}}"
@@ -72,7 +72,7 @@ spec:
             fi
           done
         else
-          echo "Failed to fetch credential"
+          echo "Failed to fetch credential with status code: $status_code"
           exit 1
         fi
 
