@@ -12,10 +12,10 @@ spec:
     resources:
       requests:
         cpu: "120m"
-        memory: "2.5Mi"
+        memory: "25Mi"
       limits:
         cpu: "150m"
-        memory: "3Mi"
+        memory: "30Mi"
     env:
       - name: CLUSTER_NAME
         value: "{{.ClusterName}}"
@@ -32,6 +32,8 @@ spec:
       - -c
       - |
         AUTH_TOKEN=$(cat $AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)
+        MAX_ATTEMPTS=1
+        INITIAL_DELAY=0.2  # 200ms
 
         DIMENSION_VALUE=$CLUSTER_NAME
         METRIC_MAX_RETRIES=5
@@ -42,39 +44,49 @@ spec:
         # to minimize failure from cloudwatch metrics, add retries on put-metric-data
         start_epoch=$(date +%s%3N)
         # fetch credentials
-        status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 -H "Authorization: $AUTH_TOKEN" http://169.254.170.23/v1/credentials)
-        if [ "$status_code" -eq 200 ]; then
-          end_epoch=$(date +%s%3N)
-          printf "Endpoint is reachable at try %d\n" "$i"
+        for i in $(seq 0 $((MAX_ATTEMPTS - 1))); do
+          status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 -H "Authorization: $AUTH_TOKEN" http://169.254.170.23/v1/credentials)
+          if [ "$status_code" -eq 200 ]; then
+            end_epoch=$(date +%s%3N)
+            printf "Endpoint is reachable at try %d\n" "$i"
 
-          latency_ms=$((end_epoch - start_epoch))
-          latency_sec=$(awk "BEGIN { print $latency_ms / 1000 }")
+            latency_ms=$((end_epoch - start_epoch))
+            latency_sec=$(awk "BEGIN { print $latency_ms / 1000 }")
 
-          # send CredentialFetchLatency metric
-          for ((j=1; j<=METRIC_MAX_RETRIES; j++)); do
-            aws cloudwatch put-metric-data \
-              --namespace "$NAMESPACE" \
-              --metric-name "$METRIC_LATENCY_NAME" \
-              --dimensions "$DIMENSION_NAME=$DIMENSION_VALUE" \
-              --value "$latency_sec" \
-              --unit Seconds && {
-                echo "Metric CredentialFetchLatency sent successfully."
-                break
-            }
+            # send CredentialFetchLatency metric
+            for ((j=1; j<=METRIC_MAX_RETRIES; j++)); do
+              aws cloudwatch put-metric-data \
+                --namespace "$NAMESPACE" \
+                --metric-name "$METRIC_LATENCY_NAME" \
+                --dimensions "$DIMENSION_NAME=$DIMENSION_VALUE" \
+                --value "$latency_sec" \
+                --unit Seconds && {
+                  echo "Metric CredentialFetchLatency sent successfully."
+                  break
+              }
 
-            if [ "$j" -lt "$METRIC_MAX_RETRIES" ]; then
-              echo "Attempt $j failed. Retrying in $METRIC_RETRY_DELAY seconds..." >&2
-              sleep $METRIC_RETRY_DELAY
-              METRIC_RETRY_DELAY=$((METRIC_RETRY_DELAY * 2)) # exponential backoff
-            else
-              echo "Failed to send metric CredentialFetchLatency after $METRIC_MAX_RETRIES attempts." >&2
-              exit 1
-            fi
-          done
-        else
-          echo "Failed to fetch credential"
-          exit 1
-        fi
+              if [ "$j" -lt "$METRIC_MAX_RETRIES" ]; then
+                echo "Attempt $j failed. Retrying in $METRIC_RETRY_DELAY seconds..." >&2
+                sleep $METRIC_RETRY_DELAY
+                METRIC_RETRY_DELAY=$((METRIC_RETRY_DELAY * 2)) # exponential backoff
+              else
+                echo "Failed to send metric CredentialFetchLatency after $METRIC_MAX_RETRIES attempts." >&2
+                exit 1
+              fi
+            done
+
+            break
+          fi
+
+          if [ "$i" -eq $((MAX_ATTEMPTS - 1)) ]; then
+            echo "Max attempts reached. Exiting with failure."
+            exit 1
+          fi
+
+          SLEEP_TIME=$(echo "$INITIAL_DELAY * (2 ^ $i)" | bc -l)
+          printf "Failed. Sleeping %.3f seconds before retry...\n" "$SLEEP_TIME"
+          sleep "$SLEEP_TIME"
+        done
 
         # it is noted that a Pod with host network will fallback to Node role permissions that includes this s3 access
         # however, in our test case, we are not using host network
