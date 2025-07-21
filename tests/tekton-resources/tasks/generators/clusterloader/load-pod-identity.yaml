@@ -268,10 +268,13 @@ spec:
       ls -larth
       aws s3 cp . s3://$S3_RESULT_PATH/  --recursive
 
-      # if p99.9 is equal to or more than 1 second, exit with failure
+      # Check if total_samples equals cl2-eks-pod-identity-pods and p99.9 is less than 1 second
+      expected_pods=$(params.cl2-eks-pod-identity-pods)
+      echo "Expected pods: $expected_pods, Actual samples: $total_samples"
       int_p999=$(echo "$p999" | awk '{printf "%d", $1}')
       echo "p99.9 is $p999"
-      if [ "$int_p999" -lt 1 ]; then
+
+      if [ "$int_p999" -lt 1 ] && [ "$total_samples" -eq "$expected_pods" ]; then
         echo "1" | tee $(results.datapoint.path)
       else
         echo "0" | tee $(results.datapoint.path)
