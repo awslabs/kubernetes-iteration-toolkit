@@ -37,6 +37,8 @@ spec:
   - name: cl2-metric-period
     description: "default metric period"
     default: "300"
+  - name: pods-per-node
+    description: "pod density"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
     default: "1000"
@@ -99,6 +101,7 @@ spec:
       echo $S3_RESULT_PATH > $(results.s3_result.path)
       echo "S3 Path: $S3_RESULT_PATH"
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
+      PODS_PER_NODE: $(params.pods-per-node)
       CL2_EKS_POD_IDENTITY_PODS: $(params.cl2-eks-pod-identity-pods)
       CL2_DEFAULT_QPS: $(params.cl2-default-qps)
       CL2_DEFAULT_BURST: $(params.cl2-default-burst)
