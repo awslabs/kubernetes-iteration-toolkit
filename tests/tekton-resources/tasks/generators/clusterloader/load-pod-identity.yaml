@@ -39,6 +39,9 @@ spec:
     default: "300"
   - name: pods-per-node
     description: "pod density"
+  - name: pod-image
+    description: "aws cli image with tag running in pods"
+    default: "public.ecr.aws/aws-cli/aws-cli:2.27.56"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
     default: "1000"
@@ -103,6 +106,7 @@ spec:
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
       PODS_PER_NODE: $(params.pods-per-node)
       CL2_EKS_POD_IDENTITY_PODS: $(params.cl2-eks-pod-identity-pods)
+      CL2_POD_IMAGE: $(params.pod-image)
       CL2_DEFAULT_QPS: $(params.cl2-default-qps)
       CL2_DEFAULT_BURST: $(params.cl2-default-burst)
       CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
@@ -181,7 +185,13 @@ spec:
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/pod-default.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
 
-      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+      ENABLE_EXEC_SERVICE=false ./clusterloader \
+        --kubeconfig=$KUBECONFIG \
+        --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/config.yaml \
+        --testoverrides=$(workspaces.source.path)/overrides.yaml \
+        --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) \
+        --node-preload-images=$(params.pod-image) \
+        --alsologtostderr --v=2
       exit_code=$?
       if [ $exit_code -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
