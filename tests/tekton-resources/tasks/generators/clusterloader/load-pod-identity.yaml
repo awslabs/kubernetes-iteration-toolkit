@@ -37,6 +37,11 @@ spec:
   - name: cl2-metric-period
     description: "default metric period"
     default: "300"
+  - name: pods-per-node
+    description: "pod density"
+  - name: pod-image
+    description: "aws cli image with tag running in pods"
+    default: "public.ecr.aws/aws-cli/aws-cli:2.27.56"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
     default: "1000"
@@ -99,7 +104,9 @@ spec:
       echo $S3_RESULT_PATH > $(results.s3_result.path)
       echo "S3 Path: $S3_RESULT_PATH"
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
+      PODS_PER_NODE: $(params.pods-per-node)
       CL2_EKS_POD_IDENTITY_PODS: $(params.cl2-eks-pod-identity-pods)
+      CL2_POD_IMAGE: $(params.pod-image)
       CL2_DEFAULT_QPS: $(params.cl2-default-qps)
       CL2_DEFAULT_BURST: $(params.cl2-default-burst)
       CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
@@ -178,7 +185,13 @@ spec:
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/pod-default.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
 
-      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+      ENABLE_EXEC_SERVICE=false ./clusterloader \
+        --kubeconfig=$KUBECONFIG \
+        --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/eks-pod-identity/config.yaml \
+        --testoverrides=$(workspaces.source.path)/overrides.yaml \
+        --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) \
+        --node-preload-images=$(params.pod-image) \
+        --alsologtostderr --v=2
       exit_code=$?
       if [ $exit_code -eq 0 ]; then
       echo "1" | tee $(results.datapoint.path)
@@ -268,10 +281,13 @@ spec:
       ls -larth
       aws s3 cp . s3://$S3_RESULT_PATH/  --recursive
 
-      # if p99.9 is equal to or more than 1 second, exit with failure
+      # Check if total_samples equals cl2-eks-pod-identity-pods and p99.9 is less than 1 second
+      expected_pods=$(params.cl2-eks-pod-identity-pods)
+      echo "Expected pods: $expected_pods, Actual samples: $total_samples"
       int_p999=$(echo "$p999" | awk '{printf "%d", $1}')
       echo "p99.9 is $p999"
-      if [ "$int_p999" -lt 1 ]; then
+
+      if [ "$int_p999" -lt 1 ] && [ "$total_samples" -eq "$expected_pods" ]; then
         echo "1" | tee $(results.datapoint.path)
       else
         echo "0" | tee $(results.datapoint.path)
