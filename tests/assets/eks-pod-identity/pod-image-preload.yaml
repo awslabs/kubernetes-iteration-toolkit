@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-preload
+  labels:
+    group: image-preload
+spec:
+  selector:
+    matchLabels:
+      name: image-preload
+  template:
+    metadata:
+      labels:
+        group: image-preload
+        name: image-preload
+    spec:
+      containers:
+      - name: image-preload
+        image: {{.PodImage}}
+        resources:
+          requests:
+            cpu: "120m"
+            memory: "100Mi"
+          limits:
+            cpu: "150m"
+            memory: "150Mi"
+        command:
+          - sh
+          - -c
+          - |
+            while true; do
+                echo "Sleeping for 1 hour..."
+                sleep 3600
+            done

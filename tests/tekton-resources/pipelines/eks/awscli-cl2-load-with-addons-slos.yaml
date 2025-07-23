@@ -79,6 +79,8 @@ spec:
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/config.yaml"
   - name: pia-test-pod-spec-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pod-default.yaml"
+  - name: pia-image-preload-spec-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pod-image-preload.yaml"
   - name: cl2-eks-pod-identity-pods
     default: "5000"
   - name: cl2-default-qps
@@ -320,6 +322,8 @@ spec:
       value: $(params.pia-test-config-url)
     - name: pia-test-pod-spec-url
       value: $(params.pia-test-pod-spec-url)
+    - name: pia-image-preload-spec-url
+      value: $(params.pia-image-preload-spec-url)
     - name: timeout-pia-pod-creation
       value: $(params.timeout-pia-pod-creation)
     - name: timeout-pia-pod-startup
