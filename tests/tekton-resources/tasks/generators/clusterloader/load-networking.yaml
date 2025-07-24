@@ -36,9 +36,9 @@ spec:
     description: The AMP workspace ID where remote write needs to happen.
     default: ""
   - name: networking-test-config-url
-    default: "https://raw.githubusercontent.com/oliviassss/kubernetes-iteration-toolkit/refs/heads/sonyingy-dev/tests/assets/eks-networking/config-eks-networking.yaml"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-networking/config-eks-networking.yaml"
   - name: networking-svc-test-config-url
-    default: "https://raw.githubusercontent.com/oliviassss/kubernetes-iteration-toolkit/refs/heads/sonyingy-dev/tests/assets/eks-networking/test-svc.yaml"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-networking/test-svc.yaml"
   results:
     - name: datapoint
       description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
