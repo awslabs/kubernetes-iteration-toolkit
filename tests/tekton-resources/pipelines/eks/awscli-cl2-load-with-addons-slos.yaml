@@ -36,6 +36,9 @@ spec:
     type: string
   - name: pods-per-node
     type: string
+  - name: pod-identity-pods-per-node
+    default: "2"
+    type: string
   - name: nodes-per-namespace
     type: string
   - name: cl2-load-test-throughput
@@ -76,14 +79,16 @@ spec:
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/config.yaml"
   - name: pia-test-pod-spec-url
     default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pod-default.yaml"
+  - name: pia-image-preload-spec-url
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pod-image-preload.yaml"
   - name: cl2-eks-pod-identity-pods
     default: "5000"
   - name: cl2-default-qps
-    default: "100"
+    default: "200"
   - name: cl2-default-burst
     default: "200"
   - name: cl2-uniform-qps
-    default: "100"
+    default: "200"
   - name: cl2-metric-dimension-name
     description: "default metric dimension name"
     default: "ClusterName"
@@ -97,9 +102,9 @@ spec:
     description: "default metric period"
     default: "300"
   - name: timeout-pia-pod-creation
-    default: "80s"
+    default: "40s"
   - name: timeout-pia-pod-startup
-    default: "60s"
+    default: "20s"
   - name: launch-template-ami
     default: ""
     description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. By default resolve to the lates AL2023 ami for cluster version"
@@ -303,6 +308,8 @@ spec:
       value: $(params.results-bucket)
     - name: nodes
       value: $(params.desired-nodes)
+    - name: pods-per-node
+      value: $(params.pod-identity-pods-per-node)
     - name: cluster-name
       value: $(params.cluster-name)
     - name: endpoint
@@ -315,6 +322,8 @@ spec:
       value: $(params.pia-test-config-url)
     - name: pia-test-pod-spec-url
       value: $(params.pia-test-pod-spec-url)
+    - name: pia-image-preload-spec-url
+      value: $(params.pia-image-preload-spec-url)
     - name: timeout-pia-pod-creation
       value: $(params.timeout-pia-pod-creation)
     - name: timeout-pia-pod-startup

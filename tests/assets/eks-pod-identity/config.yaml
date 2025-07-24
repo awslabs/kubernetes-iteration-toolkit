@@ -6,8 +6,10 @@
 {{$namespacePrefix := DefaultParam .CL2_NAMESPACE_PREFIX "default"}}
 {{$namespaceCount := DefaultParam .CL2_NAMESPACE_COUNT 1}}
 {{$totalEksPodIdentityPods := DefaultParam .CL2_EKS_POD_IDENTITY_PODS 5000}}
+{{$podImage := DefaultParam .CL2_POD_IMAGE "public.ecr.aws/aws-cli/aws-cli:2.27.56"}}
 {{$timeoutEksPodIdentityPodCreation := DefaultParam .CL2_TIMEOUT_EKS_POD_IDENTITY_POD_CREATION "20m"}}
 {{$timeoutEksPodIdentityPodStartup := DefaultParam .CL2_TIMEOUT_EKS_POD_IDENTITY_POD_STARTUP "5m"}}
+{{$timeoutImagePreload := DefaultParam .CL2_TIMEOUT_IMAGE_PRELOAD "15m"}}
 {{$defaultQps := DefaultParam .CL2_DEFAULT_QPS  500}}
 {{$defaultBurst := DefaultParam .CL2_DEFAULT_BURST 1000}}
 {{$uniformQps := DefaultParam .CL2_UNIFORM_QPS 500}}
@@ -25,6 +27,37 @@ tuningSets:
   qpsLoad:
     qps: {{$uniformQps}}
 steps:
+- name: Creating image preload measurements
+  measurements:
+  - Method: WaitForControlledPodsRunning
+    Instances:
+    - Identifier: WaitForRunningDaemonSets
+      Params:
+        apiVersion: apps/v1
+        kind: DaemonSet
+    Params:
+      action: start
+      labelSelector: group = image-preload
+      operationTimeout: {{$timeoutImagePreload}}
+- name: Create image preload daemonset
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+    replicasPerNamespace: 1
+    tuningSet: default
+    objectBundle:
+    - basename: daemonset
+      objectTemplatePath: pod-image-preload.yaml
+      templateFillMap:
+        PodImage: {{$podImage}}
+- name: Waiting for image preload daemonset to be completed
+  measurements:
+  - Method: WaitForControlledPodsRunning
+    Instances:
+    - Identifier: WaitForRunningDaemonSets
+    Params:
+      action: gather
 - name: Creating eks pod identity measurements
   measurements:
   - Identifier: EksPodIdentityPodStartupLatency
@@ -34,7 +67,7 @@ steps:
       labelSelector: group = eks-pod-identity
       threshold: {{$timeoutEksPodIdentityPodStartup}}
 # a pod identity association with (namespace: default, sa: default) is created as prerequisite
-- name: create eks pod identity pods
+- name: Create eks pod identity pods
   phases:
   - namespaceRange:
       min: 1
@@ -48,6 +81,7 @@ steps:
       templateFillMap:
         Group: eks-pod-identity
         ClusterName: {{$clusterName}}
+        PodImage: {{$podImage}}
         MetricDimensionName: {{$metricDimensionName}}
         MetricNamespace: {{$metricNamespace}}
         MetricLatencyName: {{$metricLatencyName}}
