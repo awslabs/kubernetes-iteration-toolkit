@@ -1,0 +1,39 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-mng
+  namespace: karpenter
+spec:
+  description: |
+    Creates the karpenter MNG
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: node-role-arn
+    description: 
+  steps:
+  - name: create-mng
+    image: alpine/k8s:1.23.7
+    script: |
+      SUBNET_IDS=$(aws ec2 describe-subnets \
+          --filters "Name=tag:karpenter.sh/discovery,Values=$(params.cluster-name)" \
+          --query 'Subnets[*].SubnetId' \
+          --output text)
+          
+      aws eks create-nodegroup \
+          --cluster-name $(params.cluster-name) \
+          --nodegroup-name karpenter-system-large \
+          --node-role $(params.node-role-arn) \
+          --instance-types r5.24xlarge \
+          --scaling-config minSize=2,maxSize=3,desiredSize=2 \
+          --subnets ${SUBNET_IDS} \
+          --labels dedicated=karpenter \
+          --region $(params.aws-region) \
+          --endpoint-url https://api.beta.us-west-2.wesley.amazonaws.com
+
+          
+      # quick validation
+      aws eks list-nodegroups \
+      --endpoint https://api.beta.us-west-2.wesley.amazonaws.com \
+      --cluster-name eks-titan-perflab-c05 \
+      --region $(params.aws-region)

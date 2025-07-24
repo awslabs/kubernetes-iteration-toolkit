@@ -1,0 +1,85 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kubectl-nodepools
+  namespace: karpenter
+spec:
+  description: |
+    Install karpenter on the cluster
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: aws-region
+    description: AWS region that test is running in
+  steps:
+  - name: create-nodepools
+    image: alpine/k8s:1.23.7
+    script: |
+      CLUSTER_CA=$(aws eks describe-cluster \
+          --name $(params.cluster-name) \
+          --endpoint-url https://api.beta.us-west-2.wesley.amazonaws.com \
+          --query 'cluster.certificateAuthority.data' \
+          --output text)
+
+
+      CLUSTER_ENDPOINT=$(aws eks describe-cluster \
+          --name $(params.cluster-name) \
+          --endpoint-url https://api.beta.us-west-2.wesley.amazonaws.com \
+          --query 'cluster.endpoint' \
+          --output text)
+
+      AZS=$(aws ec2 describe-availability-zones --all-availability-zones --region $(params.aws-region) --output text)
+
+      for AZ in AZS
+      do
+        cat <<EOF | kubectl apply -f -
+        apiVersion: karpenter.sh/v1
+        kind: NodePool
+        metadata:
+          name: $(params.cluster-name)
+        spec:
+          disruption:
+            budgets:
+            - nodes: 5%
+            consolidateAfter: 0s
+            consolidationPolicy: WhenEmptyOrUnderutilized
+          replicas: 0
+          template:
+            spec:
+              expireAfter: 720h
+              nodeClassRef:
+                group: karpenter.k8s.aws
+                kind: EC2NodeClass
+                name: $(params.cluster-name)
+              requirements:
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+                - $AZ
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+              - key: karpenter.sh/capacity-type
+                operator: In
+                values:
+                - on-demand
+              - key: node.kubernetes.io/instance-category
+                operator: In
+                values:
+                - c
+                - m
+                - r
+                - t
+              - key: karpenter.k8s.aws/instance-size
+                operator: In
+                values:
+                - medium
+                - large
+        EOF
+      done
+

@@ -1,0 +1,172 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-controller-role
+  namespace: karpenter
+spec:
+  description: |
+    Creates the karpenter Controller Role
+  results:
+  - name: node-role-arn
+    description: Stores the controller role arn created by the task
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: eks-endpoint
+    description: endpoint
+  - name: aws-region
+    description: region
+  - name: aws-account-id
+    description: account id
+  - name: aws-partition
+    description: partition
+  steps:
+  - name: create-role
+    image: alpine/k8s:1.23.7
+    script: |
+      OIDC_ENDPOINT="$(aws eks --endpoint $(params.eks-endpoint) describe-cluster --name "$(params.cluster-name)" \
+        --query "cluster.identity.oidc.issuer" --output text)"
+      OIDC_ID=$(aws eks --endpoint $(params.eks-endpoint) describe-cluster --name $(params.cluster-name) --region $(params.aws-region) --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
+
+      cat << EOF > controller-trust-policy.json
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "arn:$(params.aws-partition):iam::$(params.aws-account-id):oidc-provider/${OIDC_ENDPOINT#*//}"
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "${OIDC_ENDPOINT#*//}:aud": "sts.amazonaws.com",
+                  "${OIDC_ENDPOINT#*//}:sub": "system:serviceaccount:karpenter:karpenter"
+                }
+              }
+            }
+          ]
+        }
+        EOF
+      
+      aws iam create-role --role-name "KarpenterControllerRole-$(params.cluster-name)" \
+        --assume-role-policy-document file://controller-trust-policy.json
+
+      cat << EOF > controller-policy.json
+      {
+          "Statement": [
+              {
+                  "Action": [
+                      "ssm:GetParameter",
+                      "ec2:DescribeImages",
+                      "ec2:RunInstances",
+                      "ec2:DescribeSubnets",
+                      "ec2:DescribeSecurityGroups",
+                      "ec2:DescribeLaunchTemplates",
+                      "ec2:DescribeInstances",
+                      "ec2:DescribeInstanceTypes",
+                      "ec2:DescribeInstanceTypeOfferings",
+                      "ec2:DeleteLaunchTemplate",
+                      "ec2:CreateTags",
+                      "ec2:CreateLaunchTemplate",
+                      "ec2:CreateFleet",
+                      "ec2:DescribeSpotPriceHistory",
+                      "pricing:GetProducts"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Sid": "Karpenter"
+              },
+              {
+                  "Action": "ec2:TerminateInstances",
+                  "Condition": {
+                      "StringLike": {
+                          "ec2:ResourceTag/karpenter.sh/nodepool": "*"
+                      }
+                  },
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Sid": "ConditionalEC2Termination"
+              },
+              {
+                  "Effect": "Allow",
+                  "Action": "iam:PassRole",
+                  "Resource": "arn:$(params.aws-partition):iam::$(params.aws-account-id):role/KarpenterNodeRole-$(params.cluster-name)",
+                  "Sid": "PassNodeIAMRole"
+              },
+              {
+                  "Effect": "Allow",
+                  "Action": "eks:DescribeCluster",
+                  "Resource": "arn:$(params.aws-partition):eks:$(params.aws-region):$(params.aws-account-id):cluster/$(params.cluster-name)",
+                  "Sid": "EKSClusterEndpointLookup"
+              },
+              {
+                  "Sid": "AllowScopedInstanceProfileCreationActions",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                      "iam:CreateInstanceProfile"
+                  ],
+                  "Condition": {
+                      "StringEquals": {
+                          "aws:RequestTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                          "aws:RequestTag/topology.kubernetes.io/region": "$(params.aws-region)"
+                      },
+                      "StringLike": {
+                          "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*"
+                      }
+                  }
+              },
+              {
+                  "Sid": "AllowScopedInstanceProfileTagActions",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                      "iam:TagInstanceProfile"
+                  ],
+                  "Condition": {
+                      "StringEquals": {
+                          "aws:ResourceTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                          "aws:ResourceTag/topology.kubernetes.io/region": "$(params.aws-region)",
+                          "aws:RequestTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                          "aws:RequestTag/topology.kubernetes.io/region": "$(params.aws-region)"
+                      },
+                      "StringLike": {
+                          "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*",
+                          "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*"
+                      }
+                  }
+              },
+              {
+                  "Sid": "AllowScopedInstanceProfileActions",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": [
+                      "iam:AddRoleToInstanceProfile",
+                      "iam:RemoveRoleFromInstanceProfile",
+                      "iam:DeleteInstanceProfile"
+                  ],
+                  "Condition": {
+                      "StringEquals": {
+                          "aws:ResourceTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                          "aws:ResourceTag/topology.kubernetes.io/region": "$(params.aws-region)"
+                      },
+                      "StringLike": {
+                          "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*"
+                      }
+                  }
+              },
+              {
+                  "Sid": "AllowInstanceProfileReadActions",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                  "Action": "iam:GetInstanceProfile"
+              }
+          ],
+          "Version": "2012-10-17"
+      }
+      E
+
+      aws iam put-role-policy --role-name "KarpenterControllerRole-$(params.cluster-name)" \
+        --policy-name "KarpenterControllerPolicy-$(params.cluster-name)" \
+        --policy-document file://controller-policy.json
