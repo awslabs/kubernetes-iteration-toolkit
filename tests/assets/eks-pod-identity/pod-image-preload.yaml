@@ -19,11 +19,11 @@ spec:
         image: {{.PodImage}}
         resources:
           requests:
-            cpu: "120m"
-            memory: "100Mi"
+            cpu: "10m"
+            memory: "10Mi"
           limits:
-            cpu: "150m"
-            memory: "150Mi"
+            cpu: "15m"
+            memory: "15Mi"
         command:
           - sh
           - -c
