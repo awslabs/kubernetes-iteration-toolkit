@@ -1,0 +1,65 @@
+{{$ENABLE_NETWORK_POLICY_ENFORCEMENT_LATENCY_TEST := DefaultParam .CL2_ENABLE_NETWORK_POLICY_ENFORCEMENT_LATENCY_TEST false}}
+{{$defaultQps := DefaultParam .CL2_DEFAULT_QPS (IfThenElse (le .Nodes 500) 10 100)}}
+{{$uniformQps := DefaultParam .CL2_UNIFORM_QPS 500}}
+
+name: load-eks-networking
+tuningSets:
+- name: Sequence
+  parallelismLimitedLoad:
+    parallelismLimit: 1
+- name: UniformQPS
+  qpsLoad:
+    qps: {{$uniformQps}}
+- name: default
+  globalQPSLoad:
+    qps: {{$defaultQps}}
+    burst: 1
+steps:
+- name: sanity-check
+  measurements:
+  - Identifier: Print
+    Method: Sleep
+    Params:
+      duration: 1s
+- module:
+    path: /modules/measurements.yaml
+    params:
+      action: start
+{{if $ENABLE_NETWORK_POLICY_ENFORCEMENT_LATENCY_TEST}}
+- module:
+    path: modules/network-policy/net-policy-enforcement-latency.yaml
+    params:
+      setup: true
+      run: true
+      testType: "pod-creation"
+{{end}}
+- module:
+    path: modules/dns-k8s-hostnames.yaml
+{{if $ENABLE_NETWORK_POLICY_ENFORCEMENT_LATENCY_TEST}}
+- module:
+    path: modules/network-policy/net-policy-metrics.yaml
+    params:
+      action: gather
+      usePolicyCreationMetrics: false
+- module:
+    path: modules/network-policy/net-policy-enforcement-latency.yaml
+    params:
+      complete: true
+      testType: "pod-creation"
+- module:
+    path: modules/network-policy/net-policy-enforcement-latency.yaml
+    params:
+      run: true
+      testType: "policy-creation"
+{{end}}
+- module:
+    path: /modules/measurements.yaml
+    params:
+      action: gather
+{{if $ENABLE_NETWORK_POLICY_ENFORCEMENT_LATENCY_TEST}}
+- module:
+    path: modules/network-policy/net-policy-enforcement-latency.yaml
+    params:
+      complete: true
+      testType: "policy-creation"
+{{end}}
