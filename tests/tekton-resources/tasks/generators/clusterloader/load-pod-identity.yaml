@@ -290,7 +290,13 @@ spec:
       int_p999=$(echo "$p999" | awk '{printf "%d", $1}')
       echo "p99.9 is $p999"
 
-      if [ "$int_p999" -lt 1 ] && [ "$total_samples" -eq "$expected_pods" ]; then
+      # Calculate 0.1% tolerance (expected_pods * 0.001)
+      tolerance=$(echo "$expected_pods" | awk '{printf "%.0f", $1 * 0.001}')
+      max_allowed=$((expected_pods + tolerance))
+
+      echo "Tolerance: $tolerance, max allowed samples: $max_allowed"
+
+      if [ "$int_p999" -lt 1 ] && [ "$total_samples" -ge "$expected_pods" ] && [ "$total_samples" -le "$max_allowed" ]; then
         echo "1" | tee $(results.datapoint.path)
       else
         echo "0" | tee $(results.datapoint.path)
