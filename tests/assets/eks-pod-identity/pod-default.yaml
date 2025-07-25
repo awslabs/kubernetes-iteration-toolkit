@@ -43,8 +43,8 @@ spec:
         start_epoch=$(date +%s%3N)
         # fetch credentials
         status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 -H "Authorization: $AUTH_TOKEN" http://169.254.170.23/v1/credentials)
+        end_epoch=$(date +%s%3N)
         if [ "$status_code" -eq 200 ]; then
-          end_epoch=$(date +%s%3N)
           printf "Endpoint is reachable at try %d\n" "$i"
 
           latency_ms=$((end_epoch - start_epoch))
