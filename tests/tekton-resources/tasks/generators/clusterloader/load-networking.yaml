@@ -172,6 +172,7 @@ spec:
       fi
 
       # prepare eks networking load test config
+      # copy networking config under cl2 folder since the test needs to access the modules under the same folder
       curl -s $(params.networking-test-config-url) -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config-eks-networking.yaml
       curl -s $(params.networking-svc-test-config-url) -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/test-svc.yaml
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/load/config-eks-networking.yaml
