@@ -42,7 +42,7 @@
         {
             "Effect": "Allow",
             "Action": "eks:DescribeCluster",
-            "Resource": "arn:${AWS_PARTITION}:eks:${AWS_ACCOUNT_ID}:$(params.aws-account-id):cluster/${CLUSTER_NAME}",
+            "Resource": "arn:${AWS_PARTITION}:eks:${AWS_ACCOUNT_ID}:${AWS_ACCOUNT_ID}:cluster/${CLUSTER_NAME}",
             "Sid": "EKSClusterEndpointLookup"
         },
         {
@@ -54,7 +54,7 @@
             ],
             "Condition": {
                 "StringEquals": {
-                    "aws:RequestTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                    "aws:RequestTag/kubernetes.io/cluster/${CLUSTER_NAME}": "owned",
                     "aws:RequestTag/topology.kubernetes.io/region": "${AWS_REGION}"
                 },
                 "StringLike": {
@@ -71,9 +71,9 @@
             ],
             "Condition": {
                 "StringEquals": {
-                    "aws:ResourceTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                    "aws:ResourceTag/kubernetes.io/cluster/${CLUSTER_NAME}": "owned",
                     "aws:ResourceTag/topology.kubernetes.io/region": "${AWS_REGION}",
-                    "aws:RequestTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                    "aws:RequestTag/kubernetes.io/cluster/${CLUSTER_NAME}": "owned",
                     "aws:RequestTag/topology.kubernetes.io/region": "${AWS_REGION}"
                 },
                 "StringLike": {
@@ -93,7 +93,7 @@
             ],
             "Condition": {
                 "StringEquals": {
-                    "aws:ResourceTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
+                    "aws:ResourceTag/kubernetes.io/cluster/${CLUSTER_NAME}": "owned",
                     "aws:ResourceTag/topology.kubernetes.io/region": "${AWS_REGION}"
                 },
                 "StringLike": {
