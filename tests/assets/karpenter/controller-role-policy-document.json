@@ -36,13 +36,13 @@
         {
             "Effect": "Allow",
             "Action": "iam:PassRole",
-            "Resource": "arn:$(params.aws-partition):iam::$(params.aws-account-id):role/KarpenterNodeRole-$(params.cluster-name)",
+            "Resource": "arn:${AWS_PARTITION}:iam::${AWS_ACCOUNT_ID}:role/KarpenterNodeRole-${CLUSTER_NAME}",
             "Sid": "PassNodeIAMRole"
         },
         {
             "Effect": "Allow",
             "Action": "eks:DescribeCluster",
-            "Resource": "arn:$(params.aws-partition):eks:$(params.aws-region):$(params.aws-account-id):cluster/$(params.cluster-name)",
+            "Resource": "arn:${AWS_PARTITION}:eks:${AWS_ACCOUNT_ID}:$(params.aws-account-id):cluster/${CLUSTER_NAME}",
             "Sid": "EKSClusterEndpointLookup"
         },
         {
@@ -55,7 +55,7 @@
             "Condition": {
                 "StringEquals": {
                     "aws:RequestTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
-                    "aws:RequestTag/topology.kubernetes.io/region": "$(params.aws-region)"
+                    "aws:RequestTag/topology.kubernetes.io/region": "${AWS_REGION}"
                 },
                 "StringLike": {
                     "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*"
@@ -72,9 +72,9 @@
             "Condition": {
                 "StringEquals": {
                     "aws:ResourceTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
-                    "aws:ResourceTag/topology.kubernetes.io/region": "$(params.aws-region)",
+                    "aws:ResourceTag/topology.kubernetes.io/region": "${AWS_REGION}",
                     "aws:RequestTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
-                    "aws:RequestTag/topology.kubernetes.io/region": "$(params.aws-region)"
+                    "aws:RequestTag/topology.kubernetes.io/region": "${AWS_REGION}"
                 },
                 "StringLike": {
                     "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*",
@@ -94,7 +94,7 @@
             "Condition": {
                 "StringEquals": {
                     "aws:ResourceTag/kubernetes.io/cluster/$(params.cluster-name)": "owned",
-                    "aws:ResourceTag/topology.kubernetes.io/region": "$(params.aws-region)"
+                    "aws:ResourceTag/topology.kubernetes.io/region": "${AWS_REGION}"
                 },
                 "StringLike": {
                     "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*"

@@ -4,7 +4,7 @@
         {
             "Effect": "Allow",
             "Principal": {
-            "Federated": "arn:$(params.aws-partition):iam::$(params.aws-account-id):oidc-provider/${OIDC_ENDPOINT#*//}"
+            "Federated": "arn:${AWS_PARTITION}:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_ENDPOINT#*//}"
             },
             "Action": "sts:AssumeRoleWithWebIdentity",
             "Condition": {
