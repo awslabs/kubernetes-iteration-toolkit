@@ -27,7 +27,7 @@ spec:
     script: |
       STACK_NAME=Karpenter-$(params.cluster-name)
       STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
-      curl -fsSL https://raw.githubusercontent.com/aws/karpenter-provider-aws/v1.6.1/website/content/en/preview/getting-started/getting-started-with-karpenter/cloudformation.yaml -o $(workspaces.source.path)cloudformation.yaml
+      curl -fsSL https://raw.githubusercontent.com/aws/karpenter-provider-aws/$(params.karpenter-version)/website/content/en/preview/getting-started/getting-started-with-karpenter/cloudformation.yaml -o $(workspaces.source.path)cloudformation.yaml
 
       cat /src/karpenter/cloudformation.yaml
       
