@@ -42,7 +42,7 @@
         {
             "Effect": "Allow",
             "Action": "eks:DescribeCluster",
-            "Resource": "arn:${AWS_PARTITION}:eks:${AWS_ACCOUNT_ID}:${AWS_ACCOUNT_ID}:cluster/${CLUSTER_NAME}",
+            "Resource": "arn:${AWS_PARTITION}:eks:${AWS_REGION}:${AWS_ACCOUNT_ID}:cluster/${CLUSTER_NAME}",
             "Sid": "EKSClusterEndpointLookup"
         },
         {
