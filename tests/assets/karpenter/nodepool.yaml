@@ -20,7 +20,7 @@ spec:
       - key: topology.kubernetes.io/zone
         operator: In
         values:
-        - $AZ
+        - ${AZ}
       - key: kubernetes.io/arch
         operator: In
         values:
