@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: awscli-instanceprofiles
-  namespace: karpenter
+  namespace: scalability
 spec:
   description: |
     Creates the karpenter instance profile

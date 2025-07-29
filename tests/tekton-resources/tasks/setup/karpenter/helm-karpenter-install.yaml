@@ -2,25 +2,56 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: helm-karpenter-install
-  namespace: karpenter
+  namespace: scalability
 spec:
   description: |
     Install karpenter on the cluster
   params:
   - name: cluster-name
     description: The name of the cluster
-  - name: node-role-arn
-    description: 
+  - name: aws-account-id
+    description: aws account id
+  - name: karpenter-ecr-repo
+    description: ECR repo to install karpenter 
+  - name: karpenter-version
+    description: version of karpenter to install
+  - name: endpoint
+    description: eks endpoint to use
+  workspaces:
+  - name: config
   steps:
-  - name: install karpenter
+  - name: install-karpenter
     image: alpine/k8s:1.23.7
+    timeout: 10m
     script: |
-      aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 953421922360.dkr.ecr.us-west-2.amazonaws.com
+      aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin $(params.karpenter-ecr-repo)
 
-      helm upgrade --install karpenter oci://953421922360.dkr.ecr.us-west-2.amazonaws.com/karpenter/karpenter --version ${KARPENTER_VERSION} \
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+
+      aws eks describe-nodegroup --cluster-name $(params.cluster-name) --endpoint $(params.endpoint) --nodegroup-name karpenter-system-large
+      
+      kubectl get nodes -A -o yaml
+      
+      kubectl get pods -A -o wide
+
+      kubectl get pods -n karpenter -o yaml
+
+      # kubectl delete nodes -l dedicated=karpenter
+
+      kubectl get deployments -A -o wide
+
+      # helm status karpenter --namespace karpenter
+
+      # kubectl logs karpenter-5df996fbbf-f8ghz -n karpenter -f
+
+      # helm delete -n karpenter karpenter --wait
+
+      # kubectl taint nodes -l dedicated=karpenter dedicated=karpenter:NoSchedule
+      
+      helm upgrade --install karpenter oci://$(params.karpenter-ecr-repo)/karpenter/karpenter --version $(params.karpenter-version) \
         --namespace "karpenter" \
         --create-namespace \
-        --set "settings.clusterName=${CLUSTER_NAME}" \
+        --set "settings.clusterName=$(params.cluster-name)" \
         --set "settings.interruptionQueue=" \
         --set "settings.eksControlPlane=true" \
         --set-string "settings.awsCreateQPS=60" \
@@ -30,7 +61,7 @@ spec:
         --set settings.featureGates.spotToSpotConsolidation="true" \
         --set settings.featureGates.disableMetricsControllers="true" \
         --set settings.preferencePolicy=Ignore \
-        --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=${CONTROLLER_ROLE_ARN}" \
+        --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=arn:aws:iam::$(params.aws-account-id):role/KarpenterControllerRole-$(params.cluster-name)" \
         --set controller.resources.requests.cpu=60 \
         --set controller.resources.requests.memory=200Gi \
         --set controller.resources.limits.cpu=60 \
@@ -43,11 +74,15 @@ spec:
         --set "tolerations[0].operator=Equal" \
         --set "dnsPolicy=Default" \
         --set-string "controller.env[0].name=AWS_ENDPOINT_URL_EKS" \
-        --set-string "controller.env[0].value=https://api.beta.us-west-2.wesley.amazonaws.com" \
+        --set-string "controller.env[0].value=$(params.endpoint)" \
         --set-string "controller.env[1].name=KUBE_CLIENT_QPS" \
         --set-string "controller.env[1].value=50000" \
         --set-string "controller.env[2].name=KUBE_CLIENT_BURST" \
         --set-string "controller.env[2].value=50000" \
         --set-string "controller.env[3].name=ENABLE_PROFILING" \
         --set-string "controller.env[3].value=true" \
+        --timeout 100m \
+        --debug \
         --wait
+
+      kubectl get pods -n karpenter

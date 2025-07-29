@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: awscli-node-role
-  namespace: karpenter
+  namespace: scalability
 spec:
   description: |
     Creates the karpenter Node Role
@@ -39,4 +39,4 @@ spec:
         --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
       aws iam attach-role-policy --role-name "KarpenterNodeRole-$(params.cluster-name)" \
         --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-      aws iam get-role --role-name KarpenterNodeRole-$(params.cluster-name) --query 'Role.[Arn]' --output text > $(results.role-arn.path)
+      aws iam get-role --role-name KarpenterNodeRole-$(params.cluster-name) --query 'Role.[Arn]' --output text > $(results.node-role-arn)

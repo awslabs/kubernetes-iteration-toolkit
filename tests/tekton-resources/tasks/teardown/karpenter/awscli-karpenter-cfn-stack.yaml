@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-karpenter-cfn-stack-teardown
+  namespace: scalability
+spec:
+  description: |
+    Creates the karpenter instance roles and sqs interruption queue
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: karpenter-version
+    description: Version of Karpenter to deploy
+  - name: endpoint
+    description: Endpoint to use with EKS
+  - name: region
+    default: us-west-2
+    description: The region where the cluster is in.
+  - name: account-id
+    description: The aws account the cluster is running in
+  steps:
+  - name: create-stack
+    image: alpine/k8s:1.23.7
+    script: |
+      STACK_NAME=Karpenter-$(params.cluster-name)
+      STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
+      cat ${STACK_STATUS}
+
+      if [[ "$STACK_STATUS" == "ACTIVE" ]]; then
+        aws cloudformation delete-stack --stack-name ${STACK_NAME}
+    
+        aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region $(params.region)
+      else
+          echo "$STACK_NAME Already exists"
+      fi
+

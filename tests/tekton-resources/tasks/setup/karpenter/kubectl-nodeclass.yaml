@@ -2,94 +2,55 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: create-ec2nodeclass
-  namespace: karpenter
+  namespace: scalability
 spec:
   description: |
     Install karpenter on the cluster
   params:
   - name: cluster-name
     description: The name of the cluster
-  - name: node-role-arn
-    description: 
+  - name: endpoint
+    description: eks endpoint to use
+  - name: karpenter-nodeclass-url
+    description: url of the nodeclass template to use
+  workspaces:
+  - name: source
+    mountPath: /src/karpenter/
   steps:
   - name: create-ec2nodeclass
     image: alpine/k8s:1.23.7
     script: |
-      CLUSTER_CA=$(aws eks describe-cluster \
+      export CLUSTER_CA=$(aws eks describe-cluster \
           --name $(params.cluster-name) \
-          --endpoint-url https://api.beta.us-west-2.wesley.amazonaws.com \
+          --endpoint-url $(params.endpoint) \
           --query 'cluster.certificateAuthority.data' \
           --output text)
 
 
-      CLUSTER_ENDPOINT=$(aws eks describe-cluster \
+      export CLUSTER_ENDPOINT=$(aws eks describe-cluster \
           --name $(params.cluster-name) \
-          --endpoint-url https://api.beta.us-west-2.wesley.amazonaws.com \
+          --endpoint-url $(params.endpoint) \
           --query 'cluster.endpoint' \
           --output text)
 
+      export CLUSTER_NAME=$(params.cluster-name)
+
+      export ALIAS_VERSION=latest
+
       echo "Cluster endpoint: ${CLUSTER_ENDPOINT}"
 
+      curl -fsSL $(params.karpenter-nodeclass-url) -o $(workspaces.source.path)ec2nodeclass.yaml
 
-      cat <<EOF | kubectl apply -f -
-      apiVersion: karpenter.k8s.aws/v1
-      kind: EC2NodeClass
-      metadata:
-        name: $(params.cluster-name)
-      spec:
-        amiFamily: Custom
-        instanceProfile: "KarpenterNodeInstanceProfile-$(params.cluster-name)"
-        amiSelectorTerms:
-          - alias: "al2023@${ALIAS_VERSION}"
-        subnetSelectorTerms:
-          - tags:
-              karpenter.sh/discovery: "$(params.cluster-name)"
-          - tags:
-              aws:cloudformation:stack-name: "$(params.cluster-name)"
-        securityGroupSelectorTerms:
-          - tags:
-              karpenter.sh/discovery: "$(params.cluster-name)"
-          - tags:
-              aws:cloudformation:stack-name: "$(params.cluster-name)"
-          - tags:
-              kubernetes.io/cluster/$(params.cluster-name): owned
-        kubelet:
-          maxPods: 110
-          systemReserved:
-            cpu: 100m
-            memory: 100Mi
-            ephemeral-storage: 1Gi
-          kubeReserved:
-            cpu: 100m
-            memory: 100Mi
-            ephemeral-storage: 1Gi
-          evictionHard:
-            memory.available: 5%
-            nodefs.available: 10%
-            nodefs.inodesFree: 10%
-        userData: |
-          MIME-Version: 1.0
-          Content-Type: multipart/mixed; boundary="BOUNDARY"
+      cat $(workspaces.source.path)ec2nodeclass.yaml
 
-          --BOUNDARY
-          Content-Type: application/node.eks.aws
+      envsubst < $(workspaces.source.path)ec2nodeclass.yaml > $(workspaces.source.path)ec2nodeclass-modified.yaml
 
-          apiVersion: node.eks.aws/v1alpha1
-          kind: NodeConfig
-          spec:
-            cluster:
-              name: $(params.cluster-name)
-              apiServerEndpoint: ${CLUSTER_ENDPOINT}  # Using the actual cluster endpoint
-              certificateAuthority: ${CLUSTER_CA}
-              cidr: "172.20.0.0/16"
-            kubelet:
-              config:
-                nodeStatusReportFrequency: "60m"
-                nodeLeaseDurationSeconds: 60
-                maxPods: 110
-                clusterDNS: ["172.20.0.10"]
-              flags:
-                - --node-labels=karpenter.sh/capacity-type=on-demand,karpenter.sh/nodepool=titan-pool
-                - --register-with-taints=karpenter.sh/unregistered:NoExecute
-          --BOUNDARY--
-      EOF
+      ls $(workspaces.source.path)
+
+      cat $(workspaces.source.path)ec2nodeclass-modified.yaml
+
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      
+      kubectl apply -f $(workspaces.source.path)ec2nodeclass-modified.yaml
+
+      kubectl get ec2nodeclass -o yaml
