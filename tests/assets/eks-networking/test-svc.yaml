@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-svc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-svc-deployment
+  namespace: test-svc
+spec:
+  replicas: 5000
+  selector:
+    matchLabels:
+      app: test-svc
+  template:
+    metadata:
+      labels:
+        app: test-svc
+    spec:
+      containers:
+      - name: pause
+        image: public.ecr.aws/eks-distro/kubernetes/pause:3.9
+        ports:
+        - containerPort: 8080
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-svc
+  namespace: test-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: test-svc
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
