@@ -1,7 +1,7 @@
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: ${CLUSTER_NAME}
+  name: ${CLUSTER_NAME}-${AZ}
 spec:
   disruption:
     budgets:
