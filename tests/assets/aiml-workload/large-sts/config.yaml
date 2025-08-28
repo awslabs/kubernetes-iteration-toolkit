@@ -1,0 +1,116 @@
+# AI/ML Workload test configuration
+# This test creates n number of statefulsets with x replicas each.
+
+
+{{$NAMESPACE := DefaultParam .NAMESPACE "aiml-test2"}}
+{{$STATEFULSETS_COUNT := DefaultParam .STATEFULSETS_COUNT 1}}
+{{$REPLICAS_PER_STATEFULSET := DefaultParam .REPLICAS_PER_STATEFULSET 100000}}
+{{$STATEFULSET_CREATION_QPS := DefaultParam .STATEFULSET_CREATION_QPS 5}}
+{{$SCALING_QPS := DefaultParam .SCALING_QPS 10}}
+{{$BATCH_SIZE := DefaultParam .BATCH_SIZE 500}}
+{{$CREATION_TIMEOUT := DefaultParam .CREATION_TIMEOUT "15m"}}
+{{$REQUEST_CPU := DefaultParam .REQUEST_CPU "100m"}}
+{{$REQUEST_MEMORY := DefaultParam .REQUEST_MEMORY "128Mi"}}
+{{$LIMIT_CPU := DefaultParam .LIMIT_CPU "1000m"}}
+{{$LIMIT_MEMORY := DefaultParam .LIMIT_MEMORY "512Mi"}}
+{{$POD_STARTUP_THRESHOLD := DefaultParam .POD_STARTUP_THRESHOLD "10s"}}
+{{$CLUSTER_NAME := DefaultParam .CLUSTER_NAME "perflab-titan-1"}}
+{{$defaultQps := DefaultParam .CL2_DEFAULT_QPS  1000}}
+{{$defaultBurst := DefaultParam .CL2_DEFAULT_BURST 1000}}
+{{$SLEEP_DURATION := DefaultParam .SLEEP_DURATION 1}}
+
+name: aws-mock-aiml-application-test
+
+tuningSets:
+- name: StatefulSetCreationQPS
+  qpsLoad:
+    qps: {{$STATEFULSET_CREATION_QPS}}
+- name: ScalingQPS
+  qpsLoad:
+    qps: {{$SCALING_QPS}}
+- name: default
+  globalQPSLoad:
+    qps: {{$defaultQps}}
+    burst: {{$defaultBurst}}
+
+steps:
+- name: Starting measurements
+  measurements:
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: start
+      labelSelector: app = aiml-training-job
+      threshold: {{$POD_STARTUP_THRESHOLD}}
+  - Identifier: WaitForRunningStatefulSets
+    Method: WaitForControlledPodsRunning
+    Params:
+      action: start
+      apiVersion: apps/v1
+      kind: StatefulSet
+      labelSelector: app = aiml-training-job
+      operationTimeout: {{$CREATION_TIMEOUT}}
+
+- name: Creating StatefulSets with full replica count
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+      basename: {{$NAMESPACE}}
+    replicasPerNamespace: {{$STATEFULSETS_COUNT}}
+    tuningSet: StatefulSetCreationQPS
+    objectBundle:
+    - basename: aiml-training-job
+      objectTemplatePath: sts.yaml
+      templateFillMap:
+        Group: aiml-training-job
+        Replicas: {{$BATCH_SIZE}}
+        RequestCPU: "{{$REQUEST_CPU}}"
+        RequestMemory: "{{$REQUEST_MEMORY}}"
+        LimitCPU: "{{$LIMIT_CPU}}"
+        LimitMemory: "{{$LIMIT_MEMORY}}"
+        ClusterName: "{{$CLUSTER_NAME}}"
+
+{{range $batch := Loop (SubtractInt (DivideInt $REPLICAS_PER_STATEFULSET $BATCH_SIZE) 1)}}
+- name: Scaling StatefulSets batch {{AddInt $batch 2}}
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+      basename: {{$NAMESPACE}}
+    replicasPerNamespace: {{$STATEFULSETS_COUNT}}
+    tuningSet: ScalingQPS
+    objectBundle:
+    - basename: aiml-training-job
+      objectTemplatePath: sts.yaml
+      templateFillMap:
+        Group: aiml-training-job
+        Replicas: {{MultiplyInt $BATCH_SIZE (AddInt $batch 2)}}
+        RequestCPU: "{{$REQUEST_CPU}}"
+        RequestMemory: "{{$REQUEST_MEMORY}}"
+        LimitCPU: "{{$LIMIT_CPU}}"
+        LimitMemory: "{{$LIMIT_MEMORY}}"
+        ClusterName: "{{$CLUSTER_NAME}}"
+- name: Sleep after scaling batch {{AddInt $batch 2}}
+  measurements:
+  - Identifier: Wait
+    Method: Sleep
+    Params:
+      duration: "{{$SLEEP_DURATION}}s"
+{{end}}
+
+- name: Waiting for StatefulSets to be ready
+  measurements:
+  - Identifier: WaitForRunningStatefulSets
+    Method: WaitForControlledPodsRunning
+    Params:
+      action: gather
+
+- name: Gathering measurements
+  measurements:
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: gather
+      labelSelector: app = aiml-training-job
+      threshold: {{$POD_STARTUP_THRESHOLD}}
