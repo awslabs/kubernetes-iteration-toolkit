@@ -1,0 +1,23 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nodepool-scale
+  namespace: scalability
+spec:
+  description: "drift a cluster by adding a new label to the specified nodepool"
+  params:
+  - name: replicas
+    description: Number of replicas to scale to
+  - name: nodepool
+    description: Name of the nodepool to drift
+  - name: cluster-name
+    description: The name of the cluster
+  - name: endpoint
+    description: eks endpoint to use
+  steps:
+  - name: scale-nodepool
+    image: amazon/aws-cli
+    script: |
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      kubectl scale nodepool ${params.nodepool} --replicas $(params.replicas)

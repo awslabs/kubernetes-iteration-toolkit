@@ -1,0 +1,22 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nodepool-drift
+  namespace: scalability
+spec:
+  description: "drift a nodepool by adding a new label to the specified nodepool"
+  params:
+  - name: nodepool
+    description: Name of the nodepool to drift
+  - name: cluster-name
+    description: The name of the cluster
+  - name: endpoint
+    description: eks endpoint to use
+  - name: aws-region
+  steps:
+  - name: drift-nodepool
+    image: amazon/aws-cli
+    script: |
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      kubectl patch nodepool ${params.nodepool} --patch '{"spec": {"template": {"metadata": {"labels": {"myLabel": "myValue"}}}}}'
