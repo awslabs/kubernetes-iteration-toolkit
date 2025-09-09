@@ -92,9 +92,25 @@ spec:
         if [[ -n "$(params.ami)" ]]; then
             AMI_VALUE="$(params.ami)"
         else
-            AMI_VALUE="resolve:ssm:/aws/service/eks/optimized-ami/$KVERSION/amazon-linux-2023/x86_64/standard/recommended/image_id"
-        fi
+            SSM_PARAMETER_NAME="/aws/service/eks/optimized-ami/KUBERNETES_VERSION/amazon-linux-2023/x86_64/standard/recommended/image_id"
+            K8S_VERSIONED_PARAMETER_NAME=${SSM_PARAMETER_NAME/KUBERNETES_VERSION/$KVERSION}
 
+            set +e
+            aws ssm get-parameter --name 2> /dev/null
+            ssm_exit_code=$?
+            set -e
+            if [ $ssm_exit_code -ne 0 ]; then
+              echo "Optimized worker node AMI doesn't exist for K8S version $KVERSION"
+              MAJOR=$(echo "$KVERSION" | cut -d'.' -f1)
+              MINOR=$(echo "$KVERSION" | cut -d'.' -f2)
+              NEW_MINOR=$((MINOR - 1))
+              FALLBACK_KVERSION="$MAJOR.$NEW_MINOR"
+              K8S_VERSIONED_PARAMETER_NAME=${SSM_PARAMETER_NAME/KUBERNETES_VERSION/$FALLBACK_KVERSION}
+            fi
+            
+            AMI_VALUE="resolve:ssm:$K8S_VERSIONED_PARAMETER_NAME"
+        fi
+        
         # assemble the stack parameters as a JSON file
         # the AWS CLI can't handle a JSON string as a ParameterValue in the flag representation
         # and we need that for kubelet-config
