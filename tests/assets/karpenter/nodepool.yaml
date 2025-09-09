@@ -5,7 +5,7 @@ metadata:
 spec:
   disruption:
     budgets:
-    - nodes: 5%
+    - nodes: 10%
     consolidateAfter: 0s
     consolidationPolicy: WhenEmptyOrUnderutilized
   replicas: 0
