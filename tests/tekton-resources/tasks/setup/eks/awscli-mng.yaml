@@ -93,6 +93,13 @@ spec:
           echo "$node_group_name is "CREATING" at $(date)"
           sleep 2
         done
+
+        node_group_status="$(aws eks $ENDPOINT_FLAG --region $(params.region) describe-nodegroup --cluster-name $(params.cluster-name) --nodegroup-name $node_group_name --query nodegroup.status --output text)"
+        if [[ $node_group_status != "ACTIVE" ]]; then
+          echo "$node_group_name creation failed. The status is $node_group_status"
+          exit 1
+        fi
+
         while true; do
           ready_node=$(kubectl get nodes -l eks.amazonaws.com/nodegroup=$node_group_name --no-headers 2>/dev/null | grep -w Ready | wc -l)
           echo "ready-nodes=$ready_node out of $2, for nodegroup: $node_group_name"
