@@ -1,0 +1,97 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nodepool-replicas-wait
+  namespace: scalability
+spec:
+  description: "waits for the number of ready nodes in a nodepool to equal the specified replicas count"
+  results:
+    - name: datapoint
+      description: Stores the result that can be consumed by other tasks (1 for success, 0 for failure)
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: endpoint
+    description: eks endpoint to use
+  - name: aws-region
+    default: us-west-2
+  - name: initial-delay
+    default: 1m
+  - name: replicas
+    description: number of ready replicas in the nodepool to wait for
+  - name: nodepool
+    description: nodepool to check nodes in.
+  - name: check-interval
+    description: interval in seconds between checks
+    default: "60"
+  - name: timeout
+    description: total time to wait before timing out
+    default: 3000
+  steps:
+  - name: wait-for-replicas
+    image: alpine/k8s:1.30.2
+    script: |
+      sleep $(params.initial-delay)
+      CHECK_INTERVAL=$(params.check-interval)
+      TARGET_REPLICAS=$(params.replicas)
+      TIMEOUT=$(params.timeout)
+      START_TIME=$(date +%s)
+      
+      while true; do
+        # Check if timeout has been reached
+        CURRENT_TIME=$(date +%s)
+        ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+        
+        if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+          echo "$(date): Timeout reached after ${ELAPSED_TIME} seconds. Nodepools did not complete within the specified timeout."
+          echo "0" | tee $(results.datapoint.path)
+          exit 1
+        fi
+        
+        aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+        echo "$(date): Checking ready nodes in nodepool $(params.nodepool)..."
+        
+        # Get list of availability zones
+        AZ_LIST=$(aws ec2 describe-availability-zones --region $(params.aws-region) --query 'AvailabilityZones[].ZoneName' --output json | jq -r '.[]')
+        AZ_COUNT=$(echo "$AZ_LIST" | wc -l)
+        
+        echo "[INFO] Found $AZ_COUNT availability zones:"
+        echo "$AZ_LIST" | sed 's/^/  - /'
+        echo ""
+        
+        # Track if all availability zones have reached target replicas
+        ALL_AZ_READY=true
+        
+        # Check each availability zone
+        for az in $AZ_LIST; do
+          ready_nodes_count=$(kubectl get nodes -l karpenter.sh/nodepool=$(params.nodepool)-${az} -o json | jq -r '
+            [.items[] |
+            select(.status.conditions[] | select(.type == "Ready" and .status == "True"))] |
+            length
+          ')
+        
+          echo "$(date): AZ ${az} - Ready nodes: $ready_nodes_count, Target replicas: $TARGET_REPLICAS"
+        
+          if [ "$ready_nodes_count" -ne "$TARGET_REPLICAS" ]; then
+            echo "$(date): AZ ${az} - Ready nodes count ($ready_nodes_count) does not match target replicas ($TARGET_REPLICAS)"
+            ALL_AZ_READY=false
+          else
+            echo "$(date): AZ ${az} - Success! Ready nodes count matches target replicas ($TARGET_REPLICAS)"
+          fi
+        done
+        
+        # Exit if all availability zones have reached target replicas
+        if [ "$ALL_AZ_READY" = "true" ]; then
+          echo "$(date): All availability zones have reached target replica count. Exiting successfully."
+          echo "1" | tee $(results.datapoint.path)
+          exit 0
+        fi
+        
+        echo "$(date): Not all availability zones have reached target replicas. Waiting ${CHECK_INTERVAL} seconds before next check..."
+
+      done
+        sleep $CHECK_INTERVAL
+      done
+
+      exit 1

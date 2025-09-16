@@ -5,66 +5,138 @@ metadata:
   namespace: scalability
 spec:
   description: |
-    Creates the karpenter Controller Role
+    Creates the Karpenter Controller IAM Role with necessary permissions for managing EC2 instances.
+    This task downloads trust and policy documents, configures OIDC integration, and creates/updates
+    the IAM role and policies required for Karpenter to function properly in the EKS cluster.
   results:
   - name: node-role-arn
-    description: Stores the controller role arn created by the task
+    description: Stores the controller role ARN created by the task
   params:
   - name: cluster-name
-    description: The name of the cluster
+    description: The name of the EKS cluster for which the controller role will be created
   - name: endpoint
-    description: endpoint
+    description: EKS cluster endpoint URL for API operations
   - name: aws-region
-    description: region
+    description: AWS region where the cluster and IAM resources are located
     default: us-west-2
   - name: aws-account-id
-    description: account id
+    description: AWS account ID where the IAM role will be created
   - name: aws-partition
-    description: partition
+    description: AWS partition (aws, aws-cn, aws-us-gov)
     default: aws
   - name: karpenter-controller-role-trust-policy-url
+    description: URL of the trust policy document template for the controller role
     default: https://raw.githubusercontent.com/DerekFrank/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/controller-role-trust-policy-document.json
   - name: karpenter-controller-role-policy-url
+    description: URL of the IAM policy document template for the controller role
     default: https://raw.githubusercontent.com/DerekFrank/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/controller-role-policy-document.json
   workspaces:
   - name: source
     mountPath: /src/karpenter/
   steps:
   - name: create-role
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.30.2
     script: |
-      echo "Starting controller role"
-      export RAW_OIDC_ENDPOINT="$(aws eks --endpoint $(params.endpoint) describe-cluster --name "$(params.cluster-name)" \
-        --query "cluster.identity.oidc.issuer" --output text)"
-      export OIDC_ID=$(aws eks --endpoint $(params.endpoint) describe-cluster --name $(params.cluster-name) --region $(params.aws-region) --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
+      echo "Starting Karpenter Controller Role Creation Task"
+      echo "=============================================="
+
+      # Set up environment variables for template substitution
+      echo ""
+      echo "[INFO] Setting up environment variables..."
       export AWS_PARTITION=$(params.aws-partition)
       export AWS_ACCOUNT_ID=$(params.aws-account-id)
       export AWS_REGION=$(params.aws-region)
       export CLUSTER_NAME=$(params.cluster-name)
-      echo $RAW_OIDC_ENDPOINT
-      echo $OIDC_ID
 
+      # Retrieve OIDC issuer information from EKS cluster
+      echo ""
+      echo "[INFO] Retrieving OIDC issuer information from EKS cluster..."
+      export RAW_OIDC_ENDPOINT="$(aws eks --endpoint $(params.endpoint) describe-cluster --name "$(params.cluster-name)" \
+        --query "cluster.identity.oidc.issuer" --output text)"
+      
+      if [ -z "$RAW_OIDC_ENDPOINT" ]; then
+        echo "[ERROR] Failed to retrieve OIDC endpoint from cluster"
+        exit 1
+      fi
+      
+      export OIDC_ID=$(aws eks --endpoint $(params.endpoint) describe-cluster --name $(params.cluster-name) --region $(params.aws-region) --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5)
       export OIDC_ENDPOINT=$(echo ${RAW_OIDC_ENDPOINT#*//})
 
-      echo $OIDC_ENDPOINT
+      echo "[SUCCESS] Retrieved OIDC information:"
+      echo "  - Raw OIDC Endpoint: $RAW_OIDC_ENDPOINT"
+      echo "  - OIDC ID: $OIDC_ID"
+      echo "  - OIDC Endpoint: $OIDC_ENDPOINT"
 
+      # Download and process trust policy document
+      echo ""
+      echo "[INFO] Downloading trust policy document from: $(params.karpenter-controller-role-trust-policy-url)"
       curl -fsSL $(params.karpenter-controller-role-trust-policy-url) -o $(workspaces.source.path)karpenter-controller-role-trust-policy-url.json
       
+      echo "[INFO] Original trust policy template:"
+      echo "----------------------------------------"
+      cat $(workspaces.source.path)karpenter-controller-role-trust-policy-url.json | sed 's/^/   /'
+      echo "----------------------------------------"
+      
+      echo "[INFO] Processing trust policy template with environment variables..."
       envsubst < $(workspaces.source.path)karpenter-controller-role-trust-policy-url.json > $(workspaces.source.path)karpenter-controller-role-trust-policy-url-modified.json
 
-      cat $(workspaces.source.path)karpenter-controller-role-trust-policy-url.json
-
-      cat $(workspaces.source.path)karpenter-controller-role-trust-policy-url-modified.json
+      echo "[INFO] Processed trust policy document:"
+      echo "----------------------------------------"
+      cat $(workspaces.source.path)karpenter-controller-role-trust-policy-url-modified.json | sed 's/^/   /'
+      echo "----------------------------------------"
       
-      aws iam create-role --role-name "KarpenterControllerRole-$(params.cluster-name)" \
-        --assume-role-policy-document file://$(workspaces.source.path)karpenter-controller-role-trust-policy-url-modified.json
+      # Create or verify IAM role existence
+      echo ""
+      echo "[INFO] Checking if IAM role KarpenterControllerRole-$(params.cluster-name) exists..."
+      if aws iam get-role --role-name "KarpenterControllerRole-$(params.cluster-name)" >/dev/null 2>&1; then
+        echo "[INFO] IAM role KarpenterControllerRole-$(params.cluster-name) already exists, skipping creation"
+      else
+        echo "[INFO] Creating IAM role KarpenterControllerRole-$(params.cluster-name)..."
+        aws iam create-role --role-name "KarpenterControllerRole-$(params.cluster-name)" \
+          --assume-role-policy-document file://$(workspaces.source.path)karpenter-controller-role-trust-policy-url-modified.json
+        echo "[SUCCESS] Successfully created IAM role KarpenterControllerRole-$(params.cluster-name)"
+      fi
 
+      # Download and process IAM policy document
+      echo ""
+      echo "[INFO] Downloading IAM policy document from: $(params.karpenter-controller-role-policy-url)"
       curl -fsSL $(params.karpenter-controller-role-policy-url) -o $(workspaces.source.path)karpenter-controller-role-policy-url.json
 
+      echo "[INFO] Processing IAM policy template with environment variables..."
       envsubst < $(workspaces.source.path)karpenter-controller-role-policy-url.json > $(workspaces.source.path)karpenter-controller-role-policy-url-modified.json
       
-      cat $(workspaces.source.path)karpenter-controller-role-policy-url-modified.json
+      echo "[INFO] Processed IAM policy document:"
+      echo "----------------------------------------"
+      cat $(workspaces.source.path)karpenter-controller-role-policy-url-modified.json | sed 's/^/   /'
+      echo "----------------------------------------"
 
+      # Create or update role policy
+      echo ""
+      echo "[INFO] Checking if role policy KarpenterControllerPolicy-$(params.cluster-name) exists..."
+      if aws iam get-role-policy --role-name "KarpenterControllerRole-$(params.cluster-name)" --policy-name "KarpenterControllerPolicy-$(params.cluster-name)" >/dev/null 2>&1; then
+        echo "[INFO] Role policy KarpenterControllerPolicy-$(params.cluster-name) already exists, updating..."
+      else
+        echo "[INFO] Creating role policy KarpenterControllerPolicy-$(params.cluster-name)..."
+      fi
+      
       aws iam put-role-policy --role-name "KarpenterControllerRole-$(params.cluster-name)" \
         --policy-name "KarpenterControllerPolicy-$(params.cluster-name)" \
         --policy-document file://$(workspaces.source.path)karpenter-controller-role-policy-url-modified.json
+      echo "[SUCCESS] Successfully applied role policy KarpenterControllerPolicy-$(params.cluster-name)"
+
+      # Verify the created resources
+      echo ""
+      echo "[INFO] Verifying created IAM resources..."
+      echo "========================================"
+      
+      echo "[INFO] IAM Role details:"
+      aws iam get-role --role-name "KarpenterControllerRole-$(params.cluster-name)" --query 'Role.[RoleName,Arn,CreateDate]' --output table
+      
+      echo ""
+      echo "[INFO] Attached role policies:"
+      aws iam list-role-policies --role-name "KarpenterControllerRole-$(params.cluster-name)" --output table
+      
+      echo ""
+      echo "=============================================="
+      echo "Karpenter Controller Role Creation Completed"
+      echo "=============================================="

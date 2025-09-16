@@ -23,7 +23,7 @@ spec:
     mountPath: /src/karpenter/
   steps:
   - name: create-stack
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.30.2
     script: |
       STACK_NAME=Karpenter-$(params.cluster-name)
       STACK_STATUS=$(aws cloudformation describe-stacks --query 'Stacks[?StackName==`'${STACK_NAME}'`].StackStatus' --output text  --region $(params.region))
@@ -31,7 +31,38 @@ spec:
 
       cat /src/karpenter/cloudformation.yaml
       
-      aws eks update-cluster-config --name $(params.cluster-name) --access-config authenticationMode=API_AND_CONFIG_MAP --endpoint $(params.endpoint)
+      UPDATE_OUTPUT=$(aws eks update-cluster-config --name $(params.cluster-name) --access-config authenticationMode=API_AND_CONFIG_MAP --endpoint $(params.endpoint))
+      
+      echo $UPDATE_OUTPUT
+
+      # Extract the update ID from the output
+      UPDATE_ID=$(echo "$UPDATE_OUTPUT" | jq -r '.update.id // empty')
+      
+      echo "Waiting for cluster config update $UPDATE_ID to complete..."
+      
+      # Wait for the update to complete
+      while true; do
+        UPDATE_STATUS=$(aws eks describe-update --name $(params.cluster-name) --update-id "$UPDATE_ID" --endpoint $(params.endpoint) --query 'update.status' --output text)
+        
+        case "$UPDATE_STATUS" in
+          "Successful")
+            echo "Cluster config update completed successfully"
+            break
+            ;;
+          "Failed"|"Cancelled")
+            echo "Cluster config update failed with status: $UPDATE_STATUS"
+            exit 1
+            ;;
+          "InProgress")
+            echo "Update still in progress, waiting 30 seconds..."
+            sleep 30
+            ;;
+          *)
+            echo "Unknown update status: $UPDATE_STATUS"
+            sleep 30
+            ;;
+        esac
+      done
       
       if [[ "$STACK_STATUS" == "" ]]; then
         aws cloudformation deploy \
@@ -46,20 +77,21 @@ spec:
           echo "$STACK_NAME Already exists"
       fi
 
-      eksctl create iamserviceaccount \
-        --name karpenter \
-        --namespace karpenter \
-        --cluster "$(params.cluster-name)" \
-        --attach-policy-arn "arn:aws:iam::$(params.account-id):role/$(params.cluster-name)-karpenter" \
-        --approve \
-        --override-existing-serviceaccounts
+      aws eks describe-cluster --name "$(params.cluster-name)" --output text --endpoint $(params.endpoint)
 
       export AWS_EKS_ENDPOINT=$(params.endpoint)
+      # Check if OIDC provider is already associated
+      echo "Associating OIDC provider with cluster..."
       eksctl utils associate-iam-oidc-provider --cluster "$(params.cluster-name)" --approve
 
-      aws eks create-access-entry \
-        --cluster-name "$(params.cluster-name)" \
-        --principal-arn "arn:aws:iam::$(params.account-id):role/KarpenterNodeRole-$(params.cluster-name)" \
-        --endpoint $(params.endpoint) \
-        --type EC2_LINUX
-
+      # Check if access entry already exists
+      if aws eks describe-access-entry --cluster-name "$(params.cluster-name)" --principal-arn "arn:aws:iam::$(params.account-id):role/KarpenterNodeRole-$(params.cluster-name)" --endpoint $(params.endpoint) >/dev/null 2>&1; then
+        echo "Access entry for KarpenterNodeRole already exists. Skipping creation..."
+      else
+        echo "Creating access entry for KarpenterNodeRole..."
+        aws eks create-access-entry \
+          --cluster-name "$(params.cluster-name)" \
+          --principal-arn "arn:aws:iam::$(params.account-id):role/KarpenterNodeRole-$(params.cluster-name)" \
+          --endpoint $(params.endpoint) \
+          --type EC2_LINUX
+      fi

@@ -5,48 +5,66 @@ metadata:
   namespace: scalability
 spec:
   description: |
-    Install karpenter on the cluster
+    Installs Karpenter on an EKS cluster using Helm.
+    This task authenticates with ECR, configures kubectl, validates cluster state,
+    and installs Karpenter with optimized settings for large-scale workloads.
   params:
   - name: cluster-name
-    description: The name of the cluster
+    description: The name of the EKS cluster where Karpenter will be installed
   - name: aws-account-id
-    description: aws account id
+    description: AWS account ID for IAM role ARN construction
   - name: karpenter-ecr-repo
-    description: ECR repo to install karpenter 
+    description: ECR repository URL containing the Karpenter Helm chart
   - name: karpenter-version
-    description: version of karpenter to install
+    description: Version of Karpenter to install (e.g., v0.32.0)
   - name: endpoint
-    description: eks endpoint to use
+    description: EKS cluster endpoint URL for kubectl configuration
   workspaces:
   - name: config
   steps:
   - name: install-karpenter
-    image: alpine/k8s:1.23.7
-    timeout: 10m
+    image: alpine/k8s:1.30.2
     script: |
+      echo "Starting Karpenter Installation Task"
+      echo "===================================="
+
+      # Authenticate with ECR for Helm registry access
+      echo "[INFO] Authenticating with ECR registry..."
       aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin $(params.karpenter-ecr-repo)
+      echo "[SUCCESS] Successfully authenticated with ECR"
+      echo ""
 
+      # Configure kubectl to connect to the EKS cluster
+      echo "[INFO] Configuring kubectl for cluster access..."
       aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      echo "[SUCCESS] Successfully configured kubectl"
+      echo ""
 
+      # Verify karpenter-system nodegroup exists
+      echo "[INFO] Verifying karpenter-system nodegroup..."
       aws eks describe-nodegroup --cluster-name $(params.cluster-name) --endpoint $(params.endpoint) --nodegroup-name karpenter-system-large
+      echo ""
       
-      kubectl get nodes -A -o yaml
+      # Capture cluster state before installation for troubleshooting
+      echo "[INFO] Capturing cluster state before Karpenter installation..."
+      echo "----------------------------------------"
       
+      echo "[INFO] Current cluster nodes:"
+      kubectl get nodes -o wide
+      echo ""
+      
+      echo "[INFO] Current pods across all namespaces:"
       kubectl get pods -A -o wide
+      echo ""
 
-      kubectl get pods -n karpenter -o yaml
-
-      # kubectl delete nodes -l dedicated=karpenter
-
+      echo "[INFO] Current deployments across all namespaces:"
       kubectl get deployments -A -o wide
-
-      # helm status karpenter --namespace karpenter
-
-      # kubectl logs karpenter-5df996fbbf-f8ghz -n karpenter -f
-
-      # helm delete -n karpenter karpenter --wait
-
-      # kubectl taint nodes -l dedicated=karpenter dedicated=karpenter:NoSchedule
+      echo "----------------------------------------"
+      echo ""
+      
+      # Install Karpenter using Helm with optimized configuration
+      echo "[INFO] Installing Karpenter with Helm..."
+      echo ""
       
       helm upgrade --install karpenter oci://$(params.karpenter-ecr-repo)/karpenter/karpenter --version $(params.karpenter-version) \
         --namespace "karpenter" \
@@ -85,4 +103,34 @@ spec:
         --debug \
         --wait
 
-      kubectl get pods -n karpenter
+      echo ""
+      echo "[SUCCESS] Karpenter installation completed"
+      echo ""
+
+      # Verify the installation
+      echo "[INFO] Verifying Karpenter installation..."
+      echo "========================================="
+      
+      KARPENTER_PODS=$(kubectl get pods -n karpenter --no-headers 2>/dev/null | wc -l)
+      echo "[SUCCESS] Found $KARPENTER_PODS Karpenter pod(s) in the cluster"
+      echo ""
+      
+      echo "[INFO] Current Karpenter pod status:"
+      kubectl get pods -n karpenter -o wide
+      echo ""
+
+      echo "[INFO] Current Karpenter pod detailed:"
+      kubectl get pods -n karpenter -o yaml
+      echo ""
+      
+      echo "[INFO] Karpenter deployment details:"
+      kubectl get deployment -n karpenter -o wide
+      echo ""
+
+      echo "[INFO] Karpenter deployment details:"
+      kubectl get deployment -n karpenter -o yaml
+      echo ""
+      
+      echo "========================================="
+      echo "Karpenter Installation Completed"
+      echo "========================================="

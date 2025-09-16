@@ -5,39 +5,108 @@ metadata:
   namespace: scalability
 spec:
   description: |
-    Install karpenter on the cluster
+    Creates Karpenter NodePool resources for each availability zone in the specified AWS region.
+    This task downloads a nodepool template, customizes it for each AZ, and applies it to the cluster.
   params:
   - name: cluster-name
-    description: The name of the cluster
+    description: The name of the EKS cluster where nodepools will be created
   - name: endpoint
-    description: eks endpoint to use
+    description: EKS cluster endpoint URL for kubectl configuration
   - name: aws-region
-    description: aws region to use
+    description: AWS region where the cluster is located (used for AZ discovery)
     default: us-west-2
   - name: karpenter-nodepool-url
-    description: url of the nodeclass template to use
+    description: URL of the nodepool YAML template to download and customize
   workspaces:
   - name: source
     mountPath: /src/karpenter/
   steps:
   - name: create-nodepools
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.30.2
     script: |
-      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      echo "Starting Karpenter NodePool Creation Task"
 
+      # Configure kubectl to connect to the EKS cluster
+      echo "[INFO] Configuring kubectl for cluster access..."
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      if [ $? -eq 0 ]; then
+        echo "[SUCCESS] Successfully configured kubectl"
+      else
+        echo "[ERROR] Failed to configure kubectl"
+        exit 1
+      fi
+
+      # Set cluster name environment variable for template substitution
       export CLUSTER_NAME=$(params.cluster-name)
+
+      # Download the nodepool template
+      echo ""
+      echo "[INFO] Downloading nodepool template from: $(params.karpenter-nodepool-url)"
       curl -fsSL $(params.karpenter-nodepool-url) -o $(workspaces.source.path)nodepool.yaml
 
+      # Display the downloaded template for verification
+      echo ""
+      echo "[INFO] Downloaded nodepool template content:"
+      echo "----------------------------------------"
       cat $(workspaces.source.path)nodepool.yaml
+      echo "----------------------------------------"
 
+      # Discover availability zones and create nodepools
+      echo ""
+      echo "[INFO] Discovering availability zones in region: $(params.aws-region)"
       
-      aws ec2 describe-availability-zones --query 'AvailabilityZones[].ZoneName' --output json | jq -r '.[]' | while read -r az; do 
+      # Get list of availability zones
+      AZ_LIST=$(aws ec2 describe-availability-zones --region $(params.aws-region) --query 'AvailabilityZones[].ZoneName' --output json | jq -r '.[]')
+      AZ_COUNT=$(echo "$AZ_LIST" | wc -l)
+      
+      echo "[INFO] Found $AZ_COUNT availability zones:"
+      echo "$AZ_LIST" | sed 's/^/  - /'
+      echo ""
+
+      # Process each availability zone
+      NODEPOOL_COUNT=0
+      echo "$AZ_LIST" | while read -r az; do 
+        if [ -z "$az" ]; then
+          continue
+        fi
+        
+        NODEPOOL_COUNT=$((NODEPOOL_COUNT + 1))
         export AZ=$az
-        echo ${AZ}
-        envsubst < $(workspaces.source.path)nodepool.yaml > $(workspaces.source.path)nodepool-${AZ}.yaml
-        cat $(workspaces.source.path)nodepool-${AZ}.yaml
-        kubectl apply -f $(workspaces.source.path)nodepool-${AZ}.yaml
+        
+        echo "[INFO] Creating nodepool for availability zone: $az"
+        
+        # Generate AZ-specific nodepool configuration
+        echo "[INFO] Generating nodepool configuration for $az..."
+        envsubst < $(workspaces.source.path)nodepool.yaml > $(workspaces.source.path)nodepool-${az}.yaml
+        
+        # Display the generated configuration
+        echo "[INFO] Generated nodepool configuration for $az:"
+        echo "----------------------------------------"
+        cat $(workspaces.source.path)nodepool-${az}.yaml | sed 's/^/   /'
+        echo "----------------------------------------"
+        
+        # Apply the nodepool configuration
+        echo "[INFO] Applying nodepool configuration for $az..."
+        kubectl apply -f $(workspaces.source.path)nodepool-${az}.yaml
+        echo ""
       done
 
+      # Verify the created nodepools
+      echo "[INFO] Verifying created nodepools..."
+      echo "=================================="
+      
+      NODEPOOL_LIST=$(kubectl get nodepool --no-headers 2>/dev/null | wc -l)
+      echo "[SUCCESS] Found $NODEPOOL_LIST nodepool(s) in the cluster"
+      echo ""
+      echo "[INFO] Current nodepool status:"
+      kubectl get nodepool -o wide
+      echo ""
+      echo "----------------------------------------"
+      echo "[INFO] Detailed nodepool configuration:"
       kubectl get nodepool -o yaml
-
+      echo "----------------------------------------"
+    
+      echo ""
+      echo "=========================================="
+      echo "Karpenter NodePool Creation Completed"
+      echo "=========================================="

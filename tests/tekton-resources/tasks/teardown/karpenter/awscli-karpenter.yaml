@@ -1,0 +1,381 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-karpenter-cluster-teardown
+  namespace: scalability
+spec:
+  description: |
+    Teardown an EKS cluster.
+    This Task can be used to teardown an EKS cluster with mng in an AWS account.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster which will be teared down.
+  - name: region
+    default: us-west-2
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+  - name: namespace-count
+    description: The number of namespaces for EKS Pod Identity test.
+    default: "0"
+  - name: slack-hook
+    default: ""
+  - name: slack-message
+    default: "Job is completed"
+  - name: service-role-stack-name
+  - name: node-role-stack-name
+  - name: launch-template-stack-name
+  steps:
+  - name: terminate-cluster-instances
+    image: alpine/k8s:1.30.2
+    script: |
+      #!/bin/bash
+      set -e
+      
+      echo "$(date): Starting EC2 instance termination for cluster $(params.cluster-name)..."
+      
+      # Find all EC2 instances that belong to the cluster using the aws:eks:cluster-name tag
+      echo "$(date): Finding instances with tag aws:eks:cluster-name=$(params.cluster-name)..."
+      INSTANCE_IDS=$(aws ec2 describe-instances \
+        --region $(params.region) \
+        --filters "Name=tag:aws:eks:cluster-name,Values=$(params.cluster-name)" "Name=instance-state-name,Values=running,pending,stopping,stopped" \
+        --query 'Reservations[*].Instances[*].InstanceId' \
+        --output text)
+      
+      if [ -z "$INSTANCE_IDS" ]; then
+        echo "$(date): No instances found with tag aws:eks:cluster-name=$(params.cluster-name)"
+        echo "$(date): Instance termination completed - no instances to terminate"
+        exit 0
+      fi
+      
+      # Convert to array and count instances
+      INSTANCE_ARRAY=($INSTANCE_IDS)
+      INSTANCE_COUNT=${#INSTANCE_ARRAY[@]}
+      
+      echo "$(date): Found $INSTANCE_COUNT instances to terminate: $INSTANCE_IDS"
+      
+      # List instance details for logging
+      echo "$(date): Instance details:"
+      aws ec2 describe-instances \
+        --region $(params.region) \
+        --instance-ids $INSTANCE_IDS \
+        --query 'Reservations[*].Instances[*].[InstanceId,InstanceType,State.Name,LaunchTime]' \
+        --output table
+      
+      # Terminate all instances belonging to the cluster
+      echo "$(date): Terminating instances..."
+      aws ec2 terminate-instances \
+        --region $(params.region) \
+        --instance-ids $INSTANCE_IDS
+      
+      echo "$(date): Termination request sent for all instances"
+      
+      # Wait for all instances to be terminated
+      echo "$(date): Waiting for all instances to be terminated..."
+      TIMEOUT=600  # 10 minutes timeout
+      CHECK_INTERVAL=15  # Check every 15 seconds
+      START_TIME=$(date +%s)
+      
+      while true; do
+        # Check if timeout has been reached
+        CURRENT_TIME=$(date +%s)
+        ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+        
+        if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+          echo "$(date): Timeout reached after ${ELAPSED_TIME} seconds. Some instances may still be terminating."
+          # List remaining instances for debugging
+          REMAINING_INSTANCES=$(aws ec2 describe-instances \
+            --region $(params.region) \
+            --instance-ids $INSTANCE_IDS \
+            --query 'Reservations[*].Instances[?State.Name!=`terminated`].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          if [ -n "$REMAINING_INSTANCES" ] && [ "$REMAINING_INSTANCES" != "None" ]; then
+            echo "$(date): Instances still not terminated: $REMAINING_INSTANCES"
+          fi
+          exit 1
+        fi
+        
+        # Check instance states
+        RUNNING_INSTANCES=$(aws ec2 describe-instances \
+          --region $(params.region) \
+          --instance-ids $INSTANCE_IDS \
+          --query 'Reservations[*].Instances[?State.Name!=`terminated`].InstanceId' \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -z "$RUNNING_INSTANCES" ] || [ "$RUNNING_INSTANCES" = "None" ]; then
+          echo "$(date): Success! All instances have been terminated"
+          break
+        else
+          RUNNING_COUNT=$(echo "$RUNNING_INSTANCES" | wc -w)
+          echo "$(date): Still waiting for $RUNNING_COUNT instances to be terminated: $RUNNING_INSTANCES"
+          echo "$(date): Waiting ${CHECK_INTERVAL} seconds before next check..."
+          sleep $CHECK_INTERVAL
+        fi
+      done
+      
+      echo "$(date): EC2 instance termination completed successfully"
+  - name: delete-cluster
+    image: alpine/k8s:1.23.7
+    script: |
+      set +e
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+
+      for i in `aws eks list-nodegroups --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region)  | jq -r '.nodegroups[]'`;
+      do
+          aws eks delete-nodegroup --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
+          aws eks wait nodegroup-deleted --nodegroup-name $i --cluster-name $(params.cluster-name) $ENDPOINT_FLAG --region $(params.region);
+      done;
+      echo "Starting to delete cluster..."
+      aws eks delete-cluster --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
+      echo "Waiting for cluster to be deleted..."
+      aws eks wait cluster-deleted --name $(params.cluster-name) --region $(params.region) $ENDPOINT_FLAG
+      echo "Cluster is deleted..."
+
+      for i in $(seq 1 $(params.namespace-count)); do
+        PIA_ROLE_NAME=$(params.cluster-name)-pia-role-$i
+        PIA_ROLE_EXISTS=$(aws iam get-role --role-name $PIA_ROLE_NAME --query 'Role.RoleName' --output text 2>/dev/null)
+        if [ "$PIA_ROLE_EXISTS" == "$PIA_ROLE_NAME" ]; then
+          # Detach all attached managed policies
+          aws iam list-attached-role-policies --role-name "$PIA_ROLE_NAME" \
+            --query 'AttachedPolicies[*].PolicyArn' --output json | jq -r '.[]' | while read -r policy_arn; do
+            echo "Detaching managed policy: $policy_arn"
+            aws iam detach-role-policy --role-name "$PIA_ROLE_NAME" --policy-arn "$policy_arn"
+          done
+          # Delete all inline policies
+          aws iam list-role-policies --role-name "$PIA_ROLE_NAME" \
+            --query 'PolicyNames' --output json | jq -r '.[]' | while read -r policy_name; do
+            echo "Deleting inline policy: $policy_name"
+            aws iam delete-role-policy --role-name "$PIA_ROLE_NAME" --policy-name "$policy_name"
+          done
+          # Delete role
+          aws iam delete-role --role-name $PIA_ROLE_NAME
+          echo "Role $PIA_ROLE_NAME deleted successfully."
+        else
+          echo "Role $PIA_ROLE_NAME does not exist, no action needed."
+        fi
+      done
+  - name: delete-karpenter-role
+    image: alpine/k8s:1.30.2
+    script: |
+      # Check if the instance profile exists before attempting to delete
+      if aws iam get-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)" >/dev/null 2>&1; then
+        echo "Found instance profile KarpenterNodeInstanceProfile-$(params.cluster-name)..."
+        
+        # Check if the role is attached to the instance profile and remove it
+        ATTACHED_ROLES=$(aws iam get-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)" --query 'InstanceProfile.Roles[?RoleName==`KarpenterNodeRole-$(params.cluster-name)`].RoleName' --output text)
+        if [ -n "$ATTACHED_ROLES" ]; then
+          echo "Removing role KarpenterNodeRole-$(params.cluster-name) from instance profile..."
+          aws iam remove-role-from-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)" --role-name "KarpenterNodeRole-$(params.cluster-name)"
+          echo "Role KarpenterNodeRole-$(params.cluster-name) removed from instance profile successfully."
+        else
+          echo "Role KarpenterNodeRole-$(params.cluster-name) is not attached to instance profile. Skipping role removal..."
+        fi
+
+        echo "Deleting instance profile KarpenterNodeInstanceProfile-$(params.cluster-name)..."
+        aws iam delete-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)"
+        echo "Instance profile KarpenterNodeInstanceProfile-$(params.cluster-name) deleted successfully."
+      else
+        echo "Instance profile KarpenterNodeInstanceProfile-$(params.cluster-name) does not exist. Skipping deletion..."
+      fi
+  - name: delete-karpenter-controller-role
+    image: alpine/k8s:1.30.2
+    script: |
+      echo "Starting Karpenter Controller Role Teardown Task"
+      echo "==============================================="
+      
+      ROLE_NAME="KarpenterControllerRole-$(params.cluster-name)"
+      POLICY_NAME="KarpenterControllerPolicy-$(params.cluster-name)"
+      
+      # Check if the IAM role exists before attempting to delete
+      echo ""
+      echo "[INFO] Checking if IAM role $ROLE_NAME exists..."
+      if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
+        echo "[INFO] IAM role $ROLE_NAME found. Proceeding with cleanup..."
+        
+        # First, remove any attached inline policies
+        echo ""
+        echo "[INFO] Checking for attached inline policies..."
+        if aws iam get-role-policy --role-name "$ROLE_NAME" --policy-name "$POLICY_NAME" >/dev/null 2>&1; then
+          echo "[INFO] Removing inline policy $POLICY_NAME from role $ROLE_NAME..."
+          aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name "$POLICY_NAME"
+          echo "[SUCCESS] Successfully removed inline policy $POLICY_NAME"
+        else
+          echo "[INFO] No inline policy $POLICY_NAME found on role $ROLE_NAME"
+        fi
+        
+        # List and detach any managed policies (if any exist)
+        echo ""
+        echo "[INFO] Checking for attached managed policies..."
+        ATTACHED_POLICIES=$(aws iam list-attached-role-policies --role-name "$ROLE_NAME" --query 'AttachedPolicies[].PolicyArn' --output text)
+        
+        if [ -n "$ATTACHED_POLICIES" ] && [ "$ATTACHED_POLICIES" != "None" ]; then
+          echo "[INFO] Found attached managed policies. Detaching them..."
+          for policy_arn in $ATTACHED_POLICIES; do
+            echo "[INFO] Detaching managed policy: $policy_arn"
+            aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$policy_arn"
+            echo "[SUCCESS] Successfully detached policy: $policy_arn"
+          done
+        else
+          echo "[INFO] No managed policies attached to role $ROLE_NAME"
+        fi
+        
+        # Now delete the role
+        echo ""
+        echo "[INFO] Deleting IAM role $ROLE_NAME..."
+        aws iam delete-role --role-name "$ROLE_NAME"
+        echo "[SUCCESS] IAM role $ROLE_NAME deleted successfully."
+        
+      else
+        echo "[INFO] IAM role $ROLE_NAME does not exist. Skipping deletion..."
+      fi
+      
+      echo ""
+      echo "==============================================="
+      echo "Karpenter Controller Role Teardown Completed"
+      echo "==============================================="
+  - name: delete-stacks
+    image: alpine/k8s:1.30.2
+    script: |
+      #!/bin/bash
+      set -e
+      
+      echo "$(date): Starting CloudFormation stack deletion process..."
+      
+      # Define the stacks to delete in order
+      STACKS=(
+        "$(params.cluster-name)-node-role"
+        "$(params.cluster-name)-service-role"
+        "$(params.cluster-name)"
+      )
+      
+      # Function to check if a stack exists and get its status
+      check_stack_status() {
+        local stack_name=$1
+        aws cloudformation describe-stacks \
+          --stack-name "$stack_name" \
+          --region $(params.region) \
+          --query 'Stacks[0].StackStatus' \
+          --output text 2>/dev/null || echo "STACK_NOT_FOUND"
+      }
+      
+      # Function to delete a stack if it exists and is in a valid state
+      delete_stack_if_exists() {
+        local stack_name=$1
+        echo "$(date): Processing stack: $stack_name"
+        
+        local stack_status=$(check_stack_status "$stack_name")
+        echo "$(date): Stack $stack_name status: $stack_status"
+        
+        case "$stack_status" in
+          "STACK_NOT_FOUND")
+            echo "$(date): Stack $stack_name does not exist. Skipping..."
+            return 0
+            ;;
+          "CREATE_COMPLETE"|"UPDATE_COMPLETE"|"UPDATE_ROLLBACK_COMPLETE"|"ROLLBACK_COMPLETE")
+            echo "$(date): Stack $stack_name is in a valid state for deletion. Proceeding..."
+            ;;
+          "DELETE_IN_PROGRESS")
+            echo "$(date): Stack $stack_name is already being deleted. Waiting for completion..."
+            aws cloudformation wait stack-delete-complete \
+              --stack-name "$stack_name" \
+              --region $(params.region)
+            echo "$(date): Stack $stack_name deletion completed."
+            return 0
+            ;;
+          "DELETE_COMPLETE")
+            echo "$(date): Stack $stack_name is already deleted. Skipping..."
+            return 0
+            ;;
+          *)
+            echo "$(date): Stack $stack_name is in state $stack_status, which is not valid for deletion. Skipping..."
+            return 0
+            ;;
+        esac
+        
+        # Delete the stack
+        echo "$(date): Initiating deletion of stack $stack_name..."
+        aws cloudformation delete-stack \
+          --stack-name "$stack_name" \
+          --region $(params.region)
+        
+        # Wait for deletion to complete
+        echo "$(date): Waiting for stack $stack_name deletion to complete..."
+        aws cloudformation wait stack-delete-complete \
+          --stack-name "$stack_name" \
+          --region $(params.region)
+        
+        echo "$(date): Stack $stack_name deleted successfully."
+      }
+      
+      # Delete each stack
+      for stack_name in "${STACKS[@]}"; do
+        delete_stack_if_exists "$stack_name"
+        echo ""
+      done
+      
+      echo "$(date): CloudFormation stack deletion process completed successfully."
+  - name: awscli-delete-asg
+    image: alpine/k8s:1.23.7
+    script: |
+      #!/bin/bash
+      set -e
+      aws sts get-caller-identity 
+      # Stack ids for self managed node groups will have pattern <cluster-name>-nodes-<num>
+      STACK_IDS=$(aws cloudformation describe-stacks \
+        --region $(params.region) \
+        --query 'Stacks[?contains(StackName, `'$(params.cluster-name)'-nodes-`)].StackName' \
+        --output text)
+      
+      if [ -z "$STACK_IDS" ]; then
+        echo "No stacks found matching pattern: $(params.cluster-name)-nodes-"
+        exit 0
+      fi
+      
+      echo "Found stacks to delete: $STACK_IDS"
+      # Delete each stack and wait for completion
+      for stack_name in $STACK_IDS; do
+        echo "Deleting stack: $stack_name"
+        
+        # Delete the stack
+        aws cloudformation delete-stack \
+          --region $(params.region) \
+          --stack-name "$stack_name"
+        
+        echo "Waiting for stack deletion to complete..."
+        
+        # Wait for deletion to complete
+        aws cloudformation wait stack-delete-complete \
+          --region $(params.region) \
+          --stack-name "$stack_name"
+        
+        echo "Stack $stack_name deleted successfully!"
+      done
+      
+      echo "All matching stacks have been deleted!"
+  - name: teardown-eks-role-stack
+    image: alpine/k8s:1.30.2
+    script: |
+      aws cloudformation delete-stack --stack-name $(params.service-role-stack-name)
+      aws cloudformation delete-stack --stack-name $(params.launch-template-stack-name)
+      # wait for the launch-template stack to be completely deleted to avoid race-conditions.
+      echo "waiting for launch-template stack deletion..."
+      aws cloudformation wait stack-delete-complete --stack-name $(params.launch-template-stack-name)
+      STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $(params.node-role-stack-name) --query 'Stacks[0].StackStatus' --output text || echo "STACK_NOT_FOUND")
+      echo $STACK_STATUS
+      if [ "$STACK_STATUS" == "DELETE_FAILED" ]; then
+          echo "Stack is in DELETE_FAILED state, using FORCE_DELETE_STACK"
+          aws cloudformation delete-stack --stack-name $(params.node-role-stack-name) --deletion-mode FORCE_DELETE_STACK
+      else
+          echo "Normal stack deletion"
+          aws cloudformation delete-stack --stack-name $(params.node-role-stack-name)
+      fi
+  - name: send-slack-notification
+    image: alpine/k8s:1.23.7
+    script: |
+      if [ -n "$(params.slack-hook)" ]; then
+        curl -H "Content-type: application/json" --data '{"Message": "$(params.slack-message)"}' -X POST  $(params.slack-hook)
+      fi
