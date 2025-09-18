@@ -1,0 +1,111 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-node-role
+  namespace: scalability
+spec:
+  description: |
+    Creates the Karpenter Node IAM Role with required policies for EKS worker nodes.
+    This task creates an IAM role that allows EC2 instances to assume the role and attaches
+    the necessary AWS managed policies for EKS worker node functionality including container
+    registry access, CNI networking, and Systems Manager access.
+  results:
+  - name: node-role-arn
+    description: The ARN of the created Karpenter node IAM role
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster (used to create unique role name)
+  steps:
+  - name: create-role
+    image: alpine/k8s:1.30.2
+    script: |
+      echo "Starting Karpenter Node IAM Role Creation Task"
+      echo "=============================================="
+      
+      # Set role name variable for consistency
+      ROLE_NAME="KarpenterNodeRole-$(params.cluster-name)"
+      
+      echo "[INFO] Target role name: $ROLE_NAME"
+      echo ""
+
+      # Check if the IAM role already exists
+      echo "[INFO] Checking if IAM role already exists..."
+      if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
+        echo "[INFO] IAM role $ROLE_NAME already exists, skipping creation"
+      else
+        echo "[INFO] Creating new IAM role: $ROLE_NAME"
+        echo "[INFO] Configuring trust policy for EC2 service..."
+        
+        # Create the IAM role with trust policy for EC2
+        aws iam create-role --role-name "$ROLE_NAME" \
+        --assume-role-policy-document '{
+          "Version": "2012-10-17",
+          "Statement": [
+             {
+                 "Effect": "Allow",
+                  "Principal": {
+                      "Service": "ec2.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+              }
+          ]
+        }'
+        
+        echo "[SUCCESS] Successfully created IAM role: $ROLE_NAME"
+      fi
+      echo ""
+
+      # Define required AWS managed policies for EKS worker nodes
+      echo "[INFO] Preparing to attach required AWS managed policies..."
+      POLICIES=(
+        "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+        "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      )
+      
+      echo "[INFO] Required policies to attach:"
+      for policy in "${POLICIES[@]}"; do
+        echo "  - $policy"
+      done
+      echo ""
+
+      # Attach required policies to the role
+      POLICY_COUNT=0
+      for policy in "${POLICIES[@]}"; do
+        POLICY_COUNT=$((POLICY_COUNT + 1))
+        echo "[INFO] Processing policy $POLICY_COUNT of ${#POLICIES[@]}: $policy"
+        
+        # Check if policy is already attached to avoid duplicate attachments
+        if aws iam list-attached-role-policies --role-name "$ROLE_NAME" --query "AttachedPolicies[?PolicyArn=='$policy'].PolicyArn" --output text | grep -q "$policy"; then
+          echo "[INFO] Policy already attached, skipping: $policy"
+        else
+          echo "[INFO] Attaching policy to role..."
+          aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$policy"
+          echo "[SUCCESS] Successfully attached policy: $policy"
+        fi
+        echo ""
+      done
+
+      # Retrieve and store the role ARN for use by other tasks
+      echo "[INFO] Retrieving role ARN for task output..."
+      ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query 'Role.Arn' --output text)
+      echo "[INFO] Role ARN: $ROLE_ARN"
+      
+      # Write ARN to results file for pipeline consumption
+      echo "$ROLE_ARN" > $(results.node-role-arn)
+      echo "[SUCCESS] Role ARN saved to task results"
+      echo ""
+
+      # Verify final role configuration
+      echo "[INFO] Verifying final role configuration..."
+      echo "=========================================="
+      echo "[INFO] Role details:"
+      aws iam get-role --role-name "$ROLE_NAME" --query 'Role.{RoleName:RoleName,Arn:Arn,CreateDate:CreateDate}' --output table
+      echo ""
+      echo "[INFO] Attached policies:"
+      aws iam list-attached-role-policies --role-name "$ROLE_NAME" --query 'AttachedPolicies[].{PolicyName:PolicyName,PolicyArn:PolicyArn}' --output table
+      echo ""
+      echo "=========================================="
+      echo "Karpenter Node IAM Role Creation Completed"
+      echo "=========================================="

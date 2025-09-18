@@ -1,0 +1,56 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kubectl-get-karpenter-logs
+  namespace: scalability
+spec:
+  description: "Watch logs from both karpenter pods continually until they are deleted, writing logs to stdout"
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: endpoint
+    description: eks endpoint to use
+  - name: aws-region
+    description: AWS region where the cluster is located
+    default: us-west-2
+  - name: namespace
+    description: Namespace where karpenter is installed
+    default: karpenter
+  steps:
+  - name: get-karpenter-logs
+    image: alpine/k8s:1.30.2
+    script: |
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint) --region $(params.aws-region)
+      
+      echo "Finding karpenter pods to watch logs..."
+      
+      # Get all karpenter pods
+      karpenter_pods=$(kubectl get pods -n $(params.namespace) -l app.kubernetes.io/name=karpenter -o jsonpath='{.items[*].metadata.name}')
+      
+      if [ -z "$karpenter_pods" ]; then
+        echo "No karpenter pods found in namespace $(params.namespace)"
+        echo "Checking if namespace exists..."
+        kubectl get namespace $(params.namespace) || echo "Namespace $(params.namespace) does not exist"
+        echo "Listing all pods in karpenter namespace (if it exists)..."
+        kubectl get pods -n $(params.namespace) || echo "Could not list pods in namespace $(params.namespace)"
+        exit 1
+      fi
+      
+      echo "Found karpenter pods: $karpenter_pods"
+      
+      # Start watching logs for each pod in background
+      for pod in $karpenter_pods; do
+        echo "=========================================="
+        echo "Starting to watch logs for pod: $pod"
+        echo "=========================================="
+        
+        # Follow logs continuously - will exit when pod is deleted
+        kubectl logs "$pod" -n $(params.namespace) -f &
+      done
+      
+      # Wait for all background log processes
+      # This will continue until all kubectl logs processes exit (when pods are deleted)
+      wait
+      
+      echo "All karpenter pods have been deleted - log watching completed"

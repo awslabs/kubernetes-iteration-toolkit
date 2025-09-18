@@ -1,0 +1,165 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nodepool-condition-wait
+  namespace: scalability
+spec:
+  description: "waits for nodeclaims in a given nodepool to have or not have the specified condition with the given value based on presence parameter"
+  results:
+    - name: datapoint
+      description: Stores the result that can be consumed by other tasks (1 for success, 0 for failure)
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  - name: endpoint
+    description: eks endpoint to use
+  - name: aws-region
+    default: us-west-2
+  - name: initial-delay
+    default: 1m
+  - name: condition
+    description: condition to check (e.g., Ready, MemoryPressure, DiskPressure)
+  - name: presence
+    description: whether to check for the presence or absence of the condition with the value
+    default: true
+  - name: value
+    description: value of the condition to validate (e.g., True, False)
+  - name: nodepool
+    description: nodepool to check nodeclaim in.
+  - name: check-interval
+    description: interval in seconds between checks
+    default: "60"
+  - name: timeout
+    description: total time to wait before timing out in seconds
+    default: 3000
+  steps:
+  - name: wait-for-condition
+    image: alpine/k8s:1.30.2
+    script: |
+      sleep $(params.initial-delay)
+      CHECK_INTERVAL=$(params.check-interval)
+      TIMEOUT=$(params.timeout)
+      START_TIME=$(date +%s)
+      
+      while true; do
+        # Check if timeout has been reached
+        echo "in true"
+        CURRENT_TIME=$(date +%s)
+        echo "after current"
+        ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+        echo "after elapsed"
+        if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
+          echo "$(date): Timeout reached after ${ELAPSED_TIME} seconds. Nodepools did not complete within the specified timeout."
+          echo "0" | tee $(results.datapoint.path)
+          exit 1
+        fi
+        echo "updating kubeconfig"
+        aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+        if [ "$(params.presence)" = "true" ]; then
+          echo "$(date): Checking that ALL nodeclaims in nodepool $(params.nodepool) have condition $(params.condition)=$(params.value)..."
+        else
+          echo "$(date): Checking that NO nodeclaims in nodepool $(params.nodepool) have condition $(params.condition)=$(params.value)..."
+        fi
+
+        echo "getting AZs"
+        # Get list of availability zones
+        AZ_LIST=$(aws ec2 describe-availability-zones --region $(params.aws-region) --query 'AvailabilityZones[].ZoneName' --output json | jq -r '.[]')
+        AZ_COUNT=$(echo "$AZ_LIST" | wc -l)
+        
+        echo "[INFO] Found $AZ_COUNT availability zones:"
+        echo "$AZ_LIST" | sed 's/^/  - /'
+        echo ""
+        
+        # Track if all availability zones have nodeclaims meeting the condition
+        ALL_AZ_READY=true
+        TOTAL_NODECLAIMS_ALL_AZ=0
+        TOTAL_READY_NODECLAIMS_ALL_AZ=0
+        
+        # Check each availability zone
+        for az in $AZ_LIST; do
+          # Get all nodeclaims in the AZ-specific nodepool
+          all_nodeclaims=$(kubectl get nodeclaims -l karpenter.sh/nodepool=$(params.nodepool)-${az} -o json | jq -r '.items[].metadata.name')
+          
+          if [ -z "$all_nodeclaims" ]; then
+            echo "$(date): AZ ${az} - No nodeclaims found in nodepool $(params.nodepool)-${az}"
+            continue
+          fi
+          
+          # Count total nodeclaims in this AZ
+          total_nodeclaims=$(echo "$all_nodeclaims" | wc -l)
+          TOTAL_NODECLAIMS_ALL_AZ=$((TOTAL_NODECLAIMS_ALL_AZ + total_nodeclaims))
+          
+          # Get nodeclaims that have the desired condition with the specified value
+          nodeclaims_with_condition=$(kubectl get nodeclaims -l karpenter.sh/nodepool=$(params.nodepool)-${az} -o json | jq -r --arg type $(params.condition) --arg status $(params.value) '
+             .items[] |
+             select(.status.conditions[] | select(.type == $type and .status == $status)) |
+             .metadata.name
+          ')
+          
+          # Count nodeclaims with the desired condition in this AZ
+          if [ -z "$nodeclaims_with_condition" ]; then
+            nodeclaims_with_condition_count=0
+          else
+            nodeclaims_with_condition_count=$(echo "$nodeclaims_with_condition" | wc -l)
+          fi
+          
+          TOTAL_READY_NODECLAIMS_ALL_AZ=$((TOTAL_READY_NODECLAIMS_ALL_AZ + nodeclaims_with_condition_count))
+          
+          echo "$(date): AZ ${az} - Nodeclaims with $(params.condition)=$(params.value): $nodeclaims_with_condition_count/$total_nodeclaims"
+          
+          if [ "$(params.presence)" = "true" ]; then
+            # presence=true: Check if all nodeclaims have the condition
+            if [ "$nodeclaims_with_condition_count" -ne "$total_nodeclaims" ]; then
+              echo "$(date): AZ ${az} - Not all nodeclaims have $(params.condition)=$(params.value)"
+              ALL_AZ_READY=false
+            else
+              echo "$(date): AZ ${az} - Success! All nodeclaims have $(params.condition)=$(params.value)"
+            fi
+          else
+            # presence=false: Check if no nodeclaims have the condition
+            if [ "$nodeclaims_with_condition_count" -ne 0 ]; then
+              echo "$(date): AZ ${az} - Some nodeclaims still have $(params.condition)=$(params.value)"
+              ALL_AZ_READY=false
+            else
+              echo "$(date): AZ ${az} - Success! No nodeclaims have $(params.condition)=$(params.value)"
+            fi
+          fi
+        done
+        
+        echo "$(date): Overall status - Nodeclaims with $(params.condition)=$(params.value): $TOTAL_READY_NODECLAIMS_ALL_AZ/$TOTAL_NODECLAIMS_ALL_AZ across all AZs"
+        
+        # Check success condition based on presence parameter
+        if [ "$(params.presence)" = "true" ]; then
+          # presence=true: Exit if all availability zones have all nodeclaims meeting the condition
+          if [ "$ALL_AZ_READY" = "true" ] && [ "$TOTAL_NODECLAIMS_ALL_AZ" -gt 0 ]; then
+            echo "$(date): Success! All nodeclaims across all availability zones have $(params.condition)=$(params.value)"
+            echo "1" | tee $(results.datapoint.path)
+            exit 0
+          fi
+          
+          if [ "$TOTAL_NODECLAIMS_ALL_AZ" -eq 0 ]; then
+            echo "$(date): No nodeclaims found in any availability zone for nodepool $(params.nodepool)"
+          else
+            echo "$(date): Waiting for remaining nodeclaims to achieve $(params.condition)=$(params.value)..."
+          fi
+        else
+          # presence=false: Exit if no nodeclaims have the condition with the specified value
+          if [ "$TOTAL_READY_NODECLAIMS_ALL_AZ" -eq 0 ] && [ "$TOTAL_NODECLAIMS_ALL_AZ" -gt 0 ]; then
+            echo "$(date): Success! No nodeclaims across all availability zones have $(params.condition)=$(params.value)"
+            echo "1" | tee $(results.datapoint.path)
+            exit 0
+          fi
+          
+          if [ "$TOTAL_NODECLAIMS_ALL_AZ" -eq 0 ]; then
+            echo "$(date): No nodeclaims found in any availability zone for nodepool $(params.nodepool)"
+          else
+            echo "$(date): Waiting for nodeclaims to no longer have $(params.condition)=$(params.value)..."
+          fi
+        fi
+        
+        echo "$(date): Waiting ${CHECK_INTERVAL} seconds before next check..."
+        sleep $CHECK_INTERVAL
+        done
+      done
+      exit 1

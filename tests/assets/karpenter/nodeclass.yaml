@@ -1,0 +1,60 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  amiFamily: Custom
+  instanceProfile: "KarpenterNodeInstanceProfile-${CLUSTER_NAME}"
+  amiSelectorTerms:
+    - alias: "al2023@${ALIAS_VERSION}"
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${CLUSTER_NAME}"
+    - tags:
+        aws:cloudformation:stack-name: "${CLUSTER_NAME}"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${CLUSTER_NAME}"
+    - tags:
+        aws:cloudformation:stack-name: "${CLUSTER_NAME}"
+    - tags:
+        kubernetes.io/cluster/${CLUSTER_NAME}: owned
+  kubelet:
+    maxPods: 110
+    systemReserved:
+      cpu: 100m
+      memory: 100Mi
+      ephemeral-storage: 1Gi
+    kubeReserved:
+      cpu: 100m
+      memory: 100Mi
+      ephemeral-storage: 1Gi
+    evictionHard:
+      memory.available: 5%
+      nodefs.available: 10%
+      nodefs.inodesFree: 10%
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="BOUNDARY"
+
+    --BOUNDARY
+    Content-Type: application/node.eks.aws
+
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      cluster:
+        name: ${CLUSTER_NAME}
+        apiServerEndpoint: ${CLUSTER_ENDPOINT}  # Using the actual cluster endpoint
+        certificateAuthority: ${CLUSTER_CA}
+        cidr: "172.20.0.0/16"
+      kubelet:
+        config:
+          nodeStatusReportFrequency: "60m"
+          nodeLeaseDurationSeconds: 60
+          maxPods: 110
+          clusterDNS: ["172.20.0.10"]
+        flags:
+          - --node-labels=karpenter.sh/capacity-type=on-demand,karpenter.sh/nodepool=titan-pool
+          - --register-with-taints=karpenter.sh/unregistered:NoExecute
+    --BOUNDARY--

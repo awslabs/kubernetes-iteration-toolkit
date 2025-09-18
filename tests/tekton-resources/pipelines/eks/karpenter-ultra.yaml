@@ -1,0 +1,381 @@
+kind: Pipeline
+apiVersion: tekton.dev/v1
+metadata:
+  name: derekff-karpenter-testing
+  namespace: scalability
+spec:
+  params:
+  - name: cluster-name
+    type: string
+  - default: ""
+    name: endpoint
+    type: string
+  - default: "5000"
+    name: desired-nodes
+    type: string
+  - default: "30"
+    name: pods-per-node
+    type: string
+  - default: "100"
+    name: nodes-per-namespace
+    type: string
+  - default: "50"
+    name: cl2-load-test-throughput
+    type: string
+  - default: kit-eks-scalability/kit-eks-5k/etcd/$(date +%s)
+    name: results-bucket
+    type: string
+  - default: ""
+    type: string
+  - default: 'You can monitor here - https://experimental.scalability.eks.aws.dev/#/namespaces/scalability/pipelineruns/
+      ;5k node '
+    name: slack-message
+    type: string
+  - default: ""
+    name: amp-workspace-id
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/amazon-eks-vpc.json
+    name: vpc-cfn-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template.json
+    name: ng-cfn-url
+    type: string
+  - name: kubernetes-version
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_service_role.json
+    name: service-role-cfn-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_role.json
+    name: node-role-cfn-url
+    type: string
+  - name: manifest-id
+    type: string
+  - default: ""
+    name: eksadm-s3-path
+    type: string
+  - default: 1.8.0
+    name: karpenter-version
+    type: string
+  - default: karpenter
+    name: karpenter-namespace
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/karpenter/node-role-policy-document.json
+    name: karpenter-node-role-policy-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/karpenter/controller-role-policy-document.json
+    name: karpenter-controller-role-policy-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/karpenter/controller-role-trust-policy-document.json
+    name: karpenter-controller-role-trust-policy-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/nodeclass.yaml
+    name: karpenter-ec2nodeclass-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/nodepool.yaml
+    name: karpenter-nodepool-url
+    type: string
+  - default: ""
+    name: karpenter-ecr-repo
+    type: string
+  - default: ""
+    name: aws-account-id
+    type: string
+  tasks:
+  - name: awscli-vpc-create
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)
+    - name: vpc-cfn-url
+      value: "$(params.vpc-cfn-url)"
+    taskRef:
+      kind: Task
+      name:  awscli-vpc-create
+  - name: create-cluster-service-role
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)-service-role
+    - name: role-cfn-url
+      value: $(params.service-role-cfn-url)
+    - name: role-name
+      value: "$(params.cluster-name)-service-role"
+    taskRef:
+      kind: Task
+      name: awscli-role-create
+  - name: create-cluster-node-role
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)-node-role
+    - name: role-cfn-url
+      value: $(params.node-role-cfn-url)
+    - name: role-name
+      value: "$(params.cluster-name)-node-role"
+    taskRef:
+      kind: Task
+      name: awscli-role-create
+  - name: create-eks-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: service-role-name
+      value: $(params.cluster-name)-service-role
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: vpc-stack-name
+      value: $(params.cluster-name)
+    - name: manifest-id
+      value: $(params.manifest-id)
+    - name: eksadm-s3-path
+      value: $(params.eksadm-s3-path)
+    - name: kubernetes-version
+      value: $(params.kubernetes-version)
+    retries: 3
+    runAfter:
+    - create-cluster-node-role
+    - create-cluster-service-role
+    - awscli-vpc-create
+    taskRef:
+      kind: Task
+      name: awscli-eks-cluster-create-with-vpc-stack
+    workspaces:
+    - name: config
+      workspace: config
+  - name: create-karpenter-controller-role
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: aws-account-id
+      value: $(params.aws-account-id)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-controller-role-policy-url
+      value: $(params.karpenter-controller-role-policy-url)
+    - name: karpenter-controller-role-trust-policy-url
+      value: $(params.karpenter-controller-role-trust-policy-url) 
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-controller-role
+  - name: create-karpenter-mng
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: aws-account-id
+      value: $(params.aws-account-id)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-mng
+  - name: create-karpenter-cfn
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: karpenter-version
+      value: $(params.karpenter-version)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: account-id
+      value: $(params.aws-account-id)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-karpenter-cfn-stack
+  - name: helm-install-karpenter
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: karpenter-version
+      value: $(params.karpenter-version)
+    - name: aws-account-id
+      value: $(params.aws-account-id)
+    - name: karpenter-ecr-repo
+      value: $(params.karpenter-ecr-repo)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-karpenter-cfn
+    - create-karpenter-mng
+    - create-karpenter-controller-role
+    - awscli-instance-profile
+    taskRef:
+      kind: Task
+      name: helm-karpenter-install
+  - name: get-karp-logs
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - helm-install-karpenter
+    taskRef:
+      kind: Task
+      name: kubectl-get-karpenter-logs
+  - name: awscli-instance-profile
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    runAfter:
+    - create-karpenter-cfn
+    - create-karpenter-mng
+    taskRef:
+      kind: Task
+      name: awscli-instanceprofiles
+  - name: create-nodeclass
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodeclass-url
+      value: $(params.karpenter-ec2nodeclass-url)
+    runAfter:
+    - helm-install-karpenter
+    taskRef:
+      kind: Task
+      name: create-ec2nodeclass
+  - name: create-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodepool-url
+      value: $(params.karpenter-nodepool-url)
+    runAfter:
+    - helm-install-karpenter
+    taskRef:
+      kind: Task
+      name: create-nodepool
+  - name: scale-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 100
+    - name: nodepool
+      value: $(params.cluster-name)
+    runAfter:
+    - create-nodepools
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 100
+    - name: nodepool
+      value: $(params.cluster-name)
+    runAfter:
+    - scale-nodepools
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: drift
+    params:
+    - name: nodepool
+      value: $(params.cluster-name)
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - wait-for-scale
+    taskRef:
+      kind: Task
+      name: drift-nodepool
+  - name: wait-for-drift
+    params:
+    - name: nodepool
+      value: $(params.cluster-name)
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: value
+      value: "True"
+    - name: condition
+      value: Drifted
+    - name: presence
+      value: false
+    runAfter:
+     - drift
+    taskRef:
+      kind: Task
+      name: nodepool-condition-wait
+  - name: scale-down
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: nodepool
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    runAfter:
+    - wait-for-drift
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-down
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    - name: nodepool
+      value: $(params.cluster-name)
+    runAfter:
+    - scale-down
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: uninstall-karpenter
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - wait-for-scale-down
+    taskRef:
+      kind: Task
+      name: helm-karpenter-uninstall
+  finally:    
+  - name: teardown
+    retries: 10 # To deal with throttling during deletion
+    params:   
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: slack-hook
+      value: $(params.slack-hook)
+    - name: slack-message
+      value: "$(params.slack-message) job completed"
+    - name: service-role-stack-name
+      value: $(params.cluster-name)-service-role
+    - name: node-role-stack-name
+      value: $(params.cluster-name)-node-role
+    - name: launch-template-stack-name
+      value: $(params.cluster-name)-launch-template
+    taskRef:
+      kind: Task
+      name:  awscli-eks-karpenter-cluster-teardown
+  workspaces:
+  - name: source
+  - name: results
+  - name: config

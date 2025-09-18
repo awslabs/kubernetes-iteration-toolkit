@@ -1,0 +1,136 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: helm-karpenter-install
+  namespace: scalability
+spec:
+  description: |
+    Installs Karpenter on an EKS cluster using Helm.
+    This task authenticates with ECR, configures kubectl, validates cluster state,
+    and installs Karpenter with optimized settings for large-scale workloads.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster where Karpenter will be installed
+  - name: aws-account-id
+    description: AWS account ID for IAM role ARN construction
+  - name: karpenter-ecr-repo
+    description: ECR repository URL containing the Karpenter Helm chart
+  - name: karpenter-version
+    description: Version of Karpenter to install (e.g., v0.32.0)
+  - name: endpoint
+    description: EKS cluster endpoint URL for kubectl configuration
+  workspaces:
+  - name: config
+  steps:
+  - name: install-karpenter
+    image: alpine/k8s:1.30.2
+    script: |
+      echo "Starting Karpenter Installation Task"
+      echo "===================================="
+
+      # Authenticate with ECR for Helm registry access
+      echo "[INFO] Authenticating with ECR registry..."
+      aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin $(params.karpenter-ecr-repo)
+      echo "[SUCCESS] Successfully authenticated with ECR"
+      echo ""
+
+      # Configure kubectl to connect to the EKS cluster
+      echo "[INFO] Configuring kubectl for cluster access..."
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      echo "[SUCCESS] Successfully configured kubectl"
+      echo ""
+
+      # Verify karpenter-system nodegroup exists
+      echo "[INFO] Verifying karpenter-system nodegroup..."
+      aws eks describe-nodegroup --cluster-name $(params.cluster-name) --endpoint $(params.endpoint) --nodegroup-name karpenter-system-large
+      echo ""
+      
+      # Capture cluster state before installation for troubleshooting
+      echo "[INFO] Capturing cluster state before Karpenter installation..."
+      echo "----------------------------------------"
+      
+      echo "[INFO] Current cluster nodes:"
+      kubectl get nodes -o wide
+      echo ""
+      
+      echo "[INFO] Current pods across all namespaces:"
+      kubectl get pods -A -o wide
+      echo ""
+
+      echo "[INFO] Current deployments across all namespaces:"
+      kubectl get deployments -A -o wide
+      echo "----------------------------------------"
+      echo ""
+      
+      # Install Karpenter using Helm with optimized configuration
+      echo "[INFO] Installing Karpenter with Helm..."
+      echo ""
+      
+      helm upgrade --install karpenter oci://$(params.karpenter-ecr-repo)/karpenter/karpenter --version $(params.karpenter-version) \
+        --namespace "karpenter" \
+        --create-namespace \
+        --set "settings.clusterName=$(params.cluster-name)" \
+        --set "settings.interruptionQueue=" \
+        --set "settings.eksControlPlane=true" \
+        --set-string "settings.awsCreateQPS=60" \
+        --set "settings.featureGates.disableMetricsControllers=true" \
+        --set "settings.featureGates.nodeRepair=true" \
+        --set settings.featureGates.reservedCapacity="true" \
+        --set settings.featureGates.spotToSpotConsolidation="true" \
+        --set settings.featureGates.disableMetricsControllers="true" \
+        --set settings.preferencePolicy=Ignore \
+        --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=arn:aws:iam::$(params.aws-account-id):role/KarpenterControllerRole-$(params.cluster-name)" \
+        --set controller.resources.requests.cpu=60 \
+        --set controller.resources.requests.memory=200Gi \
+        --set controller.resources.limits.cpu=60 \
+        --set controller.resources.limits.memory=200Gi \
+        --set "controller.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key=dedicated" \
+        --set "controller.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator=In" \
+        --set "controller.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]=karpenter" \
+        --set "tolerations[0].key=dedicated" \
+        --set "tolerations[0].value=karpenter" \
+        --set "tolerations[0].operator=Equal" \
+        --set "dnsPolicy=Default" \
+        --set-string "controller.env[0].name=AWS_ENDPOINT_URL_EKS" \
+        --set-string "controller.env[0].value=$(params.endpoint)" \
+        --set-string "controller.env[1].name=KUBE_CLIENT_QPS" \
+        --set-string "controller.env[1].value=50000" \
+        --set-string "controller.env[2].name=KUBE_CLIENT_BURST" \
+        --set-string "controller.env[2].value=50000" \
+        --set-string "controller.env[3].name=ENABLE_PROFILING" \
+        --set-string "controller.env[3].value=true" \
+        --timeout 100m \
+        --debug \
+        --wait
+
+      echo ""
+      echo "[SUCCESS] Karpenter installation completed"
+      echo ""
+
+      # Verify the installation
+      echo "[INFO] Verifying Karpenter installation..."
+      echo "========================================="
+      
+      KARPENTER_PODS=$(kubectl get pods -n karpenter --no-headers 2>/dev/null | wc -l)
+      echo "[SUCCESS] Found $KARPENTER_PODS Karpenter pod(s) in the cluster"
+      echo ""
+      
+      echo "[INFO] Current Karpenter pod status:"
+      kubectl get pods -n karpenter -o wide
+      echo ""
+
+      echo "[INFO] Current Karpenter pod detailed:"
+      kubectl get pods -n karpenter -o yaml
+      echo ""
+      
+      echo "[INFO] Karpenter deployment details:"
+      kubectl get deployment -n karpenter -o wide
+      echo ""
+
+      echo "[INFO] Karpenter deployment details:"
+      kubectl get deployment -n karpenter -o yaml
+      echo ""
+      
+      echo "========================================="
+      echo "Karpenter Installation Completed"
+      echo "========================================="

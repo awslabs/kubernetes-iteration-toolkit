@@ -1,0 +1,93 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-mng
+  namespace: scalability
+spec:
+  description: |
+    Creates a dedicated Karpenter managed node group (MNG) for the EKS cluster.
+    This task creates a large-capacity node group specifically designed to host Karpenter
+    system components with appropriate taints and labels to ensure proper scheduling.
+    The node group uses r5.24xlarge instances with dedicated=karpenter taints.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster where the Karpenter MNG will be created
+  - name: aws-account-id
+    description: AWS account ID used to construct the node role ARN
+  - name: endpoint
+    description: EKS cluster endpoint URL for AWS EKS CLI operations
+  - name: region
+    default: "us-west-2"
+    description: AWS region where the EKS cluster is located
+  steps:
+  - name: create-mng
+    image: alpine/k8s:1.30.2
+    script: |
+      echo "Starting Karpenter Managed Node Group Creation"
+
+      # Discover subnets associated with the cluster
+      echo "[INFO] Discovering subnets for cluster $(params.cluster-name)..."
+      SUBNET_IDS=$(aws ec2 describe-subnets \
+          --filters "Name=tag:aws:cloudformation:stack-name,Values=$(params.cluster-name)" \
+          --query 'Subnets[*].SubnetId' \
+          --output text \
+          --region $(params.region))
+      echo "[INFO] Discovered Subnets: $SUBNET_IDS"
+
+      # Create the Karpenter managed node group
+      echo "[INFO] Creating Karpenter managed node group..."
+      echo ""
+      
+      aws eks create-nodegroup \
+          --cluster-name $(params.cluster-name) \
+          --nodegroup-name karpenter-system-large \
+          --node-role arn:aws:iam::$(params.aws-account-id):role/$(params.cluster-name)-node-role \
+          --instance-types r5.24xlarge \
+          --scaling-config minSize=2,maxSize=3,desiredSize=2 \
+          --subnets ${SUBNET_IDS} \
+          --labels dedicated=karpenter \
+          --region $(params.region) \
+          --endpoint-url $(params.endpoint) \
+          --taints key=dedicated,value=karpenter,effect=NO_SCHEDULE
+
+      # Verify the node group was created and list all node groups
+      echo "[INFO] Verifying node group creation..."
+      echo "======================================"
+      
+      NODE_GROUPS=$(aws eks list-nodegroups \
+        --endpoint-url $(params.endpoint) \
+        --cluster-name $(params.cluster-name) \
+        --region $(params.region) \
+        --query 'nodegroups' \
+        --output text)
+      
+      if [ -z "$NODE_GROUPS" ]; then
+        echo "[WARNING] No node groups found in cluster"
+      else
+        NODE_GROUP_COUNT=$(echo $NODE_GROUPS | wc -w)
+        echo "[SUCCESS] Found $NODE_GROUP_COUNT node group(s) in cluster:"
+        echo "$NODE_GROUPS" | tr ' ' '\n' | sed 's/^/  - /'
+      fi
+      echo ""
+
+      # Display detailed information about the Karpenter node group
+      echo "[INFO] Retrieving Karpenter node group details..."
+      aws eks describe-nodegroup \
+        --cluster-name $(params.cluster-name) \
+        --nodegroup-name karpenter-system-large \
+        --region $(params.region) \
+        --endpoint-url $(params.endpoint) \
+        --query '{
+          Status: nodegroup.status,
+          InstanceTypes: nodegroup.instanceTypes,
+          ScalingConfig: nodegroup.scalingConfig,
+          Labels: nodegroup.labels,
+          Taints: nodegroup.taints,
+          SubnetIds: nodegroup.subnets
+        }' \
+        --output table
+      echo ""
+      
+      echo "=============================================="
+      echo "Karpenter Managed Node Group Creation Complete"
+      echo "=============================================="

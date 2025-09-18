@@ -1,0 +1,31 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-instanceprofiles
+  namespace: scalability
+spec:
+  description: |
+    Creates the karpenter instance profile
+  params:
+  - name: cluster-name
+    description: The name of the cluster
+  steps:
+  - name: create-role
+    image: alpine/k8s:1.30.2
+    script: |
+      # Check if the instance profile already exists
+      if aws iam get-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)" >/dev/null 2>&1; then
+        echo "Instance profile KarpenterNodeInstanceProfile-$(params.cluster-name) already exists. Skipping creation..."
+      else
+        echo "Creating instance profile KarpenterNodeInstanceProfile-$(params.cluster-name)..."
+        aws iam create-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)"
+      fi
+      
+      # Check if the role is already added to the instance profile
+      EXISTING_ROLES=$(aws iam get-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)" --query 'InstanceProfile.Roles[?RoleName==`KarpenterNodeRole-$(params.cluster-name)`].RoleName' --output text)
+      if [ -n "$EXISTING_ROLES" ]; then
+        echo "Role KarpenterNodeRole-$(params.cluster-name) is already attached to instance profile. Skipping..."
+      else
+        echo "Adding role KarpenterNodeRole-$(params.cluster-name) to instance profile..."
+        aws iam add-role-to-instance-profile --instance-profile-name "KarpenterNodeInstanceProfile-$(params.cluster-name)" --role-name "KarpenterNodeRole-$(params.cluster-name)"
+      fi

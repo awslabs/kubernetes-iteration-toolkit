@@ -1,0 +1,86 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: drift-nodepool
+  namespace: scalability
+spec:
+  description: |
+    Triggers Karpenter nodepool drift by modifying nodepool template labels.
+    This task connects to an EKS cluster, captures the current nodepool state,
+    applies a label change to force node replacement, and verifies the drift operation.
+    The drift process causes Karpenter to replace existing nodes with new ones
+    that match the updated nodepool template specification.
+    DOES NOT CHECK TO SEE IF ALL NODES SUCESSFULLY DRIFT. Use kubectl-nodepool-condition-wait.yaml for that
+  params:
+  - name: nodepool
+    description: Name of the Karpenter nodepool to drift (must exist in cluster)
+  - name: cluster-name
+    description: The name of the EKS cluster containing the target nodepool
+  - name: endpoint
+    description: EKS cluster endpoint URL for kubectl configuration
+  - name: aws-region
+    description: AWS region where the cluster is located (used for AZ discovery)
+    default: us-west-2
+  - name: label-key
+    description: Label key to add/modify in the nodepool template
+    default: myLabel
+  - name: label-val
+    description: Label value to set for the specified label key
+    default: myValue
+  steps:
+  - name: drift-nodepool
+    image: alpine/k8s:1.30.2
+    script: |
+      echo "Starting Nodepool Drift Operation"
+      echo "================================="
+
+      # Configure kubectl to connect to the EKS cluster
+      echo "[INFO] Configuring kubectl for cluster access..."
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      echo "[SUCCESS] Successfully configured kubectl"
+      echo ""
+
+      # Get list of availability zones
+      AZ_LIST=$(aws ec2 describe-availability-zones --region $(params.aws-region) --query 'AvailabilityZones[].ZoneName' --output json | jq -r '.[]')
+      AZ_COUNT=$(echo "$AZ_LIST" | wc -l)
+      
+      echo "[INFO] Found $AZ_COUNT availability zones:"
+      echo "$AZ_LIST" | sed 's/^/  - /'
+      echo ""
+
+      # Capture cluster state before drift operation
+      echo "[INFO] Capturing cluster state before nodepool drift..."
+      echo "-----------------------------------------------------"
+      
+      echo "[INFO] Current cluster nodes:"
+      kubectl get nodes -l karpenter.sh/nodepool=$(params.nodepool) -o wide --show-labels
+      echo ""
+      
+      echo "[INFO] Current nodepool configuration:"
+      kubectl get nodepool -o yaml
+      echo ""
+
+      echo "$AZ_LIST" | while read -r az; do 
+        export AZ=$az
+        # Apply the drift-inducing label change to the nodepool
+        echo "[INFO] Applying label change to trigger nodepool drift..."
+        echo "[INFO] Patching nodepool $(params.nodepool)-${az} with label $(params.label-key)=$(params.label-val)"
+        
+        kubectl patch nodepool $(params.nodepool)-${az} --type='merge' --patch='{"spec": {"template": {"metadata": {"labels": {"$(params.label-key)": "$(params.label-val)"}}}}}'
+        
+        echo "[SUCCESS] Successfully patched nodepool $(params.nodepool)-${az}"
+        echo ""
+
+        # Verify the drift operation was applied
+        echo "[INFO] Verifying nodepool drift configuration..."
+        echo "==============================================="
+        
+        echo "[INFO] Updated nodepool configuration:"
+        kubectl get nodepool $(params.nodepool)-${az} -o yaml
+        echo ""
+      done
+      
+      echo "==============================================="
+      echo "[SUCCESS] Nodepool drift operation completed"
+      echo "[INFO] Karpenter will now begin replacing nodes to match the new template"
+      echo "==============================================="

@@ -1,0 +1,93 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: scale-nodepool
+  namespace: scalability
+spec:
+  description: |
+    Scales a Karpenter nodepool by modifying the number of replicas.
+    This task configures kubectl access to the EKS cluster, captures the current
+    cluster state for monitoring purposes, performs the scaling operation,
+    and verifies the scaling request was applied successfully.
+    DOES NOT CHECK TO SEE IF ALL NODES HAVE GONE READY. Use kubectl-nodepool-replicas-wait.yaml for that
+  params:
+  - name: replicas
+    description: Number of replicas to scale the nodepool to (target replica count)
+  - name: nodepool
+    description: Name of the Karpenter nodepool resource to scale
+  - name: cluster-name
+    description: The name of the EKS cluster containing the nodepool
+  - name: endpoint
+    description: EKS cluster endpoint URL for kubectl configuration
+  - name: aws-region
+    description: AWS region where the cluster is located (used for AZ discovery)
+    default: us-west-2
+  steps:
+  - name: scale-nodepool
+    image: alpine/k8s:1.30.2
+    script: |
+      echo "Starting Nodepool Scaling Task"
+      echo "=============================="
+
+      # Configure kubectl to connect to the EKS cluster
+      echo "[INFO] Configuring kubectl for cluster access..."
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      echo "[SUCCESS] Successfully configured kubectl"
+      echo ""
+
+      # Discover availability zones and scale nodepools
+      echo ""
+      echo "[INFO] Discovering availability zones in region: $(params.aws-region)"
+      
+      # Get list of availability zones
+      AZ_LIST=$(aws ec2 describe-availability-zones --region $(params.aws-region) --query 'AvailabilityZones[].ZoneName' --output json | jq -r '.[]')
+      AZ_COUNT=$(echo "$AZ_LIST" | wc -l)
+      
+      echo "[INFO] Found $AZ_COUNT availability zones:"
+      echo "$AZ_LIST" | sed 's/^/  - /'
+      echo ""
+
+      # Capture current cluster state before scaling operation
+      echo "[INFO] Capturing cluster state before scaling operation..."
+      echo "--------------------------------------------------------"
+      
+      echo "[INFO] Current nodepool status:"
+      kubectl get nodepools -o wide
+      echo ""
+
+      # Process each availability zone
+      NODEPOOL_COUNT=0
+      echo "$AZ_LIST" | while read -r az; do 
+        export AZ=$az
+
+        echo "[INFO] Current nodepool $(params.nodepool) detailed status:"
+        kubectl get nodepool $(params.nodepool)-${az} -o yaml
+        echo ""
+        
+        echo "[INFO] Current nodepool nodes:"
+        kubectl get nodes -l karpenter.sh/nodepool=$(params.nodepool)-${az} -o wide
+        echo ""
+
+        # Perform the scaling operation
+        echo "[INFO] Scaling nodepool $(params.nodepool)-${az} to $(params.replicas) replicas..."
+        kubectl scale nodepool $(params.nodepool)-${az} --replicas $(params.replicas)
+        echo "[SUCCESS] Scaling command executed successfully"
+        echo ""
+
+        echo "[INFO] Updated nodepool $(params.nodepool) detailed status:"
+        kubectl get nodepool $(params.nodepool)-${az} -o yaml
+        echo ""
+      done
+
+
+      # Verify the scaling operation was applied
+      echo "[INFO] Verifying scaling operation results..."
+      echo "============================================="
+      
+      echo "[INFO] Updated nodepool status:"
+      kubectl get nodepools -o wide
+      echo ""
+      
+      echo "============================================="
+      echo "Nodepool Scaling Operation Begun"
+      echo "============================================="

@@ -1,0 +1,85 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-ec2nodeclass
+  namespace: scalability
+spec:
+  description: |
+    Creates and applies an EC2NodeClass resource for Karpenter node provisioning.
+    This task retrieves cluster configuration, downloads a nodeclass template,
+    substitutes environment variables, and applies the configuration to the cluster.
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster where the EC2NodeClass will be created
+  - name: endpoint
+    description: The AWS EKS API endpoint URL to use for cluster operations
+  - name: karpenter-nodeclass-url
+    description: The URL of the EC2NodeClass YAML template to download and apply
+  workspaces:
+  - name: source
+    mountPath: /src/karpenter/
+    description: Workspace for storing downloaded and processed nodeclass files
+  steps:
+  - name: create-ec2nodeclass
+    image: alpine/k8s:1.30.2
+    script: | 
+      echo "Starting EC2NodeClass creation process for cluster: $(params.cluster-name)"
+      
+      # Retrieve cluster certificate authority data for node authentication
+      echo "Fetching cluster certificate authority data..."
+      export CLUSTER_CA=$(aws eks describe-cluster \
+          --name $(params.cluster-name) \
+          --endpoint-url $(params.endpoint) \
+          --query 'cluster.certificateAuthority.data' \
+          --output text)
+      echo "Successfully retrieved cluster CA data"
+
+      # Retrieve cluster API endpoint for node communication
+      echo "Fetching cluster API endpoint..."
+      export CLUSTER_ENDPOINT=$(aws eks describe-cluster \
+          --name $(params.cluster-name) \
+          --endpoint-url $(params.endpoint) \
+          --query 'cluster.endpoint' \
+          --output text)
+      echo "Cluster endpoint retrieved: ${CLUSTER_ENDPOINT}"
+
+      # Set cluster name for template substitution
+      export CLUSTER_NAME=$(params.cluster-name)
+      echo "Using cluster name: ${CLUSTER_NAME}"
+
+      # Set AMI alias version for node instances
+      export ALIAS_VERSION=latest
+      echo "Using AMI alias version: ${ALIAS_VERSION}"
+
+      # Download the EC2NodeClass template from the specified URL
+      echo "Downloading EC2NodeClass template from: $(params.karpenter-nodeclass-url)"
+      curl -fsSL $(params.karpenter-nodeclass-url) -o $(workspaces.source.path)ec2nodeclass.yaml
+      echo "Template downloaded successfully to $(workspaces.source.path)ec2nodeclass.yaml"
+
+      # Display the original template for verification
+      echo "Original EC2NodeClass template content:"
+      cat $(workspaces.source.path)ec2nodeclass.yaml
+
+      # Substitute environment variables in the template
+      echo "Performing environment variable substitution in template..."
+      envsubst < $(workspaces.source.path)ec2nodeclass.yaml > $(workspaces.source.path)ec2nodeclass-modified.yaml
+      echo "Environment variable substitution completed"
+
+      # Display the processed template with substituted values
+      echo "Processed EC2NodeClass configuration:"
+      cat $(workspaces.source.path)ec2nodeclass-modified.yaml
+
+      # Update kubeconfig to authenticate with the target cluster
+      echo "Updating kubeconfig for cluster access..."
+      aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
+      echo "Kubeconfig updated successfully"
+      
+      # Apply the EC2NodeClass configuration to the cluster
+      echo "Applying EC2NodeClass configuration to cluster..."
+      kubectl apply -f $(workspaces.source.path)ec2nodeclass-modified.yaml
+      echo "EC2NodeClass applied successfully"
+
+      # Verify the EC2NodeClass was created and display its configuration
+      echo "Retrieving and displaying created EC2NodeClass resources:"
+      kubectl get ec2nodeclass -o yaml
+      echo "EC2NodeClass creation process completed successfully"
