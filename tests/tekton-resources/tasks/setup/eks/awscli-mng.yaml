@@ -72,7 +72,11 @@ spec:
       create_and_validate_dp_nodes()
       {
         node_group_name=$node_group-$1
-        launch_template_name=$(params.cluster-name)-launchTemplate
+        # by default assume <cluster-name>-launchTemplate convention
+        launch_template_name="$(params.cluster-name)-launchTemplate"
+        if [ -n "$(params.launch-template-name)" ]; then
+          launch_template_name="$(params.launch-template-name)"
+        fi
         CREATED_NODEGROUP=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-nodegroups --cluster-name $(params.cluster-name)  --query 'nodegroups[?@==`'$node_group_name'`]' --output text)
         EC2_INSTANCES=$3
         if [ "$CREATED_NODEGROUP" == "" ]; then
