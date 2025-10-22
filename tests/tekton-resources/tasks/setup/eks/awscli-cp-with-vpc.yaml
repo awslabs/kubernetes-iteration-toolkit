@@ -25,7 +25,7 @@ spec:
   - name: vpc-stack-name
     description: The name of the VPC name you want to use for EKS cluster.
   - name: aws-ebs-csi-driver-version
-    default: release-1.13
+    default: release-1.51
     description: The release version for aws ebs csi driver.
   - name: aws-pod-identity-agent-version
     default: v1.3.9-eksbuild.1
