@@ -9,7 +9,7 @@ spec:
   params:
   - name: giturl
     description: "git url to clone the package"
-    default: https://github.com/mengqiy/perf-tests.git
+    default: https://github.com/kubernetes/perf-tests.git
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
     default: "master"
@@ -152,7 +152,7 @@ spec:
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
       GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
   - name: run-loadtest
-    image: alpine/k8s:1.30.2
+    image: alpine/k8s:1.33.5
     onError: continue
     script: |
       #!/bin/bash
