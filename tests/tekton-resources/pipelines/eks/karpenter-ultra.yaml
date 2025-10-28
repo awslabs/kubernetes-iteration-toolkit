@@ -80,6 +80,8 @@ spec:
   - default: ""
     name: aws-account-id
     type: string
+  - default: ""
+    name: slack-hook
   tasks:
   - name: awscli-vpc-create
     params:
