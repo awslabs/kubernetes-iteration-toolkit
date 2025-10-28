@@ -90,7 +90,6 @@ spec:
         
         echo "$(date): Not all availability zones have reached target replicas. Waiting ${CHECK_INTERVAL} seconds before next check..."
 
-      done
         sleep $CHECK_INTERVAL
       done
 
