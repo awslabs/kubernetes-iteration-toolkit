@@ -1,0 +1,115 @@
+# AI/ML Workload test configuration using Kubernetes Jobs
+# This test creates X number of Jobs with AI/ML workload pods, scaling in batches by updating parallelism.
+
+{{$NAMESPACE := DefaultParam .NAMESPACE "aiml-test"}}
+{{$JOBS_COUNT := DefaultParam .JOBS_COUNT 10}}
+{{$COMPLETIONS_PER_JOB := DefaultParam .COMPLETIONS_PER_JOB 10100}}
+{{$BATCH_SIZE := DefaultParam .BATCH_SIZE 200}}
+{{$JOB_CREATION_QPS := DefaultParam .JOB_CREATION_QPS 100}}
+{{$SCALING_QPS := DefaultParam .SCALING_QPS 100}}
+{{$JOB_COMPLETION_TIMEOUT := DefaultParam .JOB_COMPLETION_TIMEOUT "45m"}}
+{{$CREATION_TIMEOUT := DefaultParam .CREATION_TIMEOUT "51m"}}
+{{$REQUEST_CPU := DefaultParam .REQUEST_CPU "1000m"}}
+{{$REQUEST_MEMORY := DefaultParam .REQUEST_MEMORY "128Mi"}}
+{{$LIMIT_CPU := DefaultParam .LIMIT_CPU "1500m"}}
+{{$LIMIT_MEMORY := DefaultParam .LIMIT_MEMORY "512Mi"}}
+{{$CLUSTER_NAME := DefaultParam .CLUSTER_NAME "perflab-titan-1"}}
+{{$defaultQps := DefaultParam .CL2_DEFAULT_QPS  500}}
+{{$defaultBurst := DefaultParam .CL2_DEFAULT_BURST 500}}
+{{$SLEEP_DURATION := DefaultParam .SLEEP_DURATION 2}}
+
+name: aws-mock-aiml-application-large-jobs
+
+tuningSets:
+- name: JobCreationQPS
+  qpsLoad:
+    qps: {{$JOB_CREATION_QPS}}
+- name: ScalingQPS
+  qpsLoad:
+    qps: {{$SCALING_QPS}}
+- name: default
+  globalQPSLoad:
+    qps: {{$defaultQps}}
+    burst: {{$defaultBurst}}
+
+steps:
+- name: Starting measurements
+  measurements:
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: start
+      labelSelector: app = aiml-training-job
+      threshold: 5s
+  - Identifier: WaitForRunningJobs
+    Method: WaitForControlledPodsRunning
+    Params:
+      action: start
+      apiVersion: batch/v1
+      kind: Job
+      labelSelector: app = aiml-training-job
+      operationTimeout: {{$CREATION_TIMEOUT}}
+
+- name: Creating Jobs with initial parallelism
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+      basename: {{$NAMESPACE}}
+    replicasPerNamespace: {{$JOBS_COUNT}}
+    tuningSet: JobCreationQPS
+    objectBundle:
+    - basename: aiml-training-job
+      objectTemplatePath: job-with-fsx.yaml
+      templateFillMap:
+        Group: aiml-training-job
+        Completions: {{$COMPLETIONS_PER_JOB}}
+        Parallelism: {{$BATCH_SIZE}}
+        RequestCPU: "{{$REQUEST_CPU}}"
+        RequestMemory: "{{$REQUEST_MEMORY}}"
+        LimitCPU: "{{$LIMIT_CPU}}"
+        LimitMemory: "{{$LIMIT_MEMORY}}"
+        ClusterName: "{{$CLUSTER_NAME}}"
+
+{{ $numBatches := SubtractInt (DivideInt $COMPLETIONS_PER_JOB $BATCH_SIZE) 1 }}
+{{range $batch := Loop $numBatches}}
+- name: Scaling Jobs batch {{AddInt $batch 2}}
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+      basename: {{$NAMESPACE}}
+    replicasPerNamespace: {{$JOBS_COUNT}}
+    tuningSet: ScalingQPS
+    objectBundle:
+    - basename: aiml-training-job
+      objectTemplatePath: job-with-fsx.yaml
+      updateFromTemplate: true
+      templateFillMap:
+        Group: aiml-training-job
+        Completions: {{$COMPLETIONS_PER_JOB}}  
+        Parallelism: {{MultiplyInt $BATCH_SIZE (AddInt $batch 2)}}
+        RequestCPU: "{{$REQUEST_CPU}}"
+        RequestMemory: "{{$REQUEST_MEMORY}}"
+        LimitCPU: "{{$LIMIT_CPU}}"
+        LimitMemory: "{{$LIMIT_MEMORY}}"
+        ClusterName: "{{$CLUSTER_NAME}}"
+- name: Sleep after scaling batch {{AddInt $batch 2}}
+  measurements:
+  - Identifier: Wait
+    Method: Sleep
+    Params:
+      duration: "{{$SLEEP_DURATION}}s"
+{{end}}
+
+- name: Waiting for Jobs to be ready
+  measurements:
+  - Identifier: WaitForRunningJobs
+    Method: WaitForControlledPodsRunning
+    Params:
+      action: gather
+  - Identifier: PodStartupLatency
+    Method: PodStartupLatency
+    Params:
+      action: gather
+      labelSelector: app = aiml-training-job

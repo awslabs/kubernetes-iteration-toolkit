@@ -1,0 +1,86 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: aiml-training-job-{{.Group}}
+  labels:
+    app: aiml-training-job
+    group: {{.Group}}
+spec:
+  completions: {{.Completions}}
+  parallelism: {{.Parallelism}}
+  backoffLimit: 1000
+  template:
+    metadata:
+      labels:
+        app: aiml-training-job
+        group: {{.Group}}
+    spec:
+      nodeSelector:
+        purpose: ml-large
+      containers:
+      - name: app-with-awsapi
+        image: public.ecr.aws/aws-cli/aws-cli:2.27.49
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: {{.RequestCPU}}
+            memory: {{.RequestMemory}}
+          limits:
+            cpu: {{.LimitCPU}}
+            memory: {{.LimitMemory}}
+        env:
+          - name: CLUSTER_NAME
+            value: "{{.ClusterName}}"
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+        command:
+          - sh
+          - -c
+          - |
+            #ToDo remove this once PIA is compliant with exit criteria
+            sleep 3600 
+            AUTH_TOKEN=$(cat $AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)
+            MAX_ATTEMPTS=7
+
+            echo "Starting credential fetch, S3 verification, and FSx write process..."
+
+            # Fetch credentials from EKS Pod Identity agent with exponential backoff
+            for i in $(seq 0 $((MAX_ATTEMPTS - 1))); do
+              status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 -H "Authorization: $AUTH_TOKEN" http://169.254.170.23/v1/credentials)
+              if [ "$status_code" -eq 200 ]; then
+                echo "Successfully fetched credentials at attempt $i"
+                break
+              fi
+
+              if [ "$i" -eq $((MAX_ATTEMPTS - 1)) ]; then
+                echo "Failed to fetch credentials after $MAX_ATTEMPTS attempts. Exiting."
+                exit 1
+              fi
+              echo "Credential fetch failed."
+              sleep 1
+            done
+
+            # Verify S3 access
+            echo "Verifying S3 access..."
+            while ! aws s3 ls; do
+              echo "Waiting for S3 bucket access..."
+              sleep 5
+            done
+            echo "S3 bucket is accessible, proceeding."
+
+            echo "Operation completed successfully. Keeping pod alive..."
+            # Keep pod alive
+            while true; do
+              echo "Sleeping for 1hr minutes..."
+              sleep 3600
+            done
+        volumeMounts:
+        - name: fsx-volume
+          mountPath: /mnt/fsx
+      restartPolicy: Never
+      volumes:
+      - name: fsx-volume
+        persistentVolumeClaim:
+          claimName: {{.Name}}-bigpvc

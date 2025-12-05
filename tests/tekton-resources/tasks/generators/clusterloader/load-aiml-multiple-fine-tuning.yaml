@@ -1,0 +1,332 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: load-aiml-multiple-fine-tuning
+  namespace: scalability
+spec:
+  description: "clusterloader2 task to run AI/ML multiple fine-tuning workload tests with jobs on a given cluster."
+  params:
+  - name: giturl
+    description: "git url to clone the package"
+    default: https://github.com/kubernetes/perf-tests.git
+  - name: cl2-branch
+    description: "The branch of clusterloader2 you want to use"
+    default: "master"
+  - name: cluster-name
+    description: "The name of the EKS cluster to run tests against"
+  - name: region
+    default: "us-west-2"
+    description: "The region where the cluster is located"
+  - name: namespace-prefix
+    description: "Namespace prefix for the test"
+    default: "aiml-test"
+  - name: namespace-count
+    description: "Number of namespaces to create"
+    default: "1"
+  - name: jobs-count
+    description: "Number of jobs to create"
+    default: "10"
+  - name: completions-per-job
+    description: "Number of completions per job"
+    default: "10000"
+  - name: batch-size
+    description: "Batch size (initial parallelism)"
+    default: "100"
+  - name: job-creation-qps
+    description: "QPS for job creation"
+    default: "10"
+  - name: scaling-qps
+    description: "QPS for scaling operations"
+    default: "200"
+  - name: job-completion-timeout
+    description: "Timeout for job completion"
+    default: "120m"
+  - name: request-cpu
+    description: "CPU request for pods"
+    default: "100m"
+  - name: request-memory
+    description: "Memory request for pods"
+    default: "128Mi"
+  - name: limit-cpu
+    description: "CPU limit for pods"
+    default: "1000m"
+  - name: limit-memory
+    description: "Memory limit for pods"
+    default: "512Mi"
+  - name: cl2-default-qps
+    description: "Default QPS for CL2"
+    default: "500"
+  - name: cl2-default-burst
+    description: "Default burst for CL2"
+    default: "500"
+  - name: endpoint
+    description: "AWS endpoint URL (optional)"
+    default: ""
+  - name: results-bucket
+    description: "Results bucket with path of s3 to upload results"
+  - name: amp-workspace-id
+    description: "The AMP workspace ID where remote write needs to happen"
+    default: ""
+  - name: aiml-test-config-url
+    description: "URL to download the AI/ML test configuration file"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/aiml-workload/medium-batch-jobs/config.yaml"
+  - name: aiml-test-job-spec-url
+    description: "URL to download the Job specification file"
+    default: "https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/aiml-workload/medium-batch-jobs/job-w-fsx.yaml"
+  results:
+    - name: datapoint
+      description: "Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch)"
+    - name: s3_result
+      description: "Stores the S3 result path after compute"
+  workspaces:
+  - name: source
+    mountPath: /src/k8s.io/
+  - name: results
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+  - name: git-clone
+    image: alpine/git
+    workingDir: $(workspaces.source.path)
+    script: |
+      git clone $(params.giturl)
+      cd $(workspaces.source.path)/perf-tests/
+      git fetch origin --verbose --tags
+      git checkout $(params.cl2-branch)
+      git branch
+  - name: prepare-aiml-test
+    image: golang:1.24
+    workingDir: $(workspaces.source.path)
+    script: |
+      S3_RESULT_PATH=$(params.results-bucket)
+      echo $S3_RESULT_PATH > $(results.s3_result.path)
+      echo "S3 Path: $S3_RESULT_PATH"
+      
+      # Create overrides.yaml for AI/ML multiple fine-tuning workload
+      cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
+      NAMESPACE: "$(params.namespace-prefix)"
+      JOBS_COUNT: $(params.jobs-count)
+      COMPLETIONS_PER_JOB: $(params.completions-per-job)
+      BATCH_SIZE: $(params.batch-size)
+      JOB_CREATION_QPS: $(params.job-creation-qps)
+      SCALING_QPS: $(params.scaling-qps)
+      JOB_COMPLETION_TIMEOUT: "$(params.job-completion-timeout)"
+      REQUEST_CPU: "$(params.request-cpu)"
+      REQUEST_MEMORY: "$(params.request-memory)"
+      LIMIT_CPU: "$(params.limit-cpu)"
+      LIMIT_MEMORY: "$(params.limit-memory)"
+      CLUSTER_NAME: "$(params.cluster-name)"
+      EOL
+      
+      cat $(workspaces.source.path)/overrides.yaml
+      cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
+      
+      # Enable Prometheus if the remote workspace id is provided
+      if [ -n "$(params.amp-workspace-id)" ]; then
+        cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/prometheus-prometheus.yaml
+        containers:
+          - name: aws-sigv4-proxy-sidecar
+            image: public.ecr.aws/aws-observability/aws-sigv4-proxy:1.0
+            args:
+              - --name
+              - aps
+              - --region
+              - $(params.region)
+              - --host
+              - aps-workspaces.$(params.region).amazonaws.com
+              - --port
+              - :8005
+            ports:
+              - name: aws-sigv4-proxy
+                containerPort: 8005
+        remoteWrite:
+          - url: http://localhost:8005/workspaces/$(params.amp-workspace-id)/api/v1/remote_write
+            queueConfig:
+              capacity: 2500
+              maxSamplesPerSend: 1000
+              maxShards: 200
+        externalLabels:
+          cluster_name: $(params.cluster-name)
+          s3_path: $S3_RESULT_PATH
+      EOF
+      
+        # Add tolerations to Prometheus Operator deployment
+        cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/0prometheus-operator-deployment.yaml
+        tolerations:
+          - key: monitoring
+            operator: Exists
+            effect: NoSchedule
+      EOF
+      
+        # Add tolerations to kube-state-metrics deployment
+        cat << EOF >> $(workspaces.source.path)/perf-tests/clusterloader2/pkg/prometheus/manifests/exporters/kube-state-metrics/deployment.yaml
+        tolerations:
+          - key: monitoring
+            operator: Exists
+            effect: NoSchedule
+      EOF
+      fi
+      
+      # Building clusterloader2 binary
+      cd $(workspaces.source.path)/perf-tests/clusterloader2/
+      GOOS=linux CGO_ENABLED=0 go build -v -o ./clusterloader ./cmd
+  - name: bootstrap-pod-identity
+    image: amazon/aws-cli
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+      
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+          ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      
+      # Create IAM role for Pod Identity
+      S3_MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+      CLOUDWATCH_MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/CloudWatchFullAccess"
+      PIA_ROLE_NAME=$(params.cluster-name)-pia-role
+      
+      # Create trust policy document
+      cat > /tmp/pia-trust-policy.json <<EOL
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Principal": {
+              "Federated": "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):oidc-provider/$(aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||')"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+              "StringEquals": {
+                "$(aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||'):sub": "system:serviceaccount:\${namespace}:default"
+              }
+            }
+          }
+        ]
+      }
+      EOL
+      
+      # Check if the IAM role already exists
+      if aws iam get-role --role-name $PIA_ROLE_NAME &>/dev/null; then
+        echo "IAM role $PIA_ROLE_NAME already exists, skipping creation."
+      else
+        echo "Creating IAM role $PIA_ROLE_NAME..."
+        aws iam create-role --role-name $PIA_ROLE_NAME --assume-role-policy-document file:///tmp/pia-trust-policy.json
+      fi
+      
+      # Attach policies (idempotent)
+      aws iam attach-role-policy --role-name $PIA_ROLE_NAME --policy-arn $S3_MANAGED_POLICY_ARN
+      aws iam attach-role-policy --role-name $PIA_ROLE_NAME --policy-arn $CLOUDWATCH_MANAGED_POLICY_ARN
+      PIA_ROLE_ARN=$(aws iam get-role --role-name $PIA_ROLE_NAME --query 'Role.Arn' --output text)
+      echo "$PIA_ROLE_ARN is created or reused"
+      
+      # Create namespaces and associate IAM role with each namespace
+      for i in $(seq 1 $(params.namespace-count)); do
+          NS="$(params.namespace-prefix)-$i"
+          
+          # Create namespace if it doesn't exist
+          if ! kubectl get namespace "$NS" &>/dev/null; then
+              echo "Creating namespace $NS..."
+              kubectl create namespace "$NS"
+          else
+              echo "Namespace $NS already exists, skipping creation."
+          fi
+          
+          # Check for existing Pod Identity association
+          EXISTING_ASSOC=$(aws eks $ENDPOINT_FLAG --region $(params.region) list-pod-identity-associations \
+              --cluster-name $(params.cluster-name) \
+              --query "associations[?namespace=='$NS' && serviceAccount=='default'].associationId" \
+              --output text)
+          
+          if [ -n "$EXISTING_ASSOC" ]; then
+              echo "Pod Identity association for namespace $NS already exists (ID: $EXISTING_ASSOC), skipping creation."
+          else
+              echo "Creating Pod Identity association for namespace $NS..."
+              aws eks $ENDPOINT_FLAG --region $(params.region) create-pod-identity-association \
+                  --cluster-name $(params.cluster-name) \
+                  --namespace $NS \
+                  --service-account default \
+                  --role-arn $PIA_ROLE_ARN
+          fi
+      done
+      
+      echo "Waiting for 30 seconds for associations to propagate..."
+      sleep 30
+      echo "PIA bootstrap completed!"
+  - name: run-aiml-loadtest
+    image: alpine/k8s:1.33.5
+    onError: continue
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+      
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+          ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+      
+      # Enable prometheus flags if AMP workspace is provided
+      if [ -n "$(params.amp-workspace-id)" ]; then
+        export ENABLE_PROMETHEUS_SERVER=true
+        export PROMETHEUS_PVC_STORAGE_CLASS=gp2
+        export PROMETHEUS_SCRAPE_KUBE_PROXY=false
+        export PROMETHEUS_SCRAPE_APISERVER_ONLY=true
+        export PROMETHEUS_SCRAPE_KUBE_STATE_METRICS=false
+        export PROMETHEUS_MEMORY_REQUEST=250Gi
+      fi
+      
+      echo "Starting ClusterLoader2 AI/ML Multiple Fine-tuning Application Test"
+      echo "Namespace: $(params.namespace-prefix)"
+      echo "Jobs count: $(params.jobs-count)"
+      echo "Completions per Job: $(params.completions-per-job)"
+      echo "Batch size (initial parallelism): $(params.batch-size)"
+      echo "Total pods to create: $(( $(params.jobs-count) * $(params.completions-per-job) ))"
+      
+      # Prepare AI/ML load test config
+      mkdir -p $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs
+      curl -s $(params.aiml-test-config-url) -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs/config.yaml
+      curl -s $(params.aiml-test-job-spec-url) -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs/job-w-fsx.yaml
+      
+      echo "Downloaded config files:"
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs/config.yaml
+      cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs/job-w-fsx.yaml
+      
+      cd $(workspaces.source.path)/perf-tests/clusterloader2/
+      
+      # Run ClusterLoader2 with AI/ML multiple fine-tuning config
+      ENABLE_EXEC_SERVICE=false ./clusterloader \
+        --kubeconfig=$KUBECONFIG \
+        --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs/config.yaml \
+        --testoverrides=$(workspaces.source.path)/overrides.yaml \
+        --provider=eks \
+        --report-dir=$(workspaces.results.path) \
+        --alsologtostderr \
+        --v=2
+      
+      exit_code=$?
+      if [ $exit_code -eq 0 ]; then
+        echo "1" | tee $(results.datapoint.path)
+      else
+        echo "0" | tee $(results.datapoint.path)
+      fi
+      exit $exit_code
+    timeout: 30000s
+  - name: upload-results
+    image: amazon/aws-cli
+    workingDir: $(workspaces.results.path)
+    script: |
+      S3_RESULT_PATH=$(cat $(results.s3_result.path))
+      echo "S3 Path: $S3_RESULT_PATH"
+      aws sts get-caller-identity
+      # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
+      ls -larth
+      aws s3 cp . s3://$S3_RESULT_PATH/ --recursive
