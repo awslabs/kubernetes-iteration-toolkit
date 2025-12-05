@@ -26,13 +26,13 @@ spec:
     script: |
       echo "Starting Karpenter NodePool Creation Task"
 
-      # Configure kubectl to connect to the EKS cluster
-      echo "[INFO] Configuring kubectl for cluster access..."
+      # Configure kubeconfig to connect to the EKS cluster
+      echo "[INFO] Configuring kubeconfig for cluster access..."
       aws eks update-kubeconfig --name $(params.cluster-name) --endpoint $(params.endpoint)
       if [ $? -eq 0 ]; then
-        echo "[SUCCESS] Successfully configured kubectl"
+        echo "[SUCCESS] Successfully configured kubeconfig"
       else
-        echo "[ERROR] Failed to configure kubectl"
+        echo "[ERROR] Failed to configure kubeconfig"
         exit 1
       fi
 
