@@ -6,7 +6,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  BUILD_CONTEXT: ../../tests/images/toolkit-base/
+  BUILD_CONTEXT: tests/images/toolkit-base/
 
 jobs:
   build-and-push-image:
