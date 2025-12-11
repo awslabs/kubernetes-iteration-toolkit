@@ -45,6 +45,12 @@ spec:
         
         if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
           echo "$(date): Timeout reached after ${ELAPSED_TIME} seconds. Nodepools did not complete within the specified timeout."
+          for az in $AZ_LIST; do
+            echo "Nodes:"
+            echo $(kubectl get nodes -l karpenter.sh/nodepool=$(params.nodepool)-${az} -o yaml)
+            echo "Nodeclaims:"
+            echo $(kubectl get nodeclaims -l karpenter.sh/nodepool=$(params.nodepool)-${az} -o yaml)
+          done
           echo "0" | tee $(results.datapoint.path)
           exit 1
         fi
