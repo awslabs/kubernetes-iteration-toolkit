@@ -1,0 +1,84 @@
+name: Create and publish toolkit base image
+
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/eks-toolkit-base
+  BUILD_CONTEXT: tests/images/toolkit-base/
+
+jobs:
+  get_versions_job:
+    runs-on: ubuntu-latest
+    outputs:
+      k8s_versions: ${{ steps.determine_versions.outputs.k8s_versions }}
+      latest_tools: ${{ steps.determine_versions.outputs.latest_tools }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+        
+      - name: Determine K8s Versions and Tool Versions
+        id: determine_versions
+        working-directory: ${{ env.BUILD_CONTEXT }}
+        run: |
+          chmod +x ./get_versions_matrix.sh  # We need a new version of the script
+          ./get_versions_matrix.sh
+
+  build_and_push_image:
+    needs: get_versions_job 
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    
+    strategy:
+      fail-fast: false # Optional: Set to false if you want other builds to finish even if one fails
+      matrix:
+        k8s_tag: ${{ fromJson(needs.get_versions_job.outputs.k8s_versions) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Image Tag for Matrix Run
+        id: tags
+        run: |
+          # Use the K8s version as the primary tag
+          echo "tag=${{ matrix.k8s_tag }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.BUILD_CONTEXT }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # The tags are set dynamically by the 'Set Image Tag' step
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.k8s_tag }}
+
+          # Extract the static tool versions from the needs output
+          build-args: |
+            KUBECTL_VERSION=${{ matrix.k8s_tag }}
+            HELM_VERSION=${{ fromJson(needs.get_versions_job.outputs.latest_tools).helm_version }}
+            KUSTOMIZE_VERSION=${{ fromJson(needs.get_versions_job.outputs.latest_tools).kustomize_version }}
+            KUBESEAL_VERSION=${{ fromJson(needs.get_versions_job.outputs.latest_tools).kubeseal_version }}
+            KREW_VERSION=${{ fromJson(needs.get_versions_job.outputs.latest_tools).krew_version }}
+            VALS_VERSION=${{ fromJson(needs.get_versions_job.outputs.latest_tools).vals_version }}
+            KUBECONFORM_VERSION=${{ fromJson(needs.get_versions_job.outputs.latest_tools).kubeconform_version }}
