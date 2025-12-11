@@ -5,7 +5,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: "eks-toolkit-base"
+  IMAGE_NAME: ${{ github.repository_owner }}/eks-toolkit-base
   BUILD_CONTEXT: tests/images/toolkit-base/
 
 jobs:
