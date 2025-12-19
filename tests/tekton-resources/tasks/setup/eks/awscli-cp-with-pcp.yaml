@@ -1,0 +1,125 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: awscli-eks-cluster-create-with-pcp-stack
+  namespace: scalability
+spec:
+  description: |
+    Create an EKS cluster.
+    This Task can be used to create an EKS cluster for a given service role, region in an AWS account
+  params:
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin.
+  - name: kubernetes-version
+    default: "1.23"
+    description: The EKS version to install.
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: endpoint
+    default: ""
+    description: "aws eks enpoint to create clusters against"
+  - name: service-role-name
+    description: servicerole name to be used for eks cluster to perform operations in customer account to setup cluster
+  - name: vpc-stack-name
+    description: The name of the VPC name you want to use for EKS cluster.
+  - name: aws-ebs-csi-driver-version
+    default: release-1.53
+    description: The release version for aws ebs csi driver.
+  - name: aws-pod-identity-agent-version
+    default: v1.3.9-eksbuild.1
+    description: The release version for aws pod identity agent.
+  - name: control-plane-tier
+    default: "standard"
+    description: "Provisioned Control Plane tier, default to standard"
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+  - name: create-eks
+    image: ghcr.io/dheeraj-coding/eks-toolkit-base:1.32.10
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+
+      SERVICE_ROLE_NAME=$(params.service-role-name)
+      SERVICE_ROLE_ARN=$(aws iam get-role --role-name $SERVICE_ROLE_NAME --query 'Role.[Arn]' --output text)
+
+      CREATED_CLUSTER=$(aws eks $ENDPOINT_FLAG list-clusters --region $(params.region) --query 'clusters[?@==`'$(params.cluster-name)'`]' --output text )
+      echo "CREATED_CLUSTER=$CREATED_CLUSTER"
+
+      subnets=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.vpc-stack-name) --query='Stacks[].Outputs[?OutputKey==`SubnetIds`].OutputValue' --output text | sed -e 's/ /,/')
+      echo "subnets=$subnets"
+      sg=$(aws cloudformation --region $(params.region) describe-stacks --stack-name $(params.vpc-stack-name) --query='Stacks[].Outputs[?OutputKey==`SecurityGroups`].OutputValue' --output text)
+      echo "securitygroup=$sg"
+
+      if [ "$CREATED_CLUSTER" == "" ]; then
+        aws eks create-cluster --name $(params.cluster-name) --region $(params.region) --kubernetes-version $(params.kubernetes-version) --role-arn $SERVICE_ROLE_ARN --resources-vpc-config subnetIds=$subnets,securityGroupIds=$sg --control-plane-scaling-config tier=$(params.control-plane-tier) $ENDPOINT_FLAG
+      fi
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
+  - name: write-kubeconfig
+    image: ghcr.io/dheeraj-coding/eks-toolkit-base:1.32.10
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
+  - name: install-addons-and-validate
+    image: ghcr.io/dheeraj-coding/eks-toolkit-base:1.32.10
+    script: |
+      # enable PD on the cluster
+      kubectl api-versions
+      kubectl api-resources
+      # Apiserver is not recongnizing deamonset for sometime inconsistently, need to see if livez/readyz are healthy
+      while true; do date && kubectl get --raw "/readyz" --v=10 && break ; sleep 5; done
+      #ToDo remove this, adding to help eks networking evaluate ec2 DescribeNetworkInterface feature performance
+      kubectl set image daemonset/aws-node -n kube-system aws-node=602401143452.dkr.ecr.us-east-2.amazonaws.com/amazon-k8s-cni:v1.20.5-eksbuild.1
+      kubectl set env daemonset/aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true DISABLE_LEAKED_ENI_CLEANUP=true MINIMUM_IP_TARGET=30 WARM_IP_TARGET=5
+      # install csi drivers.
+      kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=$(params.aws-ebs-csi-driver-version)"
+      # TODO: Calculate replicas based on the cluster size going forward.
+      # Patching the coredns not to get scheduled on the monitoring node.
+      # Set revisionHistoryLimit to 0 to avoid keeping older replicasets.
+      kubectl patch deployment coredns --patch '{
+        "spec": {
+          "revisionHistoryLimit": 0,
+          "template": {
+            "spec": {
+              "affinity": {
+                "podAntiAffinity": {
+                  "requiredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                      "labelSelector": {
+                        "matchExpressions": [
+                          {
+                            "key": "eks.amazonaws.com/nodegroup",
+                            "operator": "In",
+                            "values": ["monitoring-$(params.cluster-name)-nodes-1"]
+                          }
+                        ]
+                      },
+                      "topologyKey": "kubernetes.io/hostname"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }' -n kube-system
+      kubectl scale --replicas 1000 deploy coredns -n kube-system
+      # Install EKS Pod Identity Agent
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version $(params.aws-pod-identity-agent-version)
+      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
