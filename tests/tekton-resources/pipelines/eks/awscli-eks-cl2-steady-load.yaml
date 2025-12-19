@@ -11,10 +11,13 @@ spec:
   - name: cluster-name
   - name: endpoint
   - name: desired-nodes
+  - name: metric-name
+    default: 'cl2-loadtest'
   - name: cl2-scheduler-throughput-threshold
     description: "scheduler throughput threshold"
   - name: cl2-scheduler-steady-qps
     description: "expected PCP tier scheduler qps"
+  - name: cl2-scheduler-throughput-pods
   - name: cl2-scheduler-create-qps
   - name: results-bucket
   - name: slack-hook
@@ -181,12 +184,16 @@ spec:
       value: $(params.cl2-scheduler-steady-qps)
     - name: cl2-scheduler-create-qps
       value: $(params.cl2-scheduler-create-qps)
+    - name: cl2-scheduler-throughput-pods
+      value: $(params.cl2-scheduler-throughput-pods)
     - name: nodes
       value: $(params.desired-nodes)
     - name: results-bucket
       value: $(params.results-bucket)
     - name: cluster-name
       value: $(params.cluster-name)
+    - name: control-plane-tier
+      value: $(params.control-plane-tier)
     runAfter:
     - create-mng-nodes
     taskRef:
@@ -207,6 +214,8 @@ spec:
       value: $(tasks.generate.results.datapoint)
     - name: namespace
       value: $(params.kubernetes-version)
+    - name: metric-name
+      value: $(params.metric-name)
     runAfter:
       - generate
     taskRef:

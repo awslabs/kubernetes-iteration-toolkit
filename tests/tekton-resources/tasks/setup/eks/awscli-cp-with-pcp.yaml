@@ -12,7 +12,7 @@ spec:
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
   - name: kubernetes-version
-    default: "1.23"
+    default: "1.33"
     description: The EKS version to install.
   - name: region
     default: "us-west-2"
@@ -27,9 +27,6 @@ spec:
   - name: aws-ebs-csi-driver-version
     default: release-1.53
     description: The release version for aws ebs csi driver.
-  - name: aws-pod-identity-agent-version
-    default: v1.3.9-eksbuild.1
-    description: The release version for aws pod identity agent.
   - name: control-plane-tier
     default: "standard"
     description: "Provisioned Control Plane tier, default to standard"
@@ -116,10 +113,3 @@ spec:
         }
       }' -n kube-system
       kubectl scale --replicas 1000 deploy coredns -n kube-system
-      # Install EKS Pod Identity Agent
-      ENDPOINT_FLAG=""
-      if [ -n "$(params.endpoint)" ]; then
-        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
-      fi
-      aws eks $ENDPOINT_FLAG create-addon --cluster-name $(params.cluster-name) --addon-name eks-pod-identity-agent --addon-version $(params.aws-pod-identity-agent-version)
-      aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
