@@ -13,8 +13,6 @@ spec:
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
     default: "steady-load"
-  - name: cl2-scheduler-throughput-pods
-    default: 500000
   - name: cl2-scheduler-throughput-threshold
     description: "scheduler throughput threshold"
     default: "150"
@@ -33,6 +31,8 @@ spec:
     description: The region where the cluster is in.
   - name: cluster-name
     description: The name of the EKS cluster you want to spin.
+  - name: control-plane-tier
+    default: "standard"
   results:
     - name: datapoint
       description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
@@ -83,20 +83,67 @@ spec:
     script: |
       #!/bin/bash
 
-      TOTAL_CYCLES=1
+      TIER=$(params.control-plane-tier)
+      ITERATIONS=0
+
+      case $TIER in
+        "tier-xl")
+          ITERATIONS=4
+          ;;
+        "tier-2xl")
+          ITERATIONS=8
+          ;;
+        "tier-4xl")
+          ITERATIONS=16
+          ;;
+        *)
+          echo "Unknown tier: $TIER. Defaulting to 1 iteration."
+          ITERATIONS=1
+          ;;
+      esac
+
       cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/scheduler-throughput/config.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
 
-      ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/sustained-scheduler-throughput/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+      FAIL_COUNT=0
+      for ((i=1; i<=ITERATIONS; i++)); do
+        echo "--- Starting iteration $i of $ITERATIONS ---"
 
-      exit_code=$?
+        ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/sustained-scheduler-throughput/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+
+        if [ $? -ne 0 ]; then
+          echo "Iteration $i failed."
+          ((FAIL_COUNT++))
+        else
+          echo "Iteration $i passed."
+        fi
+      done
+
+      FAILURE_RATE=$(( (FAIL_COUNT * 100) / ITERATIONS ))
+
+      echo "------------------------------------------"
+      echo "Total Iterations: $ITERATIONS"
+      echo "Total Failures:   $FAIL_COUNT"
+      echo "Failure Rate:     $FAILURE_RATE%"
+      echo "------------------------------------------"
+
+      exit_code=0
+      if [ "$FAILURE_RATE" -ge 25 ]; then
+        echo "Error: Failure rate ($FAILURE_RATE%) exceeded the 25% threshold."
+        exit_code=1
+      else
+        echo "Success: Failure rate ($FAILURE_RATE%) is within acceptable limits."
+        exit_code=0
+      fi
+      ls -a $(workspaces.results.path)
+      cat $(workspaces.results.path)/SchedulingThroughput*
+
       if [ $exit_code -eq 0 ]; then
         echo "1" | tee $(results.datapoint.path)
       else
         echo "0" | tee $(results.datapoint.path)
       fi
-      ls -a $(workspaces.results.path)
-      cat $(workspaces.results.path)/SchedulingThroughput*
+
       exit $exit_code
     timeout: 30000s
   - name: upload-results
