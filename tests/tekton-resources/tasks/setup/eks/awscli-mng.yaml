@@ -36,6 +36,8 @@ spec:
   - name: nodegroup-prefix
     description: Prefix that needs to be appended to asg names.
     default: ""
+  - name: launch-template-name
+    description: Name of the launch template to be used for the nodegroup.
   workspaces:
   - name: config
     mountPath: /config/
