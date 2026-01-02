@@ -10,16 +10,19 @@ spec:
   - name: giturl
     description: "git url to clone the package"
     default: https://github.com/dheeraj-coding/perf-tests.git
+  - name: kiturl
+    description: "git url to clone for kit assets"
+    default: https://github.com/dheeraj-coding/kubernetes-iteration-toolkit
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
     default: "steady-load"
-  - name: cl2-scheduler-throughput-threshold
+  - name: cl2-throughput-threshold
     description: "scheduler throughput threshold"
     default: "150"
-  - name: cl2-scheduler-steady-qps
+  - name: cl2-steady-qps
     description: "pods scheduler steady qps"
     default: "170"
-  - name: cl2-scheduler-create-qps
+  - name: cl2-create-qps
     default: "1700"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
@@ -53,6 +56,8 @@ spec:
     image: alpine/git
     workingDir: $(workspaces.source.path)
     script: |
+      git clone $(params.kiturl)
+
       git clone $(params.giturl)
       cd $(workspaces.source.path)/perf-tests/
       git fetch origin --verbose --tags
@@ -66,9 +71,9 @@ spec:
       echo $S3_RESULT_PATH > $(results.s3_result.path)
       echo "S3 Path: $S3_RESULT_PATH" 
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
-      CL2_SCHEDULER_CREATE_QPS: $(params.cl2-scheduler-create-qps)
-      CL2_SCHEDULER_STEADY_QPS: $(params.cl2-scheduler-steady-qps)
-      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: $(params.cl2-scheduler-throughput-threshold)
+      CL2_SCHEDULER_CREATE_QPS: $(params.cl2-create-qps)
+      CL2_SCHEDULER_STEADY_QPS: $(params.cl2-steady-qps)
+      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: $(params.cl2-throughput-threshold)
       EOL
 
       cat $(workspaces.source.path)/overrides.yaml
@@ -102,14 +107,14 @@ spec:
           ;;
       esac
 
-      cat $(workspaces.source.path)/perf-tests/clusterloader2/testing/scheduler-throughput/config.yaml
+      cat $(workspaces.source.path)/kubernetes-iteration-toolkit/tests/assets/sustained-throughput/config.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
 
       FAIL_COUNT=0
       for ((i=1; i<=ITERATIONS; i++)); do
         echo "--- Starting iteration $i of $ITERATIONS ---"
 
-        ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/perf-tests/clusterloader2/testing/sustained-scheduler-throughput/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+        ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/kubernetes-iteration-toolkit/tests/assets/sustained-throughput/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
 
         if [ $? -ne 0 ]; then
           echo "Iteration $i failed."

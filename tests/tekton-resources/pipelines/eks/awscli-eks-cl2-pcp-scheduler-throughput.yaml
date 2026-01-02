@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: awscli-eks-cl2steadyloadtest
+  name: awscli-eks-cl2-pcp-scheduler-throughput
   namespace: scalability
 spec:
   description: |
@@ -12,13 +12,13 @@ spec:
   - name: endpoint
   - name: desired-nodes
   - name: metric-name
-    default: 'cl2-loadtest'
-  - name: cl2-scheduler-throughput-threshold
+    default: 'pcp-scheduler-throughput'
+  - name: cl2-throughput-threshold
     description: "scheduler throughput threshold"
-  - name: cl2-scheduler-steady-qps
+  - name: cl2-steady-qps
     description: "expected PCP tier scheduler qps"
-  - name: cl2-scheduler-throughput-pods
-  - name: cl2-scheduler-create-qps
+  - name: cl2-throughput-pods
+  - name: cl2-create-qps
   - name: results-bucket
   - name: slack-hook
   - name: slack-message
@@ -178,14 +178,14 @@ spec:
       workspace: config
   - name: generate
     params:
-    - name: cl2-scheduler-throughput-threshold
-      value: $(params.cl2-scheduler-throughput-threshold)
-    - name: cl2-scheduler-steady-qps
-      value: $(params.cl2-scheduler-steady-qps)
-    - name: cl2-scheduler-create-qps
-      value: $(params.cl2-scheduler-create-qps)
-    - name: cl2-scheduler-throughput-pods
-      value: $(params.cl2-scheduler-throughput-pods)
+    - name: cl2-throughput-threshold
+      value: $(params.cl2-throughput-threshold)
+    - name: cl2-steady-qps
+      value: $(params.cl2-steady-qps)
+    - name: cl2-create-qps
+      value: $(params.cl2-create-qps)
+    - name: cl2-throughput-pods
+      value: $(params.cl2-throughput-pods)
     - name: nodes
       value: $(params.desired-nodes)
     - name: results-bucket
