@@ -1,0 +1,63 @@
+# scheduler-density-churn.yaml
+# Main test configuration for sustained scheduler throughput
+#
+{{$schedulerCreateQps:= DefaultParam .CL2_SCHEDULER_CREATE_QPS 1600}}
+{{$schedulerSteadyQps:= DefaultParam .CL2_SCHEDULER_STEADY_QPS 167}}
+{{$schedulerThroughputThreshold := DefaultParam .CL2_SCHEDULER_THROUGHPUT_THRESHOLD 150 }}
+{{$totalSchedulerThroughputPods := DefaultParam .CL2_SCHEDULER_THROUGHPUT_PODS 5000}}
+
+name: continuous-scheduler-churn
+
+namespace:
+  number: 1 
+  namePrefix: cl2-churn-density 
+
+tuningSets:
+- name: SteadyCreationQPS # This name is referenced in density.yaml and has high QPS to fill scheduler queue asap
+  qpsLoad:
+    qps: {{$schedulerCreateQps}}
+    burst: {{$schedulerCreateQps}}
+
+- name: DefaultLowQPS # This name is referenced in density.yaml the qps of this would match the steady state QPS defined for tier
+  globalQPSLoad:
+    qps: {{$schedulerSteadyQps}}
+    burst: {{$schedulerSteadyQps}}
+
+steps:
+- name: Start measurements
+  measurements:
+  - Identifier: ContinuousSchedulingThroughput
+    Method: SchedulingThroughput
+    Params:
+      action: start
+      labelSelector: group = continuous-churn
+      measurmentInterval: 1s
+
+- name: Run density module for sustained churn
+  module:
+    path: density.yaml # Assumes density.yaml is in the same directory
+    params:
+      CL2_SCHEDULER_THROUGHPUT_PODS: {{$totalSchedulerThroughputPods}}
+
+
+- name: Collect final throughput measurements
+  measurements:
+  - Identifier: ContinuousSchedulingThroughput
+    Method: SchedulingThroughput
+    Params:
+      action: gather
+      enableViolations: true
+      threshold: {{$schedulerThroughputThreshold}} # This would be the minimum expected threshold for APIServer
+
+- name: Delete remaining pods # Cleanup step for dangling resources
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+    replicasPerNamespace: 0 
+    tuningSet: SteadyCreationQPS
+    objectBundle:
+      - basename: scheduler-churn-pod
+        objectTemplatePath: pod-default.yaml 
+        templateFillMap:
+          Group: continuous-churn
