@@ -12,18 +12,22 @@ spec:
     default: https://github.com/kubernetes/perf-tests.git
   - name: kiturl
     description: "git url to clone for kit assets"
-    default: https://github.com/awslabs/kubernetes-iteration-toolkit
-  - name: cl2-branch
-    description: "The branch of clusterloader2 you want to use"
-    default: "steady-load"
+    default: https://github.com/dheeraj-coding/kubernetes-iteration-toolkit
+  - name: cl2-throughput-pods
+    description: "scheduler throughput number of pods"
+    default: "8000"
   - name: cl2-throughput-threshold
     description: "scheduler throughput threshold"
     default: "150"
-  - name: cl2-steady-qps
-    description: "pods scheduler steady qps"
+  - name: cl2-default-qps
+    description: "pods scheduler default qps"
     default: "170"
-  - name: cl2-create-qps
-    default: "1700"
+  - name: cl2-default-burst
+    description: "pods scheduler default burst qps"
+    default: "170"
+  - name: cl2-uniform-qps
+    description: "pods scheduler uniform qps"
+    default: "170"
   - name: nodes
     description: "number of dataplane nodes to run the load test against"
     default: "1000"
@@ -61,7 +65,6 @@ spec:
       git clone $(params.giturl)
       cd $(workspaces.source.path)/perf-tests/
       git fetch origin --verbose --tags
-      git checkout $(params.cl2-branch)
       git branch
   - name: prepare-loadtest
     image: golang:1.24
@@ -71,8 +74,10 @@ spec:
       echo $S3_RESULT_PATH > $(results.s3_result.path)
       echo "S3 Path: $S3_RESULT_PATH" 
       cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
-      CL2_SCHEDULER_CREATE_QPS: $(params.cl2-create-qps)
-      CL2_SCHEDULER_STEADY_QPS: $(params.cl2-steady-qps)
+      CL2_SCHEDULER_THROUGHPUT_PODS: $(params.cl2-throughput-pods)
+      CL2_DEFAULT_QPS: $(params.cl2-default-qps)
+      CL2_DEFAULT_BURST: $(params.cl2-default-burst)
+      CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
       CL2_SCHEDULER_THROUGHPUT_THRESHOLD: $(params.cl2-throughput-threshold)
       EOL
 
@@ -133,7 +138,7 @@ spec:
       echo "------------------------------------------"
 
       exit_code=0
-      if [ "$FAILURE_RATE" -ge 25 ]; then
+      if [ "$FAILURE_RATE" -gt 0 ]; then
         echo "Error: Failure rate ($FAILURE_RATE%) exceeded the 25% threshold."
         exit_code=1
       else

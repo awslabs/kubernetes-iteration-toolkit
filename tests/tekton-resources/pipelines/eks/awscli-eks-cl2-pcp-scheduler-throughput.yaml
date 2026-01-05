@@ -13,12 +13,16 @@ spec:
   - name: desired-nodes
   - name: metric-name
     default: 'pcp-scheduler-throughput'
+  - name: cl2-throughput-pods
+    description: "scheduler total number of pods to create"
   - name: cl2-throughput-threshold
     description: "scheduler throughput threshold"
-  - name: cl2-steady-qps
-    description: "expected PCP tier scheduler qps"
-  - name: cl2-throughput-pods
-  - name: cl2-create-qps
+  - name: cl2-default-qps
+    description: "scheduler default qps to use for create/delete"
+  - name: cl2-default-burst
+    description: "scheduler default scheduler burst to use"
+  - name: cl2-uniform-qps
+    description: "scheduler rate at which to create for scheduler throughput test"
   - name: results-bucket
   - name: slack-hook
   - name: slack-message
@@ -178,14 +182,16 @@ spec:
       workspace: config
   - name: generate
     params:
-    - name: cl2-throughput-threshold
-      value: $(params.cl2-throughput-threshold)
-    - name: cl2-steady-qps
-      value: $(params.cl2-steady-qps)
-    - name: cl2-create-qps
-      value: $(params.cl2-create-qps)
     - name: cl2-throughput-pods
       value: $(params.cl2-throughput-pods)
+    - name: cl2-throughput-threshold
+      value: $(params.cl2-throughput-threshold)
+    - name: cl2-default-qps
+      value: $(params.cl2-default-qps)
+    - name: cl2-default-burst
+      value: $(params.cl2-default-burst)
+    - name: cl2-uniform-qps
+      value: $(params.cl2-uniform-qps)
     - name: nodes
       value: $(params.desired-nodes)
     - name: results-bucket
