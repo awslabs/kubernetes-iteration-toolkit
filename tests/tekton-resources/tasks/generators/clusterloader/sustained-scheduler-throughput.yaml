@@ -12,7 +12,7 @@ spec:
     default: https://github.com/kubernetes/perf-tests.git
   - name: kiturl
     description: "git url to clone for kit assets"
-    default: https://github.com/dheeraj-coding/kubernetes-iteration-toolkit
+    default: https://github.com/awslabs/kubernetes-iteration-toolkit
   - name: cl2-throughput-pods
     description: "scheduler throughput number of pods"
     default: "8000"
