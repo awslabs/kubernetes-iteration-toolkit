@@ -1,63 +1,69 @@
-# scheduler-density-churn.yaml
-# Main test configuration for sustained scheduler throughput
-#
-{{$schedulerCreateQps:= DefaultParam .CL2_SCHEDULER_CREATE_QPS 1600}}
-{{$schedulerSteadyQps:= DefaultParam .CL2_SCHEDULER_STEADY_QPS 167}}
-{{$schedulerThroughputThreshold := DefaultParam .CL2_SCHEDULER_THROUGHPUT_THRESHOLD 150 }}
 {{$totalSchedulerThroughputPods := DefaultParam .CL2_SCHEDULER_THROUGHPUT_PODS 5000}}
+{{$defaultQps := DefaultParam .CL2_DEFAULT_QPS  500}}
+{{$defaultBurst := DefaultParam .CL2_DEFAULT_BURST 1000}}
+{{$uniformQps := DefaultParam .CL2_UNIFORM_QPS 500}}
 
-name: continuous-scheduler-churn
+{{$SCHEDULER_THROUGHPUT_THRESHOLD := DefaultParam .CL2_SCHEDULER_THROUGHPUT_THRESHOLD 400}}
 
+name: direct-scheduler-throughput
 namespace:
-  number: 1 
-  namePrefix: cl2-churn-density 
-
+  number: 1
 tuningSets:
-- name: SteadyCreationQPS # This name is referenced in density.yaml and has high QPS to fill scheduler queue asap
-  qpsLoad:
-    qps: {{$schedulerCreateQps}}
-    burst: {{$schedulerCreateQps}}
-
-- name: DefaultLowQPS # This name is referenced in density.yaml the qps of this would match the steady state QPS defined for tier
+# default is a tuningset that is meant to be used when we don't have any specific requirements on pace of operations.
+- name: default
   globalQPSLoad:
-    qps: {{$schedulerSteadyQps}}
-    burst: {{$schedulerSteadyQps}}
-
+    qps: {{$defaultQps}}
+    burst: {{$defaultBurst}}
+- name: UniformQPS
+  qpsLoad:
+    qps: {{$uniformQps}}
 steps:
-- name: Start measurements
+- name: Creating scheduler throughput measurements
   measurements:
-  - Identifier: ContinuousSchedulingThroughput
+  - Identifier: DirectSchedulingThroughput
     Method: SchedulingThroughput
     Params:
       action: start
-      labelSelector: group = continuous-churn
+      labelSelector: group = direct-scheduler-throughput
       measurmentInterval: 1s
-
-- name: Run density module for sustained churn
-  module:
-    path: density.yaml # Assumes density.yaml is in the same directory
-    params:
-      CL2_SCHEDULER_THROUGHPUT_PODS: {{$totalSchedulerThroughputPods}}
-
-
-- name: Collect final throughput measurements
-  measurements:
-  - Identifier: ContinuousSchedulingThroughput
-    Method: SchedulingThroughput
-    Params:
-      action: gather
-      enableViolations: true
-      threshold: {{$schedulerThroughputThreshold}} # This would be the minimum expected threshold for APIServer
-
-- name: Delete remaining pods # Cleanup step for dangling resources
+- name: create scheduler throughput pods
   phases:
   - namespaceRange:
       min: 1
       max: 1
-    replicasPerNamespace: 0 
-    tuningSet: SteadyCreationQPS
+    replicasPerNamespace: {{$totalSchedulerThroughputPods}}
+    tuningSet: UniformQPS
     objectBundle:
-      - basename: scheduler-churn-pod
-        objectTemplatePath: pod-default.yaml 
-        templateFillMap:
-          Group: continuous-churn
+    - basename: direct-scheduler-throughput-pod
+      objectTemplatePath: pod-default.yaml
+      templateFillMap:
+        Group: direct-scheduler-throughput
+- name: Waiting for scheduler throughput pods to be created
+  measurements:
+  - Identifier: WaitForDirectSchedulerThroughputPods
+    Method: WaitForRunningPods
+    Params:
+      action: gather
+      timeout: 5m
+      desiredPodCount: {{$totalSchedulerThroughputPods}}
+      labelSelector: group = direct-scheduler-throughput
+- name: Collecting scheduler throughput measurements
+  measurements:
+  - Identifier: DirectSchedulingThroughput
+    Method: SchedulingThroughput
+    Params:
+      action: gather
+      enableViolations: true
+      threshold: {{$SCHEDULER_THROUGHPUT_THRESHOLD}}
+- name: Delete scheduler throughput pods
+  phases:
+  - namespaceRange:
+      min: 1
+      max: 1
+    replicasPerNamespace: 0
+    tuningSet: default
+    objectBundle:
+    - basename: direct-scheduler-throughput-pod
+      objectTemplatePath: pod-default.yaml
+      templateFillMap:
+        Group: direct-scheduler-throughput
