@@ -174,7 +174,7 @@ spec:
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
       GOOS=linux CGO_ENABLED=0 go build -v -o ./clusterloader ./cmd
   - name: bootstrap-pod-identity
-    image: amazon/aws-cli
+    image: alpine/k8s:1.33.5
     script: |
       #!/bin/bash
       set -euo pipefail
@@ -190,34 +190,16 @@ spec:
       S3_MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
       CLOUDWATCH_MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/CloudWatchFullAccess"
       PIA_ROLE_NAME=$(params.cluster-name)-pia-role
-      
-      # Create trust policy document
-      cat > /tmp/pia-trust-policy.json <<EOL
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Principal": {
-              "Federated": "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):oidc-provider/$(aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||')"
-            },
-            "Action": "sts:AssumeRoleWithWebIdentity",
-            "Condition": {
-              "StringEquals": {
-                "$(aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||'):sub": "system:serviceaccount:\${namespace}:default"
-              }
-            }
-          }
-        ]
-      }
-      EOL
+
+      TRUST_POLICY_FILE="/tmp/pia-trust-policy.json"
+      curl -s https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pia-trust-policy.json -o $TRUST_POLICY_FILE
       
       # Check if the IAM role already exists
       if aws iam get-role --role-name $PIA_ROLE_NAME &>/dev/null; then
         echo "IAM role $PIA_ROLE_NAME already exists, skipping creation."
       else
         echo "Creating IAM role $PIA_ROLE_NAME..."
-        aws iam create-role --role-name $PIA_ROLE_NAME --assume-role-policy-document file:///tmp/pia-trust-policy.json
+        aws iam create-role --role-name $PIA_ROLE_NAME --assume-role-policy-document file://$TRUST_POLICY_FILE
       fi
       
       # Attach policies (idempotent)
