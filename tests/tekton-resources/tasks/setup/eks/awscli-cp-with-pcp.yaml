@@ -39,6 +39,9 @@ spec:
       value: /config/kubeconfig
   steps:
   - name: create-eks
+    # TODO temporarily using forked repos as workers are unavailable in awslabs repo to build the images
+    # the Dockerfile if needed is already present in the kit repo
+    # found here: https://github.com/awslabs/kubernetes-iteration-toolkit/blob/main/tests/images/toolkit-base/Dockerfile
     image: ghcr.io/dheeraj-coding/eks-toolkit-base:1.32.10
     script: |
       ENDPOINT_FLAG=""
@@ -62,6 +65,9 @@ spec:
       fi
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
   - name: write-kubeconfig
+    # TODO: temporarily using forked repos as workers are unavailable in awslabs repo to build the images
+    # the Dockerfile if needed is already present in the kit repo
+    # found here: https://github.com/awslabs/kubernetes-iteration-toolkit/blob/main/tests/images/toolkit-base/Dockerfile
     image: ghcr.io/dheeraj-coding/eks-toolkit-base:1.32.10
     script: |
       ENDPOINT_FLAG=""
@@ -70,6 +76,9 @@ spec:
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
   - name: install-addons-and-validate
+    # TODO temporarily using forked repos as workers are unavailable in awslabs repo to build the images
+    # the Dockerfile if needed is already present in the kit repo
+    # found here: https://github.com/awslabs/kubernetes-iteration-toolkit/blob/main/tests/images/toolkit-base/Dockerfile
     image: ghcr.io/dheeraj-coding/eks-toolkit-base:1.32.10
     script: |
       # enable PD on the cluster
