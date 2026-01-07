@@ -273,6 +273,13 @@ spec:
       echo "Batch size (initial parallelism): $(params.batch-size)"
       echo "Total pods to create: $(( $(params.jobs-count) * $(params.completions-per-job) ))"
       
+      # Validate that completions-per-job >= batch-size to avoid template errors
+      if [ "$(params.completions-per-job)" -lt "$(params.batch-size)" ]; then
+        echo "ERROR: completions-per-job ($(params.completions-per-job)) must be >= batch-size ($(params.batch-size))" >&2
+        echo "The config template requires at least one batch to be created before scaling." >&2
+        exit 1
+      fi
+      
       # Prepare AI/ML load test config
       mkdir -p $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs
       curl -s $(params.aiml-test-config-url) -o $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs/config.yaml
