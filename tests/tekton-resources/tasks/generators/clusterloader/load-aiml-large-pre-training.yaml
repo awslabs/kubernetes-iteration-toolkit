@@ -30,6 +30,9 @@ spec:
   - name: replicas-per-statefulset
     description: "Number of replicas per statefulset"
     default: "100000"
+  - name: batch-size
+    description: "Batch size for scaling operations (must be <= replicas-per-statefulset)"
+    default: "500"
   - name: statefulset-creation-qps
     description: "QPS for statefulset creation"
     default: "10"
@@ -109,6 +112,7 @@ spec:
       NAMESPACE: "$(params.namespace-prefix)"
       STATEFULSETS_COUNT: $(params.statefulsets-count)
       REPLICAS_PER_STATEFULSET: $(params.replicas-per-statefulset)
+      BATCH_SIZE: $(params.batch-size)
       STATEFULSET_CREATION_QPS: $(params.statefulset-creation-qps)
       CREATION_TIMEOUT: "$(params.creation-timeout)"
       REQUEST_CPU: "$(params.request-cpu)"
@@ -269,7 +273,15 @@ spec:
       echo "Namespace: $(params.namespace-prefix)"
       echo "StatefulSets count: $(params.statefulsets-count)"
       echo "Replicas per StatefulSet: $(params.replicas-per-statefulset)"
+      echo "Batch size: $(params.batch-size)"
       echo "Total pods to create: $(( $(params.statefulsets-count) * $(params.replicas-per-statefulset) ))"
+      
+      # Validate that batch-size <= replicas-per-statefulset to avoid template errors
+      if [ "$(params.replicas-per-statefulset)" -lt "$(params.batch-size)" ]; then
+        echo "ERROR: replicas-per-statefulset ($(params.replicas-per-statefulset)) must be >= batch-size ($(params.batch-size))" >&2
+        echo "The config template requires at least one batch to be created before scaling." >&2
+        exit 1
+      fi
       
       # Prepare AI/ML load test config
       mkdir -p $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-training-w-sts
