@@ -1,0 +1,84 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: ai-ml-training-large-${AZ}
+spec:
+  disruption:
+    budgets:
+    - nodes: 100%
+      reasons:
+      - Empty
+    - nodes: 10%
+      reasons:
+      - Drifted
+      - Underutilized
+    consolidateAfter: 0s
+    consolidationPolicy: WhenEmpty
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        drift: drifting-test
+        purpose: ml-large
+    spec:
+      expireAfter: 720h0m0s
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: ai-training
+      requirements:
+      - key: topology.kubernetes.io/zone
+        operator: In
+        values:
+        - ${AZ}
+      - key: kubernetes.io/arch
+        operator: In
+        values:
+        - amd64
+      - key: kubernetes.io/os
+        operator: In
+        values:
+        - linux
+      - key: karpenter.k8s.aws/instance-size
+        operator: In
+        values:
+        - large
+        - xlarge
+        - 2xlarge
+        - 4xlarge
+      - key: karpenter.k8s.aws/instance-family
+        operator: In
+        values:
+        - c5
+        - c5a
+        - c5n
+        - c6a
+        - c6g
+        - c6gd
+        - c6gn
+        - c6i
+        - c7g
+        - c7gn
+        - c7i
+        - c8g
+        - m5
+        - m5a
+        - m5n
+        - m6a
+        - m6g
+        - m6i
+        - m7g
+        - m7gd
+        - m7i
+        - m8g
+        - r5
+        - r5a
+        - r5n
+        - r6a
+        - r6g
+        - r6gd
+        - r6i
+        - r7g
+        - r7gd
+        - r7i
+        - r8g
