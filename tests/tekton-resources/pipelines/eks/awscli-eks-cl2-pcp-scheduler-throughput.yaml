@@ -39,6 +39,9 @@ spec:
   - name: control-plane-tier
     default: "standard"
     description: "Provisioned control plane tier, default standard"
+  - name: iterations
+    default: 3
+    description: "number of iterations to run scheduler throughput test for different tiers"
   tasks:
   - name: slack-notification
     params:
@@ -200,6 +203,8 @@ spec:
       value: $(params.cluster-name)
     - name: control-plane-tier
       value: $(params.control-plane-tier)
+    - name: iterations
+      value: $(params.iterations)
     runAfter:
     - create-mng-nodes
     taskRef:

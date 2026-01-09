@@ -44,7 +44,7 @@ steps:
     Method: WaitForRunningPods
     Params:
       action: gather
-      timeout: 5m
+      timeout: 240m
       desiredPodCount: {{$totalSchedulerThroughputPods}}
       labelSelector: group = direct-scheduler-throughput
 - name: Collecting scheduler throughput measurements

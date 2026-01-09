@@ -40,6 +40,9 @@ spec:
     description: The name of the EKS cluster you want to spin.
   - name: control-plane-tier
     default: "standard"
+  - name: iterations
+    default: 3
+    description: "number of iterations to run the throughput test for different tiers"
   results:
     - name: datapoint
       description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
@@ -94,23 +97,7 @@ spec:
       #!/bin/bash
 
       TIER=$(params.control-plane-tier)
-      ITERATIONS=0
-
-      case $TIER in
-        "tier-xl")
-          ITERATIONS=4
-          ;;
-        "tier-2xl")
-          ITERATIONS=8
-          ;;
-        "tier-4xl")
-          ITERATIONS=16
-          ;;
-        *)
-          echo "Unknown tier: $TIER. Defaulting to 1 iteration."
-          ITERATIONS=1
-          ;;
-      esac
+      ITERATIONS=$(params.iterations)
 
       cat $(workspaces.source.path)/kubernetes-iteration-toolkit/tests/assets/sustained-throughput/config.yaml
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
@@ -139,23 +126,21 @@ spec:
 
       exit_code=0
       if [ "$FAILURE_RATE" -gt 0 ]; then
-        echo "Error: Failure rate ($FAILURE_RATE%) exceeded the 25% threshold."
+        echo "Error: Failure rate ($FAILURE_RATE%) exceeded the 0% threshold."
         exit_code=1
       else
         echo "Success: Failure rate ($FAILURE_RATE%) is within acceptable limits."
         exit_code=0
       fi
-      ls -a $(workspaces.results.path)
-      cat $(workspaces.results.path)/SchedulingThroughput*
 
       if [ $exit_code -eq 0 ]; then
-        echo "1" | tee $(results.datapoint.path)
-      else
         echo "0" | tee $(results.datapoint.path)
+      else
+        echo "1" | tee $(results.datapoint.path)
       fi
 
       exit $exit_code
-    timeout: 30000s
+    timeout: 6h
   - name: upload-results
     image: amazon/aws-cli
     workingDir: $(workspaces.results.path)
