@@ -39,7 +39,7 @@ spec:
       value: /config/kubeconfig
   steps:
   - name: create-eks
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.35.0
     script: |
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
@@ -62,7 +62,7 @@ spec:
       fi
       aws eks $ENDPOINT_FLAG --region $(params.region) wait cluster-active --name $(params.cluster-name)
   - name: write-kubeconfig
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.35.0
     script: |
       ENDPOINT_FLAG=""
       if [ -n "$(params.endpoint)" ]; then
@@ -70,7 +70,7 @@ spec:
       fi
       aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.region)
   - name: install-addons-and-validate
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.35.0
     script: |
       # enable PD on the cluster
       kubectl api-versions
