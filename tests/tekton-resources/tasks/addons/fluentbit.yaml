@@ -22,7 +22,7 @@ spec:
       value: /config/kubeconfig
   steps:
   - name: create-fluentbit-addon
-    image: alpine/k8s:1.23.7
+    image: alpine/k8s:1.33.7
     script: |
       #kubectl commands are purely for knowing state of cluster before kicking off the test.
       kubectl version
