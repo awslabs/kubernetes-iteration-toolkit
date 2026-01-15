@@ -105,7 +105,10 @@
             "Sid": "AllowInstanceProfileReadActions",
             "Effect": "Allow",
             "Resource": "*",
-            "Action": "iam:GetInstanceProfile"
+            "Action": [
+                "iam:GetInstanceProfile",
+                "iam:ListInstanceProfiles"
+            ]
         }
     ],
     "Version": "2012-10-17"
