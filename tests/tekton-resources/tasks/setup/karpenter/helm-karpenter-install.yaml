@@ -92,6 +92,7 @@ spec:
         --set "tolerations[0].value=karpenter" \
         --set "tolerations[0].operator=Equal" \
         --set "dnsPolicy=Default" \
+        --set "settings.minValuesPolicy=BestEffort" \
         --set-string "controller.env[0].name=AWS_ENDPOINT_URL_EKS" \
         --set-string "controller.env[0].value=$(params.endpoint)" \
         --set-string "controller.env[1].name=KUBE_CLIENT_QPS" \
