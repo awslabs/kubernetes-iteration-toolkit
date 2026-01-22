@@ -1,0 +1,775 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: awscli-eks-aiml-cl2loadtest
+  namespace: scalability
+spec:
+  params:
+  - name: cluster-name
+    type: string
+  - default: ""
+    name: endpoint
+    type: string
+  - default: "500"
+    name: desired-nodes
+    type: string
+  - default: "30"
+    name: pods-per-node
+    type: string
+  - default: "100"
+    name: nodes-per-namespace
+    type: string
+  - default: "50"
+    name: cl2-load-test-throughput
+    type: string
+  - default: kit-eks-scalability/kit-eks-5k/etcd/$(date +%s)
+    name: results-bucket
+    type: string
+  - default: ""
+    type: string
+  - default: 'You can monitor here - https://experimental.scalability.eks.aws.dev/#/namespaces/scalability/pipelineruns/
+      ;5k node '
+    name: slack-message
+    type: string
+  - default: ""
+    name: amp-workspace-id
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/amazon-eks-vpc.json
+    name: vpc-cfn-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_group_launch_template.json
+    name: ng-cfn-url
+    type: string
+  - name: kubernetes-version
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_service_role.json
+    name: service-role-cfn-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_role.json
+    name: node-role-cfn-url
+    type: string
+  - name: manifest-id
+    type: string
+  - default: ""
+    name: eksadm-s3-path
+    type: string
+  - default: 1.8.3
+    name: karpenter-version
+    type: string
+  - default: karpenter
+    name: karpenter-namespace
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/karpenter/node-role-policy-document.json
+    name: karpenter-node-role-policy-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/karpenter/controller-role-policy-document.json
+    name: karpenter-controller-role-policy-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/karpenter/controller-role-trust-policy-document.json
+    name: karpenter-controller-role-trust-policy-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/nodepool.yaml
+    name: karpenter-nodepool-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/eks-perflab-ai-training-nodeclass.yaml
+    name: karpenter-ai-training-nodeclass-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/eks-perflab-titan-class-nodeclass.yaml
+    name: karpenter-titan-nodeclass-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/ai-ml-training-large.yaml
+    name: karpenter-ai-training-nodepool-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/ai-ml-operator-12xlarge.yaml
+    name: karpenter-ai-operator-nodepool-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/ai-ml-monitoring-24xlarge.yaml
+    name: karpenter-ai-monitoring-nodepool-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/ai-ml-inference-nodepool-xlarge.yaml
+    name: karpenter-ai-inference-nodepool-url
+    type: string
+  - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/refs/heads/main/tests/assets/karpenter/titan-pool.yaml
+    name: karpenter-titan-nodepool-url
+    type: string
+  - default: 30m
+    name: karpenter-timeout
+  - default: ""
+    name: karpenter-ecr-repo
+    type: string
+  - default: ""
+    name: aws-account-id
+    type: string
+  - default: 20
+    name: training-replicas
+    type: string
+  - default: 30
+    name: inference-replicas
+    type: string
+  - default: 5
+    name: operator-replicas
+    type: string
+  - default: 5
+    name: monitoring-replicas
+    type: string
+  - default: 50
+    name: titan-pool-replicas
+    type: string
+  - default: 50
+    name: replicas-per-statefulset
+    type: string
+  - default: 50
+    name: cl2-default-qps
+    type: string
+  - default: 50
+    name: cl2-default-burst
+    type: string
+  - default: 50
+    name: batch-size
+    type: string
+  - default: 50
+    name: completions-per-job
+    type: string
+  - default: "5s"
+    name: pod-startup-threshold
+    type: string
+  - default: standard
+    description: Provisioned control plane tier, default standard
+    name: control-plane-tier
+    type: string
+  - default: ""
+    name: titanpool-annotations
+    type: string
+  - default: ""
+    name: training-annotations
+    type: string
+  - default: ""
+    name: operator-annotations
+    type: string
+  - default: ""
+    name: monitoring-annotations
+    type: string
+  - default: ""
+    name: inference-annotations
+    type: string
+  tasks:
+  - name: awscli-vpc-create
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)
+    - name: vpc-cfn-url
+      value: "$(params.vpc-cfn-url)"
+    taskRef:
+      kind: Task
+      name:  awscli-vpc-create
+  - name: create-cluster-service-role
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)-service-role
+    - name: role-cfn-url
+      value: $(params.service-role-cfn-url)
+    - name: role-name
+      value: "$(params.cluster-name)-service-role"
+    taskRef:
+      kind: Task
+      name: awscli-role-create
+  - name: create-cluster-node-role
+    params:
+    - name: stack-name
+      value: $(params.cluster-name)-node-role
+    - name: role-cfn-url
+      value: $(params.node-role-cfn-url)
+    - name: role-name
+      value: "$(params.cluster-name)-node-role"
+    taskRef:
+      kind: Task
+      name: awscli-role-create
+  - name: create-eks-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: service-role-name
+      value: $(params.cluster-name)-service-role
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: vpc-stack-name
+      value: $(params.cluster-name)
+    - name: manifest-id
+      value: $(params.manifest-id)
+    - name: eksadm-s3-path
+      value: $(params.eksadm-s3-path)
+    - name: kubernetes-version
+      value: $(params.kubernetes-version)
+    - name: control-plane-tier
+      value: $(params.control-plane-tier)
+    retries: 3
+    runAfter:
+    - create-cluster-node-role
+    - create-cluster-service-role
+    - awscli-vpc-create
+    taskRef:
+      kind: Task
+      name: awscli-eks-cluster-create-with-pcp-stack
+    workspaces:
+    - name: config
+      workspace: config
+  - name: create-karpenter-controller-role
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: aws-account-id
+      value: $(params.aws-account-id)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-controller-role-policy-url
+      value: $(params.karpenter-controller-role-policy-url)
+    - name: karpenter-controller-role-trust-policy-url
+      value: $(params.karpenter-controller-role-trust-policy-url) 
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-controller-role
+  - name: create-karpenter-mng
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: aws-account-id
+      value: $(params.aws-account-id)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-mng
+  - name: create-karpenter-cfn
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: karpenter-version
+      value: $(params.karpenter-version)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: account-id
+      value: $(params.aws-account-id)
+    runAfter:
+    - create-eks-cluster
+    taskRef:
+      kind: Task
+      name: awscli-karpenter-cfn-stack
+  - name: helm-install-karpenter
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: karpenter-version
+      value: $(params.karpenter-version)
+    - name: aws-account-id
+      value: $(params.aws-account-id)
+    - name: karpenter-ecr-repo
+      value: $(params.karpenter-ecr-repo)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: timeout
+      value: $(params.karpenter-timeout)
+    runAfter:
+    - create-karpenter-cfn
+    - create-karpenter-mng
+    - create-karpenter-controller-role
+    - awscli-instance-profile
+    taskRef:
+      kind: Task
+      name: helm-karpenter-install
+  - name: get-karp-logs
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - helm-install-karpenter
+    taskRef:
+      kind: Task
+      name: kubectl-get-karpenter-logs
+  - name: awscli-instance-profile
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    runAfter:
+    - create-karpenter-cfn
+    - create-karpenter-mng
+    taskRef:
+      kind: Task
+      name: awscli-instanceprofiles
+  - name: create-ai-training-nodeclass
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodeclass-url
+      value: $(params.karpenter-ai-training-nodeclass-url)
+    runAfter:
+    - helm-install-karpenter
+    taskRef:
+      kind: Task
+      name: create-ec2nodeclass
+  - name: create-titan-class-nodeclass
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodeclass-url
+      value: $(params.karpenter-titan-nodeclass-url)
+    runAfter:
+    - helm-install-karpenter
+    taskRef:
+      kind: Task
+      name: create-ec2nodeclass
+  - name: create-ai-ml-training-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodepool-url
+      value: $(params.karpenter-ai-training-nodepool-url)
+    - name: annotations
+      value: $(params.training-annotations)
+    runAfter:
+    - create-ai-training-nodeclass
+    taskRef:
+      kind: Task
+      name: create-nodepool
+  - name: create-ai-ml-operator-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodepool-url
+      value: $(params.karpenter-ai-operator-nodepool-url)
+    - name: annotations
+      value: $(params.operator-annotations)
+    runAfter:
+    - create-ai-training-nodeclass
+    taskRef:
+      kind: Task
+      name: create-nodepool
+  - name: create-ai-ml-monitoring-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodepool-url
+      value: $(params.karpenter-ai-monitoring-nodepool-url)
+    - name: annotations
+      value: $(params.monitoring-annotations)
+    runAfter:
+    - create-ai-training-nodeclass
+    taskRef:
+      kind: Task
+      name: create-nodepool
+  - name: create-ai-ml-inference-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodepool-url
+      value: $(params.karpenter-ai-inference-nodepool-url)
+    - name: annotations
+      value: $(params.inference-annotations)
+    runAfter:
+    - create-ai-training-nodeclass
+    taskRef:
+      kind: Task
+      name: create-nodepool
+  - name: create-titan-pool-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-nodepool-url
+      value: $(params.karpenter-titan-nodepool-url)
+    - name: annotations
+      value: $(params.titanpool-annotations)
+    runAfter:
+    - create-titan-class-nodeclass
+    taskRef:
+      kind: Task
+      name: create-nodepool
+  - name: scale-training-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.training-replicas)
+    - name: nodepool
+      value: ai-ml-training-large
+    runAfter:
+    - create-ai-ml-training-nodepools
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-training
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.training-replicas)
+    - name: nodepool
+      value: ai-ml-training-large
+    runAfter:
+    - scale-training-nodepools
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-inference-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.inference-replicas)
+    - name: nodepool
+      value: ai-ml-inference-xlarge
+    runAfter:
+    - create-ai-ml-inference-nodepools
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-inference
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.inference-replicas)
+    - name: nodepool
+      value: ai-ml-inference-xlarge
+    runAfter:
+    - scale-inference-nodepools
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-operator-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.operator-replicas)
+    - name: nodepool
+      value: ai-ml-operator-12xlarge
+    runAfter:
+    - create-ai-ml-operator-nodepools
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-operator
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.operator-replicas)
+    - name: nodepool
+      value: ai-ml-operator-12xlarge
+    runAfter:
+    - scale-operator-nodepools
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-monitoring-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.monitoring-replicas)
+    - name: nodepool
+      value: ai-ml-monitoring-24xlarge
+    runAfter:
+    - create-ai-ml-monitoring-nodepools
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-monitoring
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.monitoring-replicas)
+    - name: nodepool
+      value: ai-ml-monitoring-24xlarge
+    runAfter:
+    - scale-monitoring-nodepools
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-titan-pool-nodepools
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.titan-pool-replicas)
+    - name: nodepool
+      value: titan-pool
+    runAfter:
+    - create-titan-pool-nodepools
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-titan-pool
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: $(params.titan-pool-replicas)
+    - name: nodepool
+      value: titan-pool
+    runAfter:
+    - scale-titan-pool-nodepools
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: load-aiml-large-pre-training
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas-per-statefulset
+      value: $(params.replicas-per-statefulset)
+    - name: cl2-default-qps
+      value: $(params.cl2-default-qps)
+    - name: cl2-default-burst
+      value: $(params.cl2-default-burst)
+    - name: batch-size
+      value: $(params.batch-size)
+    - name: pod-startup-threshold
+      value: $(params.pod-startup-threshold)
+    - name: results-bucket
+      value: $(params.results-bucket)
+    runAfter:
+    - wait-for-scale-training
+    - wait-for-scale-inference
+    - wait-for-scale-operator
+    - wait-for-scale-monitoring
+    - wait-for-scale-titan-pool
+    taskRef:
+      kind: Task
+      name: load-aiml
+  - name: load-aiml-multiple-fine-tuning
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: completions-per-job
+      value: $(params.completions-per-job)
+    - name: cl2-default-qps
+      value: $(params.cl2-default-qps)
+    - name: cl2-default-burst
+      value: $(params.cl2-default-burst)
+    - name: batch-size
+      value: $(params.batch-size)
+    - name: pod-startup-threshold
+      value: $(params.pod-startup-threshold)
+    - name: results-bucket
+      value: $(params.results-bucket)
+    runAfter:
+    - load-aiml-large-pre-training
+    taskRef:
+      kind: Task
+      name: load-aiml-multiple-fine-tuning
+  - name: scale-down-training
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: nodepool
+      value: ai-ml-training-large
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    runAfter:
+    - load-aiml-multiple-fine-tuning
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-down-training
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    - name: nodepool
+      value: ai-ml-training-large
+    runAfter:
+    - scale-down-training
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-down-inference
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: nodepool
+      value: ai-ml-inference-xlarge
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    runAfter:
+    - load-aiml-multiple-fine-tuning
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-down-inference
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    - name: nodepool
+      value: ai-ml-inference-xlarge
+    runAfter:
+    - scale-down-inference
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-down-operator
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: nodepool
+      value: ai-ml-operator-12xlarge
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    runAfter:
+    - load-aiml-multiple-fine-tuning
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-down-operator
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    - name: nodepool
+      value: ai-ml-operator-12xlarge
+    runAfter:
+    - scale-down-operator
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-down-monitoring
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: nodepool
+      value: ai-ml-monitoring-24xlarge
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    runAfter:
+    - load-aiml-multiple-fine-tuning
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-down-monitoring
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    - name: nodepool
+      value: ai-ml-monitoring-24xlarge
+    runAfter:
+    - scale-down-monitoring
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  - name: scale-down-titan-pool
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: nodepool
+      value: titan-pool
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    runAfter:
+    - load-aiml-multiple-fine-tuning
+    taskRef:
+      kind: Task
+      name: scale-nodepool
+  - name: wait-for-scale-down-titan-pool
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: replicas
+      value: 0
+    - name: nodepool
+      value: titan-pool
+    runAfter:
+    - scale-down-titan-pool
+    taskRef:
+      kind: Task
+      name: nodepool-replicas-wait
+  finally:
+  - name: teardown
+    retries: 10 # To deal with throttling during deletion
+    params:   
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: service-role-stack-name
+      value: $(params.cluster-name)-service-role
+    - name: node-role-stack-name
+      value: $(params.cluster-name)-node-role
+    - name: launch-template-stack-name
+      value: $(params.cluster-name)-launch-template
+    taskRef:
+      kind: Task
+      name:  awscli-eks-karpenter-cluster-teardown
+  workspaces:
+  - name: source
+  - name: results
+  - name: config

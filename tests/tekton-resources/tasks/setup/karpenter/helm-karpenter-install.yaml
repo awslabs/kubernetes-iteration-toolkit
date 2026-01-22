@@ -78,6 +78,7 @@ spec:
         --set settings.featureGates.reservedCapacity="true" \
         --set settings.featureGates.spotToSpotConsolidation="true" \
         --set settings.featureGates.disableMetricsControllers="true" \
+        --set settings.featureGates.staticCapacity="true" \
         --set settings.preferencePolicy=Ignore \
         --set "serviceAccount.annotations.eks\.amazonaws\.com/role-arn=arn:aws:iam::$(params.aws-account-id):role/KarpenterControllerRole-$(params.cluster-name)" \
         --set controller.resources.requests.cpu=60 \

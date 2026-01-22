@@ -1,0 +1,153 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: sustained-scheduler-throughput
+  namespace: scalability
+spec:
+  description: "clusterloader2 task to run various types of cl2 tests on a given cluster."
+  params:
+  - name: giturl
+    description: "git url to clone the package"
+    default: https://github.com/kubernetes/perf-tests.git
+  - name: kiturl
+    description: "git url to clone for kit assets"
+    default: https://github.com/awslabs/kubernetes-iteration-toolkit
+  - name: cl2-throughput-pods
+    description: "scheduler throughput number of pods"
+    default: "8000"
+  - name: cl2-throughput-threshold
+    description: "scheduler throughput threshold"
+    default: "150"
+  - name: cl2-default-qps
+    description: "pods scheduler default qps"
+    default: "170"
+  - name: cl2-default-burst
+    description: "pods scheduler default burst qps"
+    default: "170"
+  - name: cl2-uniform-qps
+    description: "pods scheduler uniform qps"
+    default: "170"
+  - name: nodes
+    description: "number of dataplane nodes to run the load test against"
+    default: "1000"
+  - name: results-bucket
+    description: "Results bucket with path of s3 to upload results"
+  - name: region
+    default: "us-west-2"
+    description: The region where the cluster is in.
+  - name: cluster-name
+    description: The name of the EKS cluster you want to spin.
+  - name: control-plane-tier
+    default: "standard"
+  - name: iterations
+    default: 3
+    description: "number of iterations to run the throughput test for different tiers"
+  results:
+    - name: datapoint
+      description: Stores the CL2 result that can be consumed by other tasks (e.g. cloudwatch) 
+    - name: s3_result
+      description: Stores the S3 result path after compute
+  workspaces:
+  - name: source
+    mountPath: /src/k8s.io/
+  - name: results
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+  - name: git-clone      
+    image: alpine/git
+    workingDir: $(workspaces.source.path)
+    script: |
+      git clone $(params.kiturl)
+
+      git clone $(params.giturl)
+      cd $(workspaces.source.path)/perf-tests/
+      git fetch origin --verbose --tags
+      git branch
+  - name: prepare-loadtest
+    image: golang:1.24
+    workingDir: $(workspaces.source.path)
+    script: |
+      S3_RESULT_PATH=$(params.results-bucket)
+      echo $S3_RESULT_PATH > $(results.s3_result.path)
+      echo "S3 Path: $S3_RESULT_PATH" 
+      cat > "$(workspaces.source.path)/overrides.yaml" <<EOL
+      CL2_SCHEDULER_THROUGHPUT_PODS: $(params.cl2-throughput-pods)
+      CL2_DEFAULT_QPS: $(params.cl2-default-qps)
+      CL2_DEFAULT_BURST: $(params.cl2-default-burst)
+      CL2_UNIFORM_QPS: $(params.cl2-uniform-qps)
+      CL2_SCHEDULER_THROUGHPUT_THRESHOLD: $(params.cl2-throughput-threshold)
+      EOL
+
+      cat $(workspaces.source.path)/overrides.yaml
+      cp $(workspaces.source.path)/overrides.yaml $(workspaces.results.path)/overrides.yaml
+      
+      # Building clusterloader2 binary 
+      cd $(workspaces.source.path)/perf-tests/clusterloader2/
+      GOOS=linux CGO_ENABLED=0  go build -v -o ./clusterloader ./cmd
+  - name: run-loadtest
+    image: alpine/k8s:1.30.2
+    onError: continue
+    script: |
+      #!/bin/bash
+
+      TIER=$(params.control-plane-tier)
+      ITERATIONS=$(params.iterations)
+
+      cat $(workspaces.source.path)/kubernetes-iteration-toolkit/tests/assets/sustained-throughput/config.yaml
+      cd $(workspaces.source.path)/perf-tests/clusterloader2/
+
+      FAIL_COUNT=0
+      for ((i=1; i<=ITERATIONS; i++)); do
+        echo "--- Starting iteration $i of $ITERATIONS ---"
+
+        ENABLE_EXEC_SERVICE=false ./clusterloader --kubeconfig=$KUBECONFIG --testconfig=$(workspaces.source.path)/kubernetes-iteration-toolkit/tests/assets/sustained-throughput/config.yaml --testoverrides=$(workspaces.source.path)/overrides.yaml --nodes=$(params.nodes) --provider=eks --report-dir=$(workspaces.results.path) --alsologtostderr --v=2
+
+        if [ $? -ne 0 ]; then
+          echo "Iteration $i failed."
+          ((FAIL_COUNT++))
+        else
+          echo "Iteration $i passed."
+        fi
+      done
+
+      FAILURE_RATE=$(( (FAIL_COUNT * 100) / ITERATIONS ))
+
+      echo "------------------------------------------"
+      echo "Total Iterations: $ITERATIONS"
+      echo "Total Failures:   $FAIL_COUNT"
+      echo "Failure Rate:     $FAILURE_RATE%"
+      echo "------------------------------------------"
+
+      exit_code=0
+      if [ "$FAILURE_RATE" -gt 0 ]; then
+        echo "Error: Failure rate ($FAILURE_RATE%) exceeded the 0% threshold."
+        exit_code=1
+      else
+        echo "Success: Failure rate ($FAILURE_RATE%) is within acceptable limits."
+        exit_code=0
+      fi
+
+      if [ $exit_code -eq 0 ]; then
+        echo "0" | tee $(results.datapoint.path)
+      else
+        echo "1" | tee $(results.datapoint.path)
+      fi
+
+      exit $exit_code
+    timeout: 6h
+  - name: upload-results
+    image: amazon/aws-cli
+    workingDir: $(workspaces.results.path)
+    script: |
+      S3_RESULT_PATH=$(cat $(results.s3_result.path))
+      echo "S3 Path: $S3_RESULT_PATH" 
+      aws sts get-caller-identity
+      # we expect to see all files from loadtest that clusterloader2 outputs here in this dir
+      ls -larth
+      # aws s3 cp . s3://$S3_RESULT_PATH/  --recursive

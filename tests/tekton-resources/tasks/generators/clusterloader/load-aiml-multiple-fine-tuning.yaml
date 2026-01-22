@@ -176,7 +176,7 @@ spec:
       cd $(workspaces.source.path)/perf-tests/clusterloader2/
       GOOS=linux CGO_ENABLED=0 go build -v -o ./clusterloader ./cmd
   - name: bootstrap-pod-identity
-    image: amazon/aws-cli
+    image: alpine/k8s:1.33.5
     script: |
       #!/bin/bash
       set -euo pipefail
@@ -193,33 +193,15 @@ spec:
       CLOUDWATCH_MANAGED_POLICY_ARN="arn:aws:iam::aws:policy/CloudWatchFullAccess"
       PIA_ROLE_NAME=$(params.cluster-name)-pia-role
       
-      # Create trust policy document
-      cat > /tmp/pia-trust-policy.json <<EOL
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Principal": {
-              "Federated": "arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):oidc-provider/$(aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||')"
-            },
-            "Action": "sts:AssumeRoleWithWebIdentity",
-            "Condition": {
-              "StringEquals": {
-                "$(aws eks describe-cluster --name $(params.cluster-name) --region $(params.region) --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||'):sub": "system:serviceaccount:\${namespace}:default"
-              }
-            }
-          }
-        ]
-      }
-      EOL
+      TRUST_POLICY_FILE="/tmp/pia-trust-policy.json"
+      curl -s https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks-pod-identity/pia-trust-policy.json -o $TRUST_POLICY_FILE
       
       # Check if the IAM role already exists
       if aws iam get-role --role-name $PIA_ROLE_NAME &>/dev/null; then
         echo "IAM role $PIA_ROLE_NAME already exists, skipping creation."
       else
         echo "Creating IAM role $PIA_ROLE_NAME..."
-        aws iam create-role --role-name $PIA_ROLE_NAME --assume-role-policy-document file:///tmp/pia-trust-policy.json
+        aws iam create-role --role-name $PIA_ROLE_NAME --assume-role-policy-document file://$TRUST_POLICY_FILE
       fi
       
       # Attach policies (idempotent)
@@ -290,6 +272,13 @@ spec:
       echo "Completions per Job: $(params.completions-per-job)"
       echo "Batch size (initial parallelism): $(params.batch-size)"
       echo "Total pods to create: $(( $(params.jobs-count) * $(params.completions-per-job) ))"
+      
+      # Validate that completions-per-job >= batch-size to avoid template errors
+      if [ "$(params.completions-per-job)" -lt "$(params.batch-size)" ]; then
+        echo "ERROR: completions-per-job ($(params.completions-per-job)) must be >= batch-size ($(params.batch-size))" >&2
+        echo "The config template requires at least one batch to be created before scaling." >&2
+        exit 1
+      fi
       
       # Prepare AI/ML load test config
       mkdir -p $(workspaces.source.path)/perf-tests/clusterloader2/testing/aws-mock-aiml-application-jobs

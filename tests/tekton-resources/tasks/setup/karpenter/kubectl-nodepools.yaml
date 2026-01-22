@@ -17,6 +17,10 @@ spec:
     default: us-west-2
   - name: karpenter-nodepool-url
     description: URL of the nodepool YAML template to download and customize
+  - default: ''
+    description: Comma-separated key=value pairs to annotate the nodepool (e.g., "key1=value1,key2=value2")
+    name: annotations
+    type: string
   workspaces:
   - name: source
     mountPath: /src/karpenter/
@@ -50,6 +54,23 @@ spec:
       echo "----------------------------------------"
       cat $(workspaces.source.path)nodepool.yaml
       echo "----------------------------------------"
+
+      # Annotate the template if annotations are provided
+      ANNOTATIONS="$(params.annotations)"
+      if [ -n "$ANNOTATIONS" ]; then
+        echo "[INFO] Applying annotations: $ANNOTATIONS"
+        echo "$ANNOTATIONS" | tr ',' '\n' | while IFS='=' read -r key value; do
+          yq eval ".spec.template.metadata.annotations.\"$key\" = \"$value\"" -i $(workspaces.source.path)nodepool.yaml
+        done
+        echo "[INFO] Annotations applied successfully"
+
+        # Display the template after applying annotations
+        echo ""
+        echo "[INFO] Nodepool template content after annotations:"
+        echo "----------------------------------------"
+        cat $(workspaces.source.path)nodepool.yaml
+        echo "----------------------------------------"
+      fi
 
       # Discover availability zones and create nodepools
       echo ""

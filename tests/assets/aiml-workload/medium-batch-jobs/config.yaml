@@ -60,7 +60,7 @@ steps:
     tuningSet: JobCreationQPS
     objectBundle:
     - basename: aiml-training-job
-      objectTemplatePath: job-with-fsx.yaml
+      objectTemplatePath: job-w-fsx.yaml
       templateFillMap:
         Group: aiml-training-job
         Completions: {{$COMPLETIONS_PER_JOB}}
@@ -83,7 +83,7 @@ steps:
     tuningSet: ScalingQPS
     objectBundle:
     - basename: aiml-training-job
-      objectTemplatePath: job-with-fsx.yaml
+      objectTemplatePath: job-w-fsx.yaml
       updateFromTemplate: true
       templateFillMap:
         Group: aiml-training-job
