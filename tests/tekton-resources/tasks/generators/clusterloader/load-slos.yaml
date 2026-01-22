@@ -9,7 +9,7 @@ spec:
   params:
   - name: giturl
     description: "git url to clone the package"
-    default: https://github.com/mengqiy/perf-tests.git
+    default: https://github.com/kubernetes/perf-tests.git
   - name: cl2-branch
     description: "The branch of clusterloader2 you want to use"
     default: "master"
