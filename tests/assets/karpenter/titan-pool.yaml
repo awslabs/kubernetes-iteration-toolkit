@@ -34,6 +34,7 @@ spec:
         values:
         - on-demand
       - key: karpenter.k8s.aws/instance-size
+        minValues: 4
         operator: In
         values:
         - large
@@ -41,6 +42,7 @@ spec:
         - 2xlarge
         - 4xlarge
       - key: karpenter.k8s.aws/instance-family
+        minValues: 33
         operator: In
         values:
         - c5
