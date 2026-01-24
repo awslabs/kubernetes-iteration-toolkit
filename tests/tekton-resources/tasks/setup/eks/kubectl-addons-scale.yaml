@@ -1,0 +1,74 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: scale-addons
+  namespace: scalability
+spec:
+  description: |
+    Optionally scales CoreDNS, EBS CSI Controller, and Karpenter deployments to the specified number of replicas.
+    This task configures kubectl access to the EKS cluster and scales only the deployments for which replica counts are provided.
+    Waits for the scaling operations to complete.
+  params:
+  - name: coredns-replicas
+    description: Number of replicas to scale CoreDNS to (optional, skipped if empty)
+    default: ""
+  - name: ebs-csi-replicas
+    description: Number of replicas to scale EBS CSI Controller to (optional, skipped if empty)
+    default: ""
+  - name: karpenter-replicas
+    description: Number of replicas to scale Karpenter to (optional, skipped if empty)
+    default: ""
+  - name: cluster-name
+    description: The name of the EKS cluster
+  - name: endpoint
+    description: EKS cluster endpoint URL (optional)
+    default: ""
+  - name: aws-region
+    description: AWS region where the cluster is located
+    default: "us-west-2"
+  - name: timeout
+    description: Timeout for rollout status in seconds
+    default: "1800"
+  workspaces:
+  - name: config
+    mountPath: /config/
+  stepTemplate:
+    env:
+    - name: KUBECONFIG
+      value: /config/kubeconfig
+  steps:
+  - name: update-kubeconfig
+    image: alpine/k8s:1.35.0
+    script: |
+      ENDPOINT_FLAG=""
+      if [ -n "$(params.endpoint)" ]; then
+        ENDPOINT_FLAG="--endpoint $(params.endpoint)"
+      fi
+      aws eks $ENDPOINT_FLAG update-kubeconfig --name $(params.cluster-name) --region $(params.aws-region)
+  - name: scale-coredns
+    image: alpine/k8s:1.35.0
+    script: |
+      if [ -n "$(params.coredns-replicas)" ]; then
+        kubectl scale deployment coredns -n kube-system --replicas=$(params.coredns-replicas)
+        kubectl rollout status deployment/coredns -n kube-system --timeout=$(params.timeout)s
+      else
+        echo "Skipping CoreDNS scaling (coredns-replicas not provided)"
+      fi
+  - name: scale-ebs-csi-controller
+    image: alpine/k8s:1.35.0
+    script: |
+      if [ -n "$(params.ebs-csi-replicas)" ]; then
+        kubectl scale deployment ebs-csi-controller -n kube-system --replicas=$(params.ebs-csi-replicas)
+        kubectl rollout status deployment/ebs-csi-controller -n kube-system --timeout=$(params.timeout)s
+      else
+        echo "Skipping EBS CSI Controller scaling (ebs-csi-replicas not provided)"
+      fi
+  - name: scale-karpenter
+    image: alpine/k8s:1.35.0
+    script: |
+      if [ -n "$(params.karpenter-replicas)" ]; then
+        kubectl scale deployment karpenter -n karpenter --replicas=$(params.karpenter-replicas)
+        echo "Karpenter scaled to $(params.karpenter-replicas) replicas"
+      else
+        echo "Skipping Karpenter scaling (karpenter-replicas not provided)"
+      fi
