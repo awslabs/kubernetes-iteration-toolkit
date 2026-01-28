@@ -48,8 +48,6 @@ spec:
   - default: https://raw.githubusercontent.com/awslabs/kubernetes-iteration-toolkit/main/tests/assets/eks_node_role.json
     name: node-role-cfn-url
     type: string
-  - name: manifest-id
-    type: string
   - default: ""
     name: eksadm-s3-path
     type: string
@@ -194,8 +192,6 @@ spec:
       value: $(params.endpoint)
     - name: vpc-stack-name
       value: $(params.cluster-name)
-    - name: manifest-id
-      value: $(params.manifest-id)
     - name: eksadm-s3-path
       value: $(params.eksadm-s3-path)
     - name: kubernetes-version
@@ -602,6 +598,24 @@ spec:
     taskRef:
       kind: Task
       name: load-aiml-multiple-fine-tuning
+  - name: scale-down-addons
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: coredns-replicas
+      value: 0
+    - name: ebs-csi-replicas
+      value: 0
+    - name: endpoint
+      value: $(params.endpoint)
+    runAfter:
+    - load-aiml-multiple-fine-tuning
+    taskRef:
+      kind: Task
+      name: scale-addons
+    workspaces:
+    - name: config
+      workspace: config
   - name: scale-down-training
     params:
     - name: cluster-name
@@ -613,7 +627,7 @@ spec:
     - name: replicas
       value: 0
     runAfter:
-    - load-aiml-multiple-fine-tuning
+    - scale-down-addons
     taskRef:
       kind: Task
       name: scale-nodepool
@@ -643,7 +657,7 @@ spec:
     - name: replicas
       value: 0
     runAfter:
-    - load-aiml-multiple-fine-tuning
+    - scale-down-addons
     taskRef:
       kind: Task
       name: scale-nodepool
@@ -673,7 +687,7 @@ spec:
     - name: replicas
       value: 0
     runAfter:
-    - load-aiml-multiple-fine-tuning
+    - scale-down-addons
     taskRef:
       kind: Task
       name: scale-nodepool
@@ -703,7 +717,7 @@ spec:
     - name: replicas
       value: 0
     runAfter:
-    - load-aiml-multiple-fine-tuning
+    - scale-down-addons
     taskRef:
       kind: Task
       name: scale-nodepool
@@ -733,7 +747,7 @@ spec:
     - name: replicas
       value: 0
     runAfter:
-    - load-aiml-multiple-fine-tuning
+    - scale-down-addons
     taskRef:
       kind: Task
       name: scale-nodepool
@@ -752,6 +766,26 @@ spec:
     taskRef:
       kind: Task
       name: nodepool-replicas-wait
+  - name: stop-karpenter-logs
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: endpoint
+      value: $(params.endpoint)
+    - name: karpenter-replicas
+      value: "0"
+    runAfter:
+    - wait-for-scale-down-training
+    - wait-for-scale-down-inference
+    - wait-for-scale-down-operator
+    - wait-for-scale-down-monitoring
+    - wait-for-scale-down-titan-pool
+    taskRef:
+      kind: Task
+      name: scale-addons
+    workspaces:
+    - name: config
+      workspace: config
   finally:
   - name: teardown
     retries: 10 # To deal with throttling during deletion
