@@ -109,6 +109,9 @@ spec:
     default: ""
     description: "Launch template ImageId value, which may be an AMI ID or resolve:ssm reference. By default resolve to the lates AL2023 ami for cluster version"
     type: string
+  - name: aws-ebs-csi-driver-version
+    default: release-1.53
+    description: The release version for aws ebs csi driver.
   tasks:
   - name: slack-notification
     params:
@@ -166,6 +169,8 @@ spec:
       value: $(params.cluster-name)
     - name: kubernetes-version
       value: $(params.kubernetes-version)
+    - name: aws-ebs-csi-driver-version
+      value: $(params.aws-ebs-csi-driver-version)
     retries: 3
     runAfter:
     - create-cluster-node-role
